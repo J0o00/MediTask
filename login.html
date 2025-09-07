@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Meditask</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
+    <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-8">
+        <h1 class="text-3xl font-bold text-teal-400 mb-2 text-center">Welcome Back</h1>
+        <p class="text-gray-400 mb-8 text-center">Please log in to your account.</p>
+        <form id="login-form" class="space-y-6">
+            <input type="email" id="login-email" placeholder="Email"
+                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
+                required>
+            <input type="password" id="login-password" placeholder="Password"
+                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
+                required>
+            <button type="submit"
+                class="w-full bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg transition-transform transform hover:scale-105">Login</button>
+            <p id="login-error" class="text-red-400 text-center h-5"></p>
+        </form>
+        <p class="text-center text-gray-400 mt-6">
+            Don't have an account? <a href="./signup.html" class="font-semibold text-teal-400 hover:underline">Sign
+                Up</a>
+        </p>
+    </div>
+    <script type="module">
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwqiEYkycDoxGdovRwvlXjCFscUKU6Xr8",
+            authDomain: "meditask-webapp.firebaseapp.com",
+            projectId: "meditask-webapp",
+            storageBucket: "meditask-webapp.appspot.com",
+            messagingSenderId: "550925294842",
+            appId: "1:550925294842:web:ca3b6a004801ccf635bd43"
+        };
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // If already logged in, send to the correct dashboard directly.
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) return;
+            try {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists()) {
+                    const { role } = userDoc.data();
+                    if (role === 'patient') {
+                        window.location.replace('./patient-dashboard.html');
+                    } else if (role === 'doctor') {
+                        window.location.replace('./doctor-dashboard.html');
+                    } else {
+                        // Unknown role: keep user on login to allow sign out or fixing account
+                    }
+                }
+            } catch (e) {
+                // On error, stay on login page
+            }
+        });
+
+        const loginForm = document.getElementById('login-form');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById('login-error');
+            errorEl.textContent = '';
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(error => {
+                    errorEl.textContent = error.message.replace('Firebase: ', '');
+                });
+        });
+    </script>
+</body>
+
+</html>

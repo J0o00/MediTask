@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Dashboard - Meditask</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .loader {
+            border: 4px solid #4a5568;
+            border-top: 4px solid #4fd1c5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
+    <div id="app-container" class="w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-teal-400">Meditask 🏋️‍♂️</h1>
+            <button id="logout-btn"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Logout</button>
+        </header>
+
+        <main id="main-content" class="hidden">
+            <h2 class="text-xl md:text-2xl font-semibold mb-4">Patient Dashboard</h2>
+            <p class="mb-4 text-gray-400">Perform the "Right Hand Raise" exercise. Ensure your upper body is visible.
+            </p>
+            <div class="bg-gray-700 p-4 rounded-xl">
+                <div
+                    class="relative w-full aspect-video rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                    <video id="webcam" class="w-full h-full object-cover transform -scale-x-100" autoplay
+                        playsinline></video>
+                    <canvas id="pose-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                </div>
+                <div id="feedback-box"
+                    class="mt-4 text-center text-xl font-bold p-4 rounded-lg bg-gray-800 transition-colors">
+                    Initializing Camera...
+                </div>
+            </div>
+        </main>
+
+        <div id="loading-view" class="text-center py-16">
+            <div class="loader mx-auto"></div>
+            <p class="mt-4 text-gray-400">Authenticating...</p>
+        </div>
+    </div>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <script type="module">
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwqiEYkycDoxGdovRwvlXjCFscUKU6Xr8",
+            authDomain: "meditask-webapp.firebaseapp.com",
+            projectId: "meditask-webapp",
+            storageBucket: "meditask-webapp.appspot.com",
+            messagingSenderId: "550925294842",
+            appId: "1:550925294842:web:ca3b6a004801ccf635bd43"
+        };
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const mainContent = document.getElementById('main-content');
+        const loadingView = document.getElementById('loading-view');
+
+        let video, canvasCtx, canvasElement, pose, cameraInstance;
+        let isCameraActive = false;
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                window.location.replace('login.html');
+                return;
+            }
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (!userDoc.exists() || userDoc.data().role !== 'patient') {
+                await signOut(auth);
+                window.location.replace('login.html');
+            } else {
+                loadingView.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                initPatientView();
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            cleanupPatientView();
+            signOut(auth);
+        });
+
+        async function initPatientView() {
+            if (isCameraActive) return;
+            isCameraActive = true;
+            video = document.getElementById('webcam');
+            canvasElement = document.getElementById('pose-canvas');
+            canvasCtx = canvasElement.getContext('2d');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' } });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvasElement.width = video.videoWidth;
+                    canvasElement.height = video.videoHeight;
+                    pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+                    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+                    pose.onResults(onPoseResults);
+                    cameraInstance = new Camera(video, {
+                        onFrame: async () => { if (video.readyState >= 3) await pose.send({ image: video }); },
+                        width: 1280, height: 720
+                    });
+                    cameraInstance.start();
+                };
+            } catch (err) { document.getElementById('feedback-box').textContent = `Error: ${err.message}`; }
+        }
+
+        function cleanupPatientView() {
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            if (cameraInstance) { cameraInstance.stop(); cameraInstance = null; }
+            if (pose) { pose.close(); pose = null; }
+            isCameraActive = false;
+        }
+
+        let lastFeedback = "";
+        async function onPoseResults(results) {
+            if (!isCameraActive) return;
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            const feedbackBox = document.getElementById('feedback-box');
+            if (results.poseLandmarks && results.poseLandmarks.length > 0) {
+                const landmarks = results.poseLandmarks;
+                const rightShoulder = landmarks[12], rightWrist = landmarks[16];
+                let currentFeedback = "", isCorrect = false;
+                if (rightShoulder.visibility > 0.5 && rightWrist.visibility > 0.5) {
+                    if (rightWrist.y < rightShoulder.y) {
+                        currentFeedback = "✅ Right hand raised correctly"; isCorrect = true;
+                        feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-green-800 text-green-200 transition-colors";
+                    } else {
+                        currentFeedback = "⬆️ Raise your right hand higher"; isCorrect = false;
+                        feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-yellow-800 text-yellow-200 transition-colors";
+                    }
+                } else {
+                    currentFeedback = "Body not fully visible.";
+                    feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-red-800 text-red-200 transition-colors";
+                }
+                feedbackBox.textContent = currentFeedback;
+                if (currentFeedback !== lastFeedback) {
+                    lastFeedback = currentFeedback;
+                    const user = auth.currentUser;
+                    if (user) addDoc(collection(db, "exercise_logs"), {
+                        patientId: user.uid, patientEmail: user.email,
+                        exercise: "Right Hand Raise", feedback: currentFeedback,
+                        isCorrect: isCorrect, timestamp: serverTimestamp()
+                    }).catch(e => console.error("Error writing document: ", e));
+                }
+                drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, { color: '#4ade80', lineWidth: 4 });
+                drawLandmarks(canvasCtx, landmarks, { color: '#f87171', lineWidth: 2, radius: 5 });
+            } else {
+                feedbackBox.textContent = "No person detected.";
+                feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-gray-800 transition-colors";
+            }
+            canvasCtx.restore();
+        }
+    </script>
+</body>
+
+</html>

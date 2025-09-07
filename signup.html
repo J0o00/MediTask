@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Meditask</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
+    <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-8">
+        <h1 class="text-3xl font-bold text-teal-400 mb-2 text-center">Create an Account</h1>
+        <p class="text-gray-400 mb-8 text-center">Join Meditask to start your recovery journey.</p>
+        <form id="signup-form" class="space-y-6">
+            <input type="email" id="signup-email" placeholder="Email"
+                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
+                required>
+            <input type="password" id="signup-password" placeholder="Password (min. 6 characters)"
+                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
+                required>
+            <select id="signup-role"
+                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <option value="patient">I am a Patient</option>
+                <option value="doctor">I am a Doctor</option>
+            </select>
+            <button type="submit"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-transform transform hover:scale-105">Create
+                Account</button>
+            <p id="signup-error" class="text-red-400 text-center h-5"></p>
+        </form>
+        <p class="text-center text-gray-400 mt-6">
+            Already have an account? <a href="./login.html"
+                class="font-semibold text-teal-400 hover:underline">Login</a>
+        </p>
+    </div>
+    <script type="module">
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwqiEYkycDoxGdovRwvlXjCFscUKU6Xr8",
+            authDomain: "meditask-webapp.firebaseapp.com",
+            projectId: "meditask-webapp",
+            storageBucket: "meditask-webapp.appspot.com",
+            messagingSenderId: "550925294842",
+            appId: "1:550925294842:web:ca3b6a004801ccf635bd43"
+        };
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) return;
+            try {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists()) {
+                    const { role } = userDoc.data();
+                    if (role === 'patient') {
+                        window.location.replace('./patient-dashboard.html');
+                    } else if (role === 'doctor') {
+                        window.location.replace('./doctor-dashboard.html');
+                    }
+                }
+            } catch (e) {
+                // stay on signup
+            }
+        });
+
+        const signupForm = document.getElementById('signup-form');
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById('signup-error');
+            errorEl.textContent = '';
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const role = document.getElementById('signup-role').value;
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, "users", userCredential.user.uid), {
+                    email: userCredential.user.email,
+                    role: role,
+                    uid: userCredential.user.uid
+                });
+            } catch (error) {
+                errorEl.textContent = error.message.replace('Firebase: ', '');
+            }
+        });
+    </script>
+</body>
+
+</html>
