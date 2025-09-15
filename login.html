@@ -58,15 +58,18 @@
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
                     const { role } = userDoc.data();
-                    if (role === 'patient') {
+                    const normalizedRole = (role || '').toString().trim().toLowerCase();
+                    if (normalizedRole === 'patient') {
                         window.location.replace('./patient-dashboard.html');
-                    } else if (role === 'doctor') {
+                        return;
+                    } else if (normalizedRole === 'doctor') {
                         window.location.replace('./doctor-dashboard.html');
-                    } else {
-                        // Unknown role: keep user on login to allow sign out or fixing account
+                        return;
                     }
+                    // Unknown role: keep user on login
                 }
             } catch (e) {
+                console.error('Login auth check error:', e);
                 // On error, stay on login page
             }
         });
@@ -79,6 +82,25 @@
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             signInWithEmailAndPassword(auth, email, password)
+                .then(async ({ user }) => {
+                    try {
+                        const userDoc = await getDoc(doc(db, "users", user.uid));
+                        if (!userDoc.exists()) {
+                            errorEl.textContent = 'No role set for this account. Please sign up again.';
+                            return;
+                        }
+                        const normalizedRole = (userDoc.data().role || '').toString().trim().toLowerCase();
+                        if (normalizedRole === 'doctor') {
+                            window.location.replace('./doctor-dashboard.html');
+                        } else if (normalizedRole === 'patient') {
+                            window.location.replace('./patient-dashboard.html');
+                        } else {
+                            errorEl.textContent = 'Unknown role. Please contact support or sign up again.';
+                        }
+                    } catch (e) {
+                        errorEl.textContent = 'Error loading account role. Try again.';
+                    }
+                })
                 .catch(error => {
                     errorEl.textContent = error.message.replace('Firebase: ', '');
                 });

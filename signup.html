@@ -65,11 +65,14 @@
                     const { role } = userDoc.data();
                     if (role === 'patient') {
                         window.location.replace('./patient-dashboard.html');
+                        return;
                     } else if (role === 'doctor') {
                         window.location.replace('./doctor-dashboard.html');
+                        return;
                     }
                 }
             } catch (e) {
+                console.error('Signup auth check error:', e);
                 // stay on signup
             }
         });

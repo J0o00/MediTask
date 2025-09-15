@@ -43,6 +43,7 @@
     <div id="action-view" class="hidden text-center max-w-lg mx-auto bg-gray-800 p-10 rounded-2xl">
         <h1 class="text-4xl font-bold text-teal-400 mb-4">Welcome to Meditask</h1>
         <p class="text-gray-300 mb-8 text-lg">Your AI-powered guide to rehabilitation and wellness.</p>
+        <div id="error-box" class="hidden mb-6 p-3 rounded-lg text-sm bg-red-900 text-red-200"></div>
         <div class="flex justify-center gap-4">
             <a href="./login.html"
                 class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105">Login</a>
@@ -74,27 +75,52 @@
         const actionView = document.getElementById('action-view');
 
         onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // User is signed in, check their role and redirect
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists()) {
-                    const { role } = userDoc.data();
-                    if (role === 'patient') {
-                        window.location.replace('./patient-dashboard.html');
-                    } else if (role === 'doctor') {
-                        window.location.replace('./doctor-dashboard.html');
-                    } else {
-                        // If role is unknown, show action buttons
-                        loadingView.classList.add('hidden');
-                        actionView.classList.remove('hidden');
+            try {
+                if (user) {
+                    // User is signed in, check their role and redirect
+                    const userDoc = await getDoc(doc(db, "users", user.uid));
+                    if (userDoc.exists()) {
+                        const { role } = userDoc.data();
+                        const normalizedRole = (role || '').toString().trim().toLowerCase();
+                        if (normalizedRole === 'patient') {
+                            window.location.replace('./patient-dashboard.html');
+                            return;
+                        } else if (normalizedRole === 'doctor') {
+                            window.location.replace('./doctor-dashboard.html');
+                            return;
+                        }
                     }
-                } else {
-                    // User exists in Auth but not in Firestore, show actions
+                    // If role is unknown or user doesn't exist in Firestore, show action buttons
                     loadingView.classList.add('hidden');
                     actionView.classList.remove('hidden');
+                    const errorBox = document.getElementById('error-box');
+                    errorBox.textContent = 'Your account is missing a role. Please sign out and sign up again to set your role.';
+                    errorBox.classList.remove('hidden');
+                } else {
+                    // No user is signed in, show login/signup actions
+                    loadingView.classList.add('hidden');
+                    actionView.classList.remove('hidden');
+                    const params = new URLSearchParams(window.location.search);
+                    const err = params.get('err');
+                    if (err) {
+                        const errorBox = document.getElementById('error-box');
+                        let msg = '';
+                        if (err === 'notLoggedIn') msg = 'Please log in to continue.';
+                        else if (err === 'notDoctor') msg = 'Access denied: doctor account required.';
+                        else if (err === 'authError') msg = 'Authentication error. Please try again.';
+                        if (msg) {
+                            errorBox.textContent = msg;
+                            errorBox.classList.remove('hidden');
+                        }
+                        // Clean URL
+                        const url = new URL(window.location);
+                        url.searchParams.delete('err');
+                        window.history.replaceState({}, '', url);
+                    }
                 }
-            } else {
-                // No user is signed in, show login/signup actions
+            } catch (error) {
+                console.error('Auth state change error:', error);
+                // On error, show action buttons
                 loadingView.classList.add('hidden');
                 actionView.classList.remove('hidden');
             }

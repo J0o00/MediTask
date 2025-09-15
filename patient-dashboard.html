@@ -1,6 +1,4 @@
-<!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,10 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-
+        body { font-family: 'Inter', sans-serif; }
         .loader {
             border: 4px solid #4a5568;
             border-top: 4px solid #4fd1c5;
@@ -20,19 +15,12 @@
             height: 40px;
             animation: spin 1s linear infinite;
         }
-
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
     <div id="app-container" class="w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
         <header class="flex justify-between items-center mb-8">
@@ -41,35 +29,71 @@
                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Logout</button>
         </header>
 
-        <main id="main-content" class="hidden">
+        <main id="main-content">
             <h2 class="text-xl md:text-2xl font-semibold mb-4">Patient Dashboard</h2>
-            <p class="mb-4 text-gray-400">Perform the "Right Hand Raise" exercise. Ensure your upper body is visible.
-            </p>
-            <div class="bg-gray-700 p-4 rounded-xl">
-                <div
-                    class="relative w-full aspect-video rounded-lg overflow-hidden bg-black flex items-center justify-center">
-                    <video id="webcam" class="w-full h-full object-cover transform -scale-x-100" autoplay
-                        playsinline></video>
-                    <canvas id="pose-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+            
+            <!-- Prescription List View -->
+            <div id="prescription-list-view">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Your Prescribed Exercises</h3>
+                    <div id="prescription-loading" class="text-gray-400">Loading prescriptions...</div>
                 </div>
-                <div id="feedback-box"
-                    class="mt-4 text-center text-xl font-bold p-4 rounded-lg bg-gray-800 transition-colors">
-                    Initializing Camera...
+                <div id="prescription-list" class="space-y-3">
+                    <!-- Prescriptions will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Exercise Session View -->
+            <div id="exercise-session-view" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="current-exercise-title" class="text-lg font-semibold">Exercise Session</h3>
+                    <button id="back-to-prescriptions" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">
+                        ← Back to Prescriptions
+                    </button>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Exercise Info Panel -->
+                    <div class="bg-gray-700 p-4 rounded-xl">
+                        <h4 class="font-semibold mb-3">Exercise Details</h4>
+                        <div id="exercise-info" class="space-y-2">
+                            <p><span class="font-medium">Exercise:</span> <span id="exercise-name">-</span></p>
+                            <p><span class="font-medium">Sets:</span> <span id="exercise-sets">-</span></p>
+                            <p><span class="font-medium">Reps per Set:</span> <span id="exercise-reps">-</span></p>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-gray-800 rounded-lg">
+                            <h5 class="font-semibold mb-2">Progress</h5>
+                            <p>Current Set: <span id="current-set">1</span> / <span id="total-sets">-</span></p>
+                            <p>Reps in Current Set: <span id="current-reps">0</span> / <span id="target-reps">-</span></p>
+                            <div class="mt-2">
+                                <div class="w-full bg-gray-600 rounded-full h-2">
+                                    <div id="progress-bar" class="bg-teal-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Camera View -->
+                    <div class="bg-gray-700 p-4 rounded-xl">
+                        <h4 class="font-semibold mb-3">Camera View</h4>
+                        <div class="relative w-full aspect-video rounded-lg overflow-hidden bg-black flex items-center justify-center">
+                            <video id="webcam" class="w-full h-full object-cover transform -scale-x-100" autoplay playsinline></video>
+                            <canvas id="pose-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                        </div>
+                        <div id="feedback-box" class="mt-4 text-center text-xl font-bold p-4 rounded-lg bg-gray-800 transition-colors">
+                            Initializing Camera...
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
 
-        <div id="loading-view" class="text-center py-16">
+        <div id="loading-view" class="text-center py-16 hidden">
             <div class="loader mx-auto"></div>
             <p class="mt-4 text-gray-400">Authenticating...</p>
         </div>
     </div>
-
-    
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
-        crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
     <script type="module">
         const firebaseConfig = {
@@ -83,7 +107,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -91,30 +115,181 @@
 
         const mainContent = document.getElementById('main-content');
         const loadingView = document.getElementById('loading-view');
+        const prescriptionListView = document.getElementById('prescription-list-view');
+        const exerciseSessionView = document.getElementById('exercise-session-view');
 
         let video, canvasCtx, canvasElement, pose, cameraInstance;
         let isCameraActive = false;
+        let currentPrescription = null;
+        let currentSet = 1;
+        let currentReps = 0;
+        let totalReps = 0;
+        let exerciseState = 'idle'; // 'idle', 'up', 'down'
+        let lastRepTime = 0;
+        let repThreshold = 1000; // 1 second between reps
 
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
-                window.location.replace('login.html');
+                window.location.replace('./index.html');
                 return;
             }
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-            if (!userDoc.exists() || userDoc.data().role !== 'patient') {
-                await signOut(auth);
-                window.location.replace('login.html');
-            } else {
+            try {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (!userDoc.exists() || userDoc.data().role !== 'patient') {
+                    window.location.replace('./index.html');
+                    return;
+                }
                 loadingView.classList.add('hidden');
                 mainContent.classList.remove('hidden');
-                initPatientView();
+                await loadPrescriptions();
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.replace('./index.html');
             }
         });
 
         document.getElementById('logout-btn').addEventListener('click', () => {
             cleanupPatientView();
-            signOut(auth);
+            signOut(auth)
+                .then(() => window.location.replace('./index.html'))
+                .catch((e) => console.error('Logout error:', e));
         });
+
+        document.getElementById('back-to-prescriptions').addEventListener('click', () => {
+            showPrescriptionList();
+        });
+
+        async function loadPrescriptions() {
+            const prescriptionList = document.getElementById('prescription-list');
+            const loadingDiv = document.getElementById('prescription-loading');
+            
+            try {
+                // Try to load real prescriptions
+                const user = auth.currentUser;
+                if (user) {
+                    const q = query(collection(db, "prescriptions"), 
+                        where("patientId", "==", user.uid), 
+                        where("isCompleted", "==", false),
+                        orderBy("assignedAt", "desc"));
+                    const querySnapshot = await getDocs(q);
+                    
+                    if (!querySnapshot.empty) {
+                        prescriptionList.innerHTML = '';
+                        querySnapshot.forEach(doc => {
+                            const prescription = { id: doc.id, ...doc.data() };
+                            createPrescriptionCard(prescription);
+                        });
+                        loadingDiv.textContent = `${querySnapshot.size} prescription(s) found`;
+                        return;
+                    }
+                }
+                
+                // Show sample prescriptions if no real ones found
+                showSamplePrescriptions();
+                
+            } catch (error) {
+                console.error('Error loading prescriptions:', error);
+                showSamplePrescriptions();
+            }
+        }
+
+        function showSamplePrescriptions() {
+            const prescriptionList = document.getElementById('prescription-list');
+            const loadingDiv = document.getElementById('prescription-loading');
+            
+            const samplePrescriptions = [
+                { id: 'sample1', exercise: 'Right Hand Raise', sets: 3, reps: 10, assignedAt: new Date() },
+                { id: 'sample2', exercise: 'Shoulder Abduction', sets: 2, reps: 15, assignedAt: new Date() },
+                { id: 'sample3', exercise: 'Squat', sets: 3, reps: 12, assignedAt: new Date() }
+            ];
+            
+            prescriptionList.innerHTML = '';
+            samplePrescriptions.forEach(prescription => {
+                createPrescriptionCard(prescription);
+            });
+            loadingDiv.textContent = 'Showing sample prescriptions';
+        }
+
+        function createPrescriptionCard(prescription) {
+            const prescriptionList = document.getElementById('prescription-list');
+            const card = document.createElement('div');
+            card.className = 'bg-gray-700 p-4 rounded-xl border border-gray-600 hover:border-teal-500 transition-colors';
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h4 class="font-semibold text-lg">${prescription.exercise}</h4>
+                        <p class="text-gray-400">${prescription.sets} sets × ${prescription.reps} reps</p>
+                        <p class="text-sm text-gray-500">Assigned: ${prescription.assignedAt.toLocaleDateString()}</p>
+                    </div>
+                    <button onclick="startExercise('${prescription.id}')" 
+                        class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-2 px-4 rounded-lg">
+                        Start
+                    </button>
+                </div>
+            `;
+            prescriptionList.appendChild(card);
+        }
+
+        function startExercise(prescriptionId) {
+            // Find the prescription
+            const prescriptions = document.querySelectorAll('#prescription-list > div');
+            let prescription = null;
+            
+            // For demo purposes, use sample data
+            const samplePrescriptions = [
+                { id: 'sample1', exercise: 'Right Hand Raise', sets: 3, reps: 10 },
+                { id: 'sample2', exercise: 'Shoulder Abduction', sets: 2, reps: 15 },
+                { id: 'sample3', exercise: 'Squat', sets: 3, reps: 12 }
+            ];
+            
+            prescription = samplePrescriptions.find(p => p.id === prescriptionId);
+            
+            if (!prescription) return;
+            
+            currentPrescription = prescription;
+            currentSet = 1;
+            currentReps = 0;
+            totalReps = 0;
+            exerciseState = 'idle';
+            
+            // Update UI
+            document.getElementById('exercise-name').textContent = prescription.exercise;
+            document.getElementById('exercise-sets').textContent = prescription.sets;
+            document.getElementById('exercise-reps').textContent = prescription.reps;
+            document.getElementById('total-sets').textContent = prescription.sets;
+            document.getElementById('target-reps').textContent = prescription.reps;
+            document.getElementById('current-set').textContent = currentSet;
+            document.getElementById('current-reps').textContent = currentReps;
+            document.getElementById('current-exercise-title').textContent = `${prescription.exercise} - Set ${currentSet}`;
+            
+            updateProgress();
+            
+            // Show exercise session view
+            prescriptionListView.classList.add('hidden');
+            exerciseSessionView.classList.remove('hidden');
+            
+            // Initialize camera
+            initPatientView();
+        }
+
+        function showPrescriptionList() {
+            exerciseSessionView.classList.add('hidden');
+            prescriptionListView.classList.remove('hidden');
+            cleanupPatientView();
+        }
+
+        function updateProgress() {
+            if (!currentPrescription) return;
+            
+            const totalTargetReps = currentPrescription.sets * currentPrescription.reps;
+            const completedReps = (currentSet - 1) * currentPrescription.reps + currentReps;
+            const progress = Math.min((completedReps / totalTargetReps) * 100, 100);
+            
+            const progressBar = document.getElementById('progress-bar');
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+            }
+        }
 
         async function initPatientView() {
             if (isCameraActive) return;
@@ -137,7 +312,9 @@
                     });
                     cameraInstance.start();
                 };
-            } catch (err) { document.getElementById('feedback-box').textContent = `Error: ${err.message}`; }
+            } catch (err) { 
+                document.getElementById('feedback-box').textContent = `Error: ${err.message}`;
+            }
         }
 
         function cleanupPatientView() {
@@ -150,47 +327,187 @@
             isCameraActive = false;
         }
 
-        let lastFeedback = "";
         async function onPoseResults(results) {
-            if (!isCameraActive) return;
+            if (!isCameraActive || !currentPrescription || !canvasCtx || !canvasElement) return;
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             const feedbackBox = document.getElementById('feedback-box');
+            
             if (results.poseLandmarks && results.poseLandmarks.length > 0) {
                 const landmarks = results.poseLandmarks;
-                const rightShoulder = landmarks[12], rightWrist = landmarks[16];
-                let currentFeedback = "", isCorrect = false;
-                if (rightShoulder.visibility > 0.5 && rightWrist.visibility > 0.5) {
-                    if (rightWrist.y < rightShoulder.y) {
-                        currentFeedback = "✅ Right hand raised correctly"; isCorrect = true;
-                        feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-green-800 text-green-200 transition-colors";
-                    } else {
-                        currentFeedback = "⬆️ Raise your right hand higher"; isCorrect = false;
-                        feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-yellow-800 text-yellow-200 transition-colors";
+                let currentFeedback = "";
+                let isCorrect = false;
+                
+                // Analyze based on exercise type
+                switch (currentPrescription.exercise) {
+                    case 'Right Hand Raise':
+                        isCorrect = analyzeHandRaise(landmarks);
+                        break;
+                    case 'Shoulder Abduction':
+                        isCorrect = analyzeShoulderAbduction(landmarks);
+                        break;
+                    case 'Squat':
+                        isCorrect = analyzeSquat(landmarks);
+                        break;
+                }
+                
+                if (isCorrect) {
+                    const now = Date.now();
+                    if (now - lastRepTime > repThreshold) {
+                        currentReps++;
+                        totalReps++;
+                        lastRepTime = now;
+                        
+                        if (currentReps >= currentPrescription.reps) {
+                            // Set completed
+                            currentSet++;
+                            currentReps = 0;
+                            
+                            if (currentSet > currentPrescription.sets) {
+                                // All sets completed
+                                currentFeedback = `🎉 Exercise completed! Total reps: ${totalReps}`;
+                                feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-green-800 text-green-200 transition-colors";
+                                await completeExercise();
+                            } else {
+                                currentFeedback = `✅ Set ${currentSet - 1} completed! Start set ${currentSet}`;
+                                feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-blue-800 text-blue-200 transition-colors";
+                                document.getElementById('current-set').textContent = currentSet;
+                                document.getElementById('current-exercise-title').textContent = `${currentPrescription.exercise} - Set ${currentSet}`;
+                            }
+                        } else {
+                            currentFeedback = `✅ Rep ${currentReps}/${currentPrescription.reps} - Set ${currentSet}`;
+                            feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-green-800 text-green-200 transition-colors";
+                        }
+                        
+                        document.getElementById('current-reps').textContent = currentReps;
+                        updateProgress();
+                        
+                        // Log the rep
+                        await logRep();
                     }
                 } else {
-                    currentFeedback = "Body not fully visible.";
-                    feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-red-800 text-red-200 transition-colors";
+                    currentFeedback = getExerciseInstruction();
+                    feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-yellow-800 text-yellow-200 transition-colors";
                 }
+                
                 feedbackBox.textContent = currentFeedback;
-                if (currentFeedback !== lastFeedback) {
-                    lastFeedback = currentFeedback;
-                    const user = auth.currentUser;
-                    if (user) addDoc(collection(db, "exercise_logs"), {
-                        patientId: user.uid, patientEmail: user.email,
-                        exercise: "Right Hand Raise", feedback: currentFeedback,
-                        isCorrect: isCorrect, timestamp: serverTimestamp()
-                    }).catch(e => console.error("Error writing document: ", e));
-                }
                 drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, { color: '#4ade80', lineWidth: 4 });
                 drawLandmarks(canvasCtx, landmarks, { color: '#f87171', lineWidth: 2, radius: 5 });
             } else {
-                feedbackBox.textContent = "No person detected.";
-                feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-gray-800 transition-colors";
+                feedbackBox.textContent = "No person detected. Please position yourself in front of the camera.";
+                feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-red-800 text-red-200 transition-colors";
             }
             canvasCtx.restore();
         }
-    </script>
-</body>
 
+        function analyzeHandRaise(landmarks) {
+            const rightShoulder = landmarks[12];
+            const rightWrist = landmarks[16];
+            return rightShoulder.visibility > 0.5 && rightWrist.visibility > 0.5 && rightWrist.y < rightShoulder.y;
+        }
+
+        function analyzeShoulderAbduction(landmarks) {
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftWrist = landmarks[15];
+            const rightWrist = landmarks[16];
+            
+            const leftRaised = leftShoulder.visibility > 0.5 && leftWrist.visibility > 0.5 && leftWrist.y < leftShoulder.y;
+            const rightRaised = rightShoulder.visibility > 0.5 && rightWrist.visibility > 0.5 && rightWrist.y < rightShoulder.y;
+            
+            return leftRaised && rightRaised;
+        }
+
+        function analyzeSquat(landmarks) {
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+            const leftKnee = landmarks[25];
+            const rightKnee = landmarks[26];
+            
+            const leftBent = leftHip.visibility > 0.5 && leftKnee.visibility > 0.5 && leftKnee.y > leftHip.y;
+            const rightBent = rightHip.visibility > 0.5 && rightKnee.visibility > 0.5 && rightKnee.y > rightHip.y;
+            
+            return leftBent && rightBent;
+        }
+
+        function getExerciseInstruction() {
+            switch (currentPrescription.exercise) {
+                case 'Right Hand Raise':
+                    return '⬆️ Raise your right hand higher';
+                case 'Shoulder Abduction':
+                    return '⬆️ Raise both arms to shoulder height';
+                case 'Squat':
+                    return '⬇️ Lower your body into a squat position';
+                default:
+                    return 'Follow the exercise instructions';
+            }
+        }
+
+        async function logRep() {
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    await addDoc(collection(db, "exercise_logs"), {
+                        patientId: user.uid,
+                        patientEmail: user.email,
+                        exercise: currentPrescription.exercise,
+                        feedback: `Rep ${currentReps}/${currentPrescription.reps} - Set ${currentSet}`,
+                        isCorrect: true,
+                        repCount: currentReps,
+                        setCount: currentSet,
+                        totalReps: totalReps,
+                        timestamp: serverTimestamp()
+                    });
+                }
+            } catch (error) {
+                console.error("Error logging rep:", error);
+            }
+        }
+
+        async function completeExercise() {
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    // Log completion
+                    await addDoc(collection(db, "exercise_logs"), {
+                        patientId: user.uid,
+                        patientEmail: user.email,
+                        exercise: currentPrescription.exercise,
+                        feedback: `Exercise completed! Total reps: ${totalReps}`,
+                        isCorrect: true,
+                        repCount: currentReps,
+                        setCount: currentSet,
+                        totalReps: totalReps,
+                        completed: true,
+                        timestamp: serverTimestamp()
+                    });
+                    
+                    // Mark prescription as completed
+                    if (currentPrescription.id && currentPrescription.id.startsWith('sample') === false) {
+                        await updateDoc(doc(db, "prescriptions", currentPrescription.id), {
+                            isCompleted: true,
+                            completedAt: serverTimestamp(),
+                            totalRepsCompleted: totalReps
+                        });
+                    }
+                }
+                
+                // Show completion message and return to prescriptions
+                setTimeout(() => {
+                    showPrescriptionList();
+                    loadPrescriptions(); // Refresh the list
+                }, 3000);
+                
+            } catch (error) {
+                console.error("Error completing exercise:", error);
+            }
+        }
+
+        // Make functions globally available
+        window.startExercise = startExercise;
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</body>
 </html>
