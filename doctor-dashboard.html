@@ -4,17 +4,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doctor Dashboard - Meditask</title>
+    <title>Doctor Dashboard - MediTask</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
 
+        /* Animated Gradient Background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 15s ease infinite;
+        }
+
+        @keyframes gradientShift {
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-strong {
+            background: rgba(31, 41, 55, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Glow Effects */
+        .glow-teal {
+            box-shadow: 0 0 20px rgba(20, 184, 166, 0.3);
+        }
+
+        /* Loader */
         .loader {
-            border: 4px solid #4a5568;
-            border-top: 4px solid #4fd1c5;
+            border: 4px solid rgba(20, 184, 166, 0.1);
+            border-top: 4px solid #14b8a6;
             border-radius: 50%;
             width: 60px;
             height: 60px;
@@ -31,76 +72,127 @@
             }
         }
 
+        /* Pulse Animation */
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .pulse-slow {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
         /* Custom Scrollbar */
         #patient-list::-webkit-scrollbar,
-        #patient-report-container::-webkit-scrollbar {
-            width: 8px;
+        #patient-report-container::-webkit-scrollbar,
+        #chat-messages::-webkit-scrollbar {
+            width: 6px;
         }
 
         #patient-list::-webkit-scrollbar-track,
-        #patient-report-container::-webkit-scrollbar-track {
-            background: #2d3748;
+        #patient-report-container::-webkit-scrollbar-track,
+        #chat-messages::-webkit-scrollbar-track {
+            background: #1f2937;
         }
 
         #patient-list::-webkit-scrollbar-thumb,
-        #patient-report-container::-webkit-scrollbar-thumb {
-            background: #4a5568;
-            border-radius: 4px;
+        #patient-report-container::-webkit-scrollbar-thumb,
+        #chat-messages::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+
+        /* Fade In */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
         }
     </style>
 </head>
 
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
-    <div id="app-container"
-        class="w-full max-w-6xl mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 h-[90vh] flex flex-col">
-        <header class="flex flex-col md:flex-row justify-between items-center mb-4 md:mb-6 gap-4">
-            <div class="flex items-center justify-between w-full md:w-auto">
-                <h1 class="text-2xl md:text-3xl font-bold text-teal-400 flex items-center gap-2">
-                    <button id="mobile-menu-btn" class="md:hidden text-white bg-gray-700 p-2 rounded-lg">
+<body class="gradient-bg text-white min-h-screen p-4 antialiased overflow-x-hidden">
+
+    <div id="app-container" class="w-full max-w-7xl mx-auto h-[95vh] flex flex-col">
+
+        <!-- Header -->
+        <header class="glass-strong rounded-2xl shadow-2xl p-4 md:p-6 mb-4 fade-in glow-teal">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <button id="mobile-menu-btn"
+                        class="md:hidden glass p-2 rounded-lg hover:glass-strong transition-all">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <span>Doctor ⚕️</span>
-                </h1>
-            </div>
-            <div class="flex flex-wrap justify-center gap-2 md:gap-4 w-full md:w-auto">
-                <button id="add-patient-btn"
-                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 md:px-4 rounded-lg text-sm md:text-base flex-1 md:flex-none whitespace-nowrap">
-                    + Add
-                </button>
-                <button id="link-patient-btn"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 md:px-4 rounded-lg text-sm md:text-base flex-1 md:flex-none whitespace-nowrap">
-                    Link
-                </button>
-                <button id="logout-btn"
-                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 md:px-4 rounded-lg text-sm md:text-base flex-1 md:flex-none">Logout</button>
+                    <h1
+                        class="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">
+                        ⚕️ Doctor Portal
+                    </h1>
+                </div>
+                <div class="flex flex-wrap justify-center gap-2 md:gap-3 w-full md:w-auto">
+                    <button id="add-patient-btn"
+                        class="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-xl transition-all transform hover:scale-105 backdrop-blur text-sm md:text-base flex-1 md:flex-none">
+                        + Add Patient
+                    </button>
+                    <button id="link-patient-btn"
+                        class="bg-indigo-500/80 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-xl transition-all transform hover:scale-105 backdrop-blur text-sm md:text-base flex-1 md:flex-none">
+                        Link Patient
+                    </button>
+                    <button id="logout-btn"
+                        class="bg-red-500/80 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-xl transition-all transform hover:scale-105 backdrop-blur text-sm md:text-base flex-1 md:flex-none">
+                        Logout
+                    </button>
+                </div>
             </div>
         </header>
 
+        <!-- Main Content -->
         <main id="main-content" class="hidden flex-1 overflow-hidden">
-            <div class="grid md:grid-cols-12 gap-6 h-full">
+            <div class="grid md:grid-cols-12 gap-4 h-full">
+
                 <!-- Sidebar: Patient List -->
                 <div id="sidebar"
-                    class="md:col-span-3 bg-gray-700 rounded-xl p-4 hidden md:flex flex-col h-full absolute md:relative z-20 inset-0 md:inset-auto m-4 md:m-0 shadow-2xl md:shadow-none">
+                    class="md:col-span-3 glass-strong rounded-2xl p-4 hidden md:flex flex-col h-full absolute md:relative z-20 inset-0 md:inset-auto m-4 md:m-0 shadow-2xl md:shadow-none glow-teal">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg text-teal-300">Patients</h3>
-                        <button id="close-sidebar-btn" class="md:hidden text-gray-400">✕</button>
+                        <h3 class="font-bold text-lg text-teal-400">👥 Patients</h3>
+                        <button id="close-sidebar-btn"
+                            class="md:hidden text-gray-400 hover:text-white text-xl transition-colors">✕</button>
                     </div>
                     <div id="patient-list" class="flex-1 overflow-y-auto space-y-2">
-                        <!-- Patient items generated by JS -->
-                        <p class="text-gray-400 text-sm">Loading...</p>
+                        <p class="text-gray-400 text-sm pulse-slow">Loading...</p>
                     </div>
                 </div>
 
-                <!-- Main Content: Reports & Prescriptions -->
-                <div class="md:col-span-9 bg-gray-700 rounded-xl p-6 flex flex-col h-full overflow-hidden relative">
+                <!-- Main Content Area -->
+                <div
+                    class="md:col-span-9 glass-strong rounded-2xl p-6 flex flex-col h-full overflow-hidden relative glow-teal">
                     <div id="report-view" class="flex flex-col h-full">
                         <div id="patient-report-container" class="flex-1 overflow-y-auto">
                             <div id="report-placeholder" class="text-center text-gray-400 mt-20">
-                                Select a patient to view details.
+                                <div class="glass rounded-2xl p-12 inline-block">
+                                    <div class="text-6xl mb-4">📋</div>
+                                    <p class="text-xl">Select a patient to view details</p>
+                                </div>
                             </div>
                             <div id="patient-report" class="hidden">
                                 <!-- Report content generated by JS -->
@@ -108,12 +200,13 @@
                         </div>
                     </div>
 
-                    <!-- Prescription Modal/View (Overlay) -->
+                    <!-- Prescription Modal -->
                     <div id="prescription-view"
-                        class="hidden absolute inset-0 bg-gray-800 z-10 p-6 rounded-xl flex flex-col">
+                        class="hidden absolute inset-0 glass-strong z-10 p-6 rounded-2xl flex flex-col">
                         <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-xl font-bold text-teal-400">Assign New Exercise</h3>
-                            <button id="cancel-prescription-btn" class="text-gray-400 hover:text-white">✕ Close</button>
+                            <h3 class="text-2xl font-bold text-teal400">🎯 Assign New Exercise</h3>
+                            <button id="cancel-prescription-btn"
+                                class="text-gray-400 hover:text-white text-2xl transition-colors">✕</button>
                         </div>
 
                         <form id="prescription-form" class="space-y-6 max-w-lg mx-auto w-full">
@@ -121,7 +214,7 @@
                                 <label for="exercise-select" class="block text-sm font-medium text-gray-300 mb-2">Select
                                     Exercise</label>
                                 <select id="exercise-select"
-                                    class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                    class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all">
                                     <option value="Right Hand Raise">Right Hand Raise</option>
                                     <option value="Shoulder Abduction">Shoulder Abduction</option>
                                     <option value="Squat">Squat</option>
@@ -133,18 +226,18 @@
                                     <label for="sets-input"
                                         class="block text-sm font-medium text-gray-300 mb-2">Sets</label>
                                     <input type="number" id="sets-input" value="3" min="1"
-                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                        class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all">
                                 </div>
                                 <div>
                                     <label for="reps-input"
-                                        class="block text-sm font-medium text-gray-300 mb-2">Reps</label>
+                                        class="block text-sm fontmedium text-gray-300 mb-2">Reps</label>
                                     <input type="number" id="reps-input" value="10" min="1"
-                                        class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+                                        class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all">
                                 </div>
                             </div>
 
                             <button type="submit"
-                                class="w-full bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg shadow-lg">
+                                class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] glow-teal">
                                 Assign Exercise
                             </button>
                         </form>
@@ -153,23 +246,30 @@
             </div>
         </main>
 
+        <!-- Loading View -->
+        <div id="loading-view" class="flex-1 flex items-center justify-center">
+            <div class="glass-strong rounded-3xl p-12 glow-teal">
+                <div class="loader mx-auto mb-4"></div>
+                <p class="text-gray-400 text-lg">Authenticating...</p>
+            </div>
+        </div>
+
         <!-- Chat Modal -->
         <div id="chat-modal"
-            class="hidden fixed bottom-24 right-6 w-80 md:w-96 bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden"
+            class="hidden fixed bottom-24 right-6 w-80 md:w-96 glass-strong border border-gray-700 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden glow-teal"
             style="height: 500px;">
-            <div class="bg-gray-900 p-4 flex justify-between items-center border-b border-gray-700">
-                <div>
-                    <h3 class="font-bold text-teal-400" id="chat-patient-name">Chat</h3>
-                </div>
-                <button id="close-chat-btn" class="text-gray-400 hover:text-white">✕</button>
+            <div class="glass-strong p-4 flex justify-between items-center border-b border-gray-700">
+                <h3 class="font-bold text-teal-400" id="chat-patient-name">💬 Chat</h3>
+                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-xl transition-colors">✕</button>
             </div>
-            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-800">
-                <!-- Messages will appear here -->
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3">
+                <!-- Messages -->
             </div>
-            <div class="p-4 bg-gray-900 border-t border-gray-700 flex gap-2">
+            <div class="p-3 glass-strong border-t border-gray-700 flex gap-2">
                 <input type="text" id="chat-input" placeholder="Type a message..."
-                    class="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500 border border-gray-700">
-                <button id="send-msg-btn" class="bg-teal-500 hover:bg-teal-600 text-black p-2 rounded-lg">
+                    class="flex-1 bg-gray-800/50 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 border border-gray-700 transition-all">
+                <button id="send-msg-btn"
+                    class="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black p-2 rounded-xl transition-all transform hover:scale-110">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -181,29 +281,34 @@
 
         <!-- Add Patient Modal -->
         <div id="add-patient-modal"
-            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-            <div class="bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md border border-gray-700">
-                <h3 class="text-xl font-bold text-teal-400 mb-4">Add New Patient</h3>
+            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-md glow-teal">
+                <h3 class="text-2xl font-bold text-teal-400 mb-6">➕ Add New Patient</h3>
 
-                <form id="add-patient-form" class="space-y-4">
+                <form id="add-patient-form" class="space-y-5">
                     <div>
                         <label for="new-patient-email"
-                            class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                            class="block text-sm font-medium text-gray-300 mb-2">Email</label>
                         <input type="email" id="new-patient-email" required
-                            class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-white focus:outline-none focus:ring-2">
+                            class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white transition-all">
                     </div>
                     <div>
                         <label for="new-patient-password"
-                            class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                            class="block text-sm font-medium text-gray-300 mb-2">Password</label>
                         <input type="password" id="new-patient-password" required minlength="6"
-                            class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-white focus:outline-none focus:ring-2">
+                            class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white transition-all">
                     </div>
-                    <div id="add-patient-error" class="text-red-500 text-sm hidden"></div>
+                    <div id="add-patient-error"
+                        class="hidden text-red-400 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
                     <div class="flex gap-3 pt-2">
                         <button type="button" id="cancel-add-patient-btn"
-                            class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg">Cancel</button>
+                            class="flex-1 glass hover:glass-strong text-white font-semibold py-3 rounded-xl transition-all border border-gray-700">
+                            Cancel
+                        </button>
                         <button type="submit" id="submit-add-patient-btn"
-                            class="flex-1 bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg">Create</button>
+                            class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl transition-all transform hover:scale-[1.02]">
+                            Create
+                        </button>
                     </div>
                 </form>
             </div>
@@ -211,31 +316,31 @@
 
         <!-- Link Patient Modal -->
         <div id="link-patient-modal"
-            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-            <div class="bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md border border-gray-700">
-                <h3 class="text-xl font-bold text-teal-400 mb-4">Link Existing Patient</h3>
+            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-md glow-teal">
+                <h3 class="text-2xl font-bold text-teal-400 mb-6">🔗 Link Existing Patient</h3>
 
-                <form id="link-patient-form" class="space-y-4">
+                <form id="link-patient-form" class="space-y-5">
                     <div>
-                        <label for="link-patient-email" class="block text-sm font-medium text-gray-300 mb-1">Patient
+                        <label for="link-patient-email" class="block text-sm font-medium text-gray-300 mb-2">Patient
                             Email</label>
                         <input type="email" id="link-patient-email" required
-                            class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-white focus:outline-none focus:ring-2">
+                            class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white transition-all">
                     </div>
-                    <div id="link-patient-error" class="text-red-500 text-sm hidden"></div>
+                    <div id="link-patient-error"
+                        class="hidden text-red-400 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
                     <div class="flex gap-3 pt-2">
                         <button type="button" id="cancel-link-patient-btn"
-                            class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg">Cancel</button>
+                            class="flex-1 glass hover:glass-strong text-white font-semibold py-3 rounded-xl transition-all border border-gray-700">
+                            Cancel
+                        </button>
                         <button type="submit" id="submit-link-patient-btn"
-                            class="flex-1 bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg">Link</button>
+                            class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl transition-all transform hover:scale-[1.02]">
+                            Link
+                        </button>
                     </div>
                 </form>
             </div>
-        </div>
-
-        <div id="loading-view" class="text-center py-16">
-            <div class="loader mx-auto"></div>
-            <p class="mt-4 text-gray-400">Authenticating...</p>
         </div>
     </div>
 

@@ -4,17 +4,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meditask - AI Rehab Assistant</title>
+    <title>MediTask - AI-Powered Rehabilitation Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
 
+        /* Animated Gradient Background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 15s ease infinite;
+        }
+
+        @keyframes gradientShift {
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-strong {
+            background: rgba(31, 41, 55, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Floating Animation */
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        .float-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Glow Effect */
+        .glow-teal {
+            box-shadow: 0 0 30px rgba(20, 184, 166, 0.3);
+        }
+
+        .glow-teal-strong {
+            box-shadow: 0 0 40px rgba(20, 184, 166, 0.5);
+        }
+
+        /* Fade In Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        .fade-in {
+            animation: fadeIn 1s ease-out forwards;
+        }
+
+        /* Staggered Animation Delays */
+        .delay-100 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-200 {
+            animation-delay: 0.2s;
+        }
+
+        .delay-300 {
+            animation-delay: 0.3s;
+        }
+
+        .delay-400 {
+            animation-delay: 0.4s;
+        }
+
+        .delay-500 {
+            animation-delay: 0.5s;
+        }
+
+        /* Loader */
         .loader {
-            border: 4px solid #4a5568;
-            border-top: 4px solid #4fd1c5;
+            border: 4px solid #374151;
+            border-top: 4px solid #14b8a6;
             border-radius: 50%;
             width: 60px;
             height: 60px;
@@ -30,72 +144,355 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* Ripple Effect on Buttons */
+        .btn-ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-ripple::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn-ripple:active::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        /* Particle Background */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(20, 184, 166, 0.15);
+            border-radius: 50%;
+            animation: particleFloat 20s linear infinite;
+        }
+
+        @keyframes particleFloat {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-100vh) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
     </style>
     <link rel="icon" href="data:,">
 </head>
 
-<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4 antialiased overflow-x-hidden">
+<body class="gradient-bg text-white min-h-screen relative overflow-x-hidden">
 
-    <div id="loading-view" class="text-center flex-grow flex flex-col justify-center">
-        <div class="loader mx-auto"></div>
-        <p class="mt-4 text-lg text-gray-400">Authenticating...</p>
+    <!-- Particle Background -->
+    <div class="particles fixed inset-0 z-0">
+        <div class="particle" style="width: 5px; height: 5px; left: 10%; animation-delay: 0s;"></div>
+        <div class="particle" style="width: 3px; height: 3px; left: 20%; animation-delay: 2s;"></div>
+        <div class="particle" style="width: 4px; height: 4px; left: 30%; animation-delay: 4s;"></div>
+        <div class="particle" style="width: 6px; height: 6px; left: 40%; animation-delay: 6s;"></div>
+        <div class="particle" style="width: 3px; height: 3px; left: 50%; animation-delay: 8s;"></div>
+        <div class="particle" style="width: 5px; height: 5px; left: 60%; animation-delay: 10s;"></div>
+        <div class="particle" style="width: 4px; height: 4px; left: 70%; animation-delay: 12s;"></div>
+        <div class="particle" style="width: 3px; height: 3px; left: 80%; animation-delay: 14s;"></div>
+        <div class="particle" style="width: 5px; height: 5px; left: 90%; animation-delay: 16s;"></div>
     </div>
 
-    <div id="action-view"
-        class="hidden text-center max-w-lg mx-auto bg-gray-800 p-10 rounded-2xl shadow-2xl mt-10 md:mt-20">
-        <h1 class="text-4xl font-bold text-teal-400 mb-4">Welcome to Meditask</h1>
-        <p class="text-gray-300 mb-8 text-lg">Your AI-powered guide to rehabilitation and wellness.</p>
-        <div id="error-box" class="hidden mb-6 p-3 rounded-lg text-sm bg-red-900 text-red-200"></div>
-        <div class="flex flex-col sm:flex-row justify-center gap-4">
-            <a href="./login.html"
-                class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 w-full sm:w-auto">Start
-                Unlimited Demo</a>
-            <a href="./signup.html"
-                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 w-full sm:w-auto">Sign
-                Up</a>
-        </div>
+    <!-- Loading View -->
+    <div id="loading-view" class="fixed inset-0 z-50 flex flex-col items-center justify-center fade-in">
+        <div class="loader"></div>
+        <p class="mt-6 text-lg text-gray-400 animate-pulse">Initializing...</p>
     </div>
 
-    <!-- Pricing Section -->
-    <div id="pricing-view" class="hidden mt-16 max-w-4xl mx-auto px-4 pb-20">
-        <h2 class="text-3xl font-bold text-center text-teal-400 mb-10">Simple, Transparent Pricing</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- Monthly Plan -->
-            <div
-                class="bg-gray-800 rounded-2xl p-8 border border-gray-700 hover:border-teal-500 transition-colors shadow-lg flex flex-col items-center">
-                <h3 class="text-xl font-semibold text-white mb-2">Monthly Subscription</h3>
-                <div class="text-4xl font-bold text-teal-400 mb-4">₹999<span
-                        class="text-lg text-gray-400 font-normal">/mo</span></div>
-                <ul class="text-gray-300 space-y-3 mb-8 w-full">
-                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Unlimited Patients</li>
-                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> AI Pose Analysis</li>
-                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Secure Chat Support</li>
-                </ul>
-                <a href="./signup.html"
-                    class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-lg text-center transition-colors">Start
-                    Monthly Demo</a>
+    <!-- Main Content -->
+    <div id="main-content" class="hidden relative z-10">
+
+        <!-- Hero Section -->
+        <section class="container mx-auto px-4 md:px-6 py-12 md:py-24">
+            <div class="flex flex-col md:flex-row items-center gap-12 md:gap-16">
+
+                <!-- Hero Text -->
+                <div class="flex-1 text-center md:text-left opacity-0 fade-in-up">
+                    <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6">
+                        Rehabilitation
+                        <span class="block text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">
+                            Reimagined
+                        </span>
+                    </h1>
+                    <p class="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed opacity-0 fade-in-up delay-100">
+                        AI-powered motion analysis that ensures correct exercise form and accelerates recovery
+                    </p>
+                    <div
+                        class="flex flex-col sm:flex-row gap-4 justify-center md:justify-start opacity-0 fade-in-up delay-200">
+                        <a href="./login.html"
+                            class="btn-ripple bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 shadow-lg glow-teal text-center">
+                            Start Free Trial
+                        </a>
+                        <a href="./signup.html"
+                            class="btn-ripple glass hover:glass-strong text-white font-bold py-4 px-8 rounded-full transition-all text-center border border-teal-500/30 hover:border-teal-500">
+                            Create Account
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Hero Visual -->
+                <div class="flex-1 flex justify-center opacity-0 fade-in-up delay-300">
+                    <div class="relative">
+                        <!-- Glowing Orb Background -->
+                        <div
+                            class="absolute inset-0 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 blur-3xl rounded-full transform scale-150">
+                        </div>
+
+                        <!-- Main Card -->
+                        <div class="relative glass-strong rounded-3xl p-8 max-w-md float-animation glow-teal">
+                            <div class="text-center mb-6">
+                                <div class="text-7xl mb-4">🏋️</div>
+                                <h3 class="text-2xl font-bold text-teal-400 mb-2">Real-Time Analysis</h3>
+                                <p class="text-gray-400">Precision motion tracking</p>
+                            </div>
+
+                            <!-- Mock Stats -->
+                            <div class="grid grid-cols-3 gap-4 mt-8">
+                                <div class="glass rounded-xl p-4 text-center">
+                                    <div class="text-2xl font-bold text-teal-400">98%</div>
+                                    <div class="text-xs text-gray-400 mt-1">Accuracy</div>
+                                </div>
+                                <div class="glass rounded-xl p-4 text-center">
+                                    <div class="text-2xl font-bold text-cyan-400">15ms</div>
+                                    <div class="text-xs text-gray-400 mt-1">Latency</div>
+                                </div>
+                                <div class="glass rounded-xl p-4 text-center">
+                                    <div class="text-2xl font-bold text-emerald-400">24/7</div>
+                                    <div class="text-xs text-gray-400 mt-1">Support</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="container mx-auto px-4 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-16 opacity-0 fade-in-up">
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">Powerful Features</h2>
+                <p class="text-xl text-gray-400">Everything you need for effective rehabilitation</p>
             </div>
 
-            <!-- Annual Plan -->
-            <div
-                class="bg-gray-800 rounded-2xl p-8 border-2 border-teal-500 shadow-2xl relative flex flex-col items-center">
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
                 <div
-                    class="absolute -top-4 bg-teal-500 text-black text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                    Best Value</div>
-                <h3 class="text-xl font-semibold text-white mb-2">Annual Subscription</h3>
-                <div class="text-4xl font-bold text-teal-400 mb-4">₹10,000<span
-                        class="text-lg text-gray-400 font-normal">/yr</span></div>
-                <p class="text-sm text-green-400 mb-6">Save ₹1,988 per year</p>
-                <ul class="text-gray-300 space-y-3 mb-8 w-full">
-                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> All Monthly Features</li>
-                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Priority Support</li>
-                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Advanced Analytics</li>
-                </ul>
-                <a href="./signup.html"
-                    class="w-full bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg text-center transition-transform transform hover:scale-105">Start
-                    Annual Demo</a>
+                    class="glass-strong rounded-2xl p-8 hover:scale-105 transition-transform cursor-pointer opacity-0 fade-in-up delay-100">
+                    <div
+                        class="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-6 glow-teal">
+                        <span class="text-3xl">🎯</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">AI Pose Detection</h3>
+                    <p class="text-gray-400">Advanced computer vision tracks your movements in real-time with 98%
+                        accuracy</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div
+                    class="glass-strong rounded-2xl p-8 hover:scale-105 transition-transform cursor-pointer opacity-0 fade-in-up delay-200">
+                    <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6"
+                        style="box-shadow: 0 0 30px rgba(168, 85, 247, 0.3);">
+                        <span class="text-3xl">📊</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Progress Analytics</h3>
+                    <p class="text-gray-400">Comprehensive insights and detailed reports to monitor your recovery
+                        journey</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div
+                    class="glass-strong rounded-2xl p-8 hover:scale-105 transition-transform cursor-pointer opacity-0 fade-in-up delay-300">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mb-6"
+                        style="box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);">
+                        <span class="text-3xl">💬</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">Doctor Communication</h3>
+                    <p class="text-gray-400">Seamless messaging between patients and healthcare professionals</p>
+                </div>
             </div>
-        </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="container mx-auto px-4 md:px-6 py-16">
+            <div class="glass-strong rounded-3xl p-12 md:p-16 glow-teal-strong opacity-0 fade-in-up">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                    <div>
+                        <div class="text-4xl md:text-5xl font-bold text-teal-400 mb-2" data-count="10000">0</div>
+                        <div class="text-gray-400">Exercises Tracked</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-bold text-cyan-400 mb-2" data-count="500">0</div>
+                        <div class="text-gray-400">Active Users</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-bold text-emerald-400 mb-2" data-count="98">0</div>
+                        <div class="text-gray-400">Satisfaction Rate</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-bold text-purple-400 mb-2" data-count="24">0</div>
+                        <div class="text-gray-400">Hours Support</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing" class="container mx-auto px-4 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-16 opacity-0 fade-in-up">
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">Simple, Transparent Pricing</h2>
+                <p class="text-xl text-gray-400">Choose the plan that works for you</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                <!-- Monthly Plan -->
+                <div
+                    class="glass-strong rounded-3xl p-8 md:p-10 hover:scale-105 transition-all opacity-0 fade-in-up delay-100 border border-gray-700 hover:border-teal-500">
+                    <h3 class="text-2xl font-bold text-white mb-2">Monthly</h3>
+                    <div class="mb-6">
+                        <span class="text-5xl font-bold text-teal-400">₹999</span>
+                        <span class="text-gray-400">/month</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Unlimited Patients</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">AI Pose Analysis</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Secure Chat Support</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Progress Analytics</span>
+                        </li>
+                    </ul>
+                    <a href="./signup.html"
+                        class="btn-ripple block w-full glass hover:glass-strong text-white font-bold py-4 rounded-xl text-center transition-all border border-teal-500/30 hover:border-teal-500">
+                        Get Started
+                    </a>
+                </div>
+
+                <!-- Annual Plan -->
+                <div
+                    class="glass-strong rounded-3xl p-8 md:p-10 hover:scale-105 transition-all opacity-0 fade-in-up delay-200 border-2 border-teal-500 glow-teal relative">
+                    <div
+                        class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-teal-500 to-cyan-500 text-black text-sm font-bold px-6 py-1 rounded-full">
+                        BEST VALUE
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Annual</h3>
+                    <div class="mb-6">
+                        <span class="text-5xl font-bold text-teal-400">₹10,000</span>
+                        <span class="text-gray-400">/year</span>
+                        <div class="text-emerald-400 text-sm font-semibold mt-2">Save ₹1,988 yearly</div>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Everything in Monthly</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Priority Support</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Advanced Analytics</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <span
+                                class="flex-shrink-0 w-6 h-6 bg-teal-500/20 rounded-full flex items-center justify-center">
+                                <span class="text-teal-400">✓</span>
+                            </span>
+                            <span class="text-gray-300">Custom Reports</span>
+                        </li>
+                    </ul>
+                    <a href="./signup.html"
+                        class="btn-ripple block w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-4 rounded-xl text-center transition-all shadow-lg glow-teal">
+                        Get Started
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="container mx-auto px-4 md:px-6 py-12 text-center opacity-0 fade-in-up">
+            <div class="glass-strong rounded-2xl p-8 inline-block">
+                <p class="text-gray-400">© 2024 MediTask. Transforming rehabilitation through AI.</p>
+            </div>
+        </footer>
     </div>
 
     <script type="module">
@@ -103,21 +500,41 @@
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // Simple auth check to enable buttons
         const loadingView = document.getElementById('loading-view');
-        const actionView = document.getElementById('action-view');
-        const pricingView = document.getElementById('pricing-view');
+        const mainContent = document.getElementById('main-content');
 
-        // Short timeout to simulate initialization if not instant
+        // Animated counter function
+        function animateCounter(element, target, duration = 2000) {
+            const start = 0;
+            const increment = target / (duration / 16);
+            let current = start;
+
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= target) {
+                    element.textContent = target.toLocaleString();
+                    clearInterval(timer);
+                } else {
+                    element.textContent = Math.floor(current).toLocaleString();
+                }
+            }, 16);
+        }
+
+        // Initialize page
         setTimeout(() => {
             loadingView.classList.add('hidden');
-            actionView.classList.remove('hidden');
-            pricingView.classList.remove('hidden');
-        }, 800);
+            mainContent.classList.remove('hidden');
 
+            // Start counter animations
+            document.querySelectorAll('[data-count]').forEach(el => {
+                const target = parseInt(el.getAttribute('data-count'));
+                animateCounter(el, target);
+            });
+        }, 1000);
+
+        // Auth check and redirect
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Determine role and redirect
                 const db = getFirestore();
                 try {
                     const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -127,7 +544,7 @@
                         else window.location.href = './patient-dashboard.html';
                     }
                 } catch (e) {
-                    console.error("Error checking role on landing:", e);
+                    console.error("Error checking role:", e);
                 }
             }
         });

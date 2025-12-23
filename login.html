@@ -4,40 +4,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Meditask</title>
+    <title>Login - MediTask</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+        }
+
+        /* Animated Gradient Background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 15s ease infinite;
+        }
+
+        @keyframes gradientShift {
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Glow Effect */
+        .glow-teal {
+            box-shadow: 0 0 40px rgba(20, 184, 166, 0.2);
+        }
+
+        /* Fade In Animation */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+
+        /* Input Focus Animation */
+        .input-field {
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(20, 184, 166, 0.2);
+        }
+
+        /* Button Ripple Effect */
+        .btn-ripple {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-ripple::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn-ripple:active::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        /* Floating Particles */
+        .particle {
+            position: absolute;
+            background: rgba(20, 184, 166, 0.1);
+            border-radius: 50%;
+            animation: particleFloat 20s linear infinite;
+        }
+
+        @keyframes particleFloat {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-100vh) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* Error Message Animation */
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            75% {
+                transform: translateX(10px);
+            }
+        }
+
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid rgba(20, 184, 166, 0.1);
+            border-top: 3px solid #14b8a6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
     <link rel="icon" href="data:,">
 </head>
 
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
-    <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-8">
-        <h1 class="text-3xl font-bold text-teal-400 mb-2 text-center">Welcome Back</h1>
-        <p class="text-gray-400 mb-8 text-center">Please log in to your account.</p>
-        <form id="login-form" class="space-y-6">
-            <input type="email" id="login-email" placeholder="Email"
-                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
-                required>
-            <input type="password" id="login-password" placeholder="Password"
-                class="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
-                required>
-            <button type="submit"
-                class="w-full bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg transition-transform transform hover:scale-105">Login</button>
-            <p id="login-error" class="text-red-400 text-center h-5"></p>
-        </form>
-        <p class="text-center text-gray-400 mt-6">
-            Don't have an account? <a href="./signup.html" class="font-semibold text-teal-400 hover:underline">Sign
-                Up</a>
-        </p>
-        <p class="mt-4 text-center text-sm">
-            <a href="./index.html" class="text-gray-500 hover:text-gray-300">← Back to Home</a>
-        </p>
+<body class="gradient-bg text-white min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+
+    <!-- Particle Background -->
+    <div class="particles fixed inset-0 pointer-events-none">
+        <div class="particle" style="width: 4px; height: 4px; left: 15%; animation-delay: 0s;"></div>
+        <div class="particle" style="width: 6px; height: 6px; left: 35%; animation-delay: 3s;"></div>
+        <div class="particle" style="width: 3px; height: 3px; left: 55%; animation-delay: 6s;"></div>
+        <div class="particle" style="width: 5px; height: 5px; left: 75%; animation-delay: 9s;"></div>
+        <div class="particle" style="width: 4px; height: 4px; left: 85%; animation-delay: 12s;"></div>
     </div>
+
+    <!-- Login Form Container -->
+    <div class="w-full max-w-md mx-auto glass rounded-3xl shadow-2xl p-8 md:p-10 glow-teal fade-in-up relative z-10">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div
+                class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl mb-4 glow-teal">
+                <span class="text-3xl">🏋️</span>
+            </div>
+            <h1
+                class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300 mb-2">
+                Welcome Back
+            </h1>
+            <p class="text-gray-400">Log in to continue your recovery journey</p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="space-y-5">
+            <!-- Email Input -->
+            <div>
+                <label for="login-email" class="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                    Email Address
+                </label>
+                <input type="email" id="login-email" placeholder="you@example.com"
+                    class="input-field w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                    required>
+            </div>
+
+            <!-- Password Input -->
+            <div>
+                <label for="login-password" class="block text-sm font-medium text-gray-300 mb-2 ml-1">
+                    Password
+                </label>
+                <input type="password" id="login-password" placeholder="••••••••"
+                    class="input-field w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                    required>
+            </div>
+
+            <!-- Error Message -->
+            <div id="login-error" class="hidden">
+                <div
+                    class="bg-red-500/10 border border-red-500/50 rounded-xl p-3 text-red-400 text-sm text-center shake">
+                    <span id="error-text"></span>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="login-btn"
+                class="btn-ripple w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3.5 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg glow-teal flex items-center justify-center gap-2">
+                <span id="btn-text">Log In</span>
+                <span id="btn-spinner" class="spinner hidden"></span>
+            </button>
+        </form>
+
+        <!-- Divider -->
+        <div class="my-8 flex items-center gap-4">
+            <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent"></div>
+            <span class="text-gray-500 text-sm">or</span>
+            <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent"></div>
+        </div>
+
+        <!-- Footer Links -->
+        <div class="text-center space-y-3">
+            <p class="text-gray-400">
+                Don't have an account?
+                <a href="./signup.html" class="text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+                    Sign Up
+                </a>
+            </p>
+            <p>
+                <a href="./index.html"
+                    class="text-gray-500 hover:text-gray-300 text-sm transition-colors inline-flex items-center gap-1">
+                    <span>←</span>
+                    <span>Back to Home</span>
+                </a>
+            </p>
+        </div>
+    </div>
+
     <script type="module">
         import { login, checkAuthAndRedirect } from "./js/services/auth.js";
 
@@ -45,22 +264,75 @@
         checkAuthAndRedirect();
 
         const loginForm = document.getElementById('login-form');
-        const errorEl = document.getElementById('login-error');
+        const errorBox = document.getElementById('login-error');
+        const errorText = document.getElementById('error-text');
+        const loginBtn = document.getElementById('login-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+
+        // Show error with animation
+        function showError(message) {
+            errorText.textContent = message;
+            errorBox.classList.remove('hidden');
+            errorBox.classList.add('shake');
+            setTimeout(() => errorBox.classList.remove('shake'), 400);
+        }
+
+        // Hide error
+        function hideError() {
+            errorBox.classList.add('hidden');
+        }
+
+        // Set loading state
+        function setLoading(isLoading) {
+            loginBtn.disabled = isLoading;
+            if (isLoading) {
+                btnText.textContent = 'Logging in...';
+                btnSpinner.classList.remove('hidden');
+                loginBtn.classList.add('opacity-90', 'cursor-not-allowed');
+            } else {
+                btnText.textContent = 'Log In';
+                btnSpinner.classList.add('hidden');
+                loginBtn.classList.remove('opacity-90', 'cursor-not-allowed');
+            }
+        }
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            hideError();
+            setLoading(true);
+
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
-            errorEl.textContent = '';
 
             try {
                 await login(email, password);
+                // Success animation
+                btnText.textContent = 'Success! Redirecting...';
                 // Redirect handled by checkAuthAndRedirect listener
             } catch (error) {
                 console.error("Login error:", error);
-                errorEl.textContent = 'Invalid email or password.';
+                setLoading(false);
+
+                // User-friendly error messages
+                let errorMessage = 'Invalid email or password.';
+                if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'No account found with this email.';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorMessage = 'Incorrect password.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    errorMessage = 'Too many attempts. Please try again later.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Network error. Please check your connection.';
+                }
+
+                showError(errorMessage);
             }
         });
+
+        // Clear error on input
+        document.getElementById('login-email').addEventListener('input', hideError);
+        document.getElementById('login-password').addEventListener('input', hideError);
     </script>
 </body>
 
