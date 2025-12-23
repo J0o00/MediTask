@@ -34,31 +34,32 @@
     <link rel="icon" href="data:,">
 </head>
 
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4 antialiased overflow-x-hidden">
 
-    <div id="loading-view" class="text-center">
+    <div id="loading-view" class="text-center flex-grow flex flex-col justify-center">
         <div class="loader mx-auto"></div>
         <p class="mt-4 text-lg text-gray-400">Authenticating...</p>
     </div>
 
-    <div id="action-view" class="hidden text-center max-w-lg mx-auto bg-gray-800 p-10 rounded-2xl shadow-2xl">
+    <div id="action-view"
+        class="hidden text-center max-w-lg mx-auto bg-gray-800 p-10 rounded-2xl shadow-2xl mt-10 md:mt-20">
         <h1 class="text-4xl font-bold text-teal-400 mb-4">Welcome to Meditask</h1>
         <p class="text-gray-300 mb-8 text-lg">Your AI-powered guide to rehabilitation and wellness.</p>
         <div id="error-box" class="hidden mb-6 p-3 rounded-lg text-sm bg-red-900 text-red-200"></div>
-        <div class="flex justify-center gap-4">
+        <div class="flex flex-col sm:flex-row justify-center gap-4">
             <a href="./login.html"
-                class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105">Start
+                class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 w-full sm:w-auto">Start
                 Unlimited Demo</a>
             <a href="./signup.html"
-                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105">Sign
+                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 w-full sm:w-auto">Sign
                 Up</a>
         </div>
     </div>
 
     <!-- Pricing Section -->
-    <div id="pricing-view" class="hidden mt-16 max-w-4xl mx-auto px-4">
+    <div id="pricing-view" class="hidden mt-16 max-w-4xl mx-auto px-4 pb-20">
         <h2 class="text-3xl font-bold text-center text-teal-400 mb-10">Simple, Transparent Pricing</h2>
-        <div class="grid md:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Monthly Plan -->
             <div
                 class="bg-gray-800 rounded-2xl p-8 border border-gray-700 hover:border-teal-500 transition-colors shadow-lg flex flex-col items-center">
