@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // DEVELOPMENT RULES: Allow any logged-in user to read/write everything.
+    // This allows Doctors to create Patient profiles and Patients to chat.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

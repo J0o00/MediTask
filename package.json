@@ -1,0 +1,15 @@
+{
+  "name": "meditask-webapp",
+  "version": "1.0.0",
+  "description": "MediTask Web Application - Rehabilitation & Wellness",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "rehabilitation",
+    "firebase",
+    "mediapipe"
+  ],
+  "author": "",
+  "license": "ISC"
+}

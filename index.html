@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Meditask</title>
+    <title>Meditask - AI Rehab Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -31,6 +31,7 @@
             }
         }
     </style>
+    <link rel="icon" href="data:,">
 </head>
 
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
@@ -40,89 +41,93 @@
         <p class="mt-4 text-lg text-gray-400">Authenticating...</p>
     </div>
 
-    <div id="action-view" class="hidden text-center max-w-lg mx-auto bg-gray-800 p-10 rounded-2xl">
+    <div id="action-view" class="hidden text-center max-w-lg mx-auto bg-gray-800 p-10 rounded-2xl shadow-2xl">
         <h1 class="text-4xl font-bold text-teal-400 mb-4">Welcome to Meditask</h1>
         <p class="text-gray-300 mb-8 text-lg">Your AI-powered guide to rehabilitation and wellness.</p>
         <div id="error-box" class="hidden mb-6 p-3 rounded-lg text-sm bg-red-900 text-red-200"></div>
         <div class="flex justify-center gap-4">
             <a href="./login.html"
-                class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105">Login</a>
+                class="bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105">Start
+                Unlimited Demo</a>
             <a href="./signup.html"
                 class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105">Sign
                 Up</a>
         </div>
     </div>
 
-    <script type="module">
-        const firebaseConfig = {
-            apiKey: "AIzaSyBwqiEYkycDoxGdovRwvlXjCFscUKU6Xr8",
-            authDomain: "meditask-webapp.firebaseapp.com",
-            projectId: "meditask-webapp",
-            storageBucket: "meditask-webapp.appspot.com",
-            messagingSenderId: "550925294842",
-            appId: "1:550925294842:web:ca3b6a004801ccf635bd43"
-        };
+    <!-- Pricing Section -->
+    <div id="pricing-view" class="hidden mt-16 max-w-4xl mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center text-teal-400 mb-10">Simple, Transparent Pricing</h2>
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Monthly Plan -->
+            <div
+                class="bg-gray-800 rounded-2xl p-8 border border-gray-700 hover:border-teal-500 transition-colors shadow-lg flex flex-col items-center">
+                <h3 class="text-xl font-semibold text-white mb-2">Monthly Subscription</h3>
+                <div class="text-4xl font-bold text-teal-400 mb-4">₹999<span
+                        class="text-lg text-gray-400 font-normal">/mo</span></div>
+                <ul class="text-gray-300 space-y-3 mb-8 w-full">
+                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Unlimited Patients</li>
+                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> AI Pose Analysis</li>
+                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Secure Chat Support</li>
+                </ul>
+                <a href="./signup.html"
+                    class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-lg text-center transition-colors">Start
+                    Monthly Demo</a>
+            </div>
 
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+            <!-- Annual Plan -->
+            <div
+                class="bg-gray-800 rounded-2xl p-8 border-2 border-teal-500 shadow-2xl relative flex flex-col items-center">
+                <div
+                    class="absolute -top-4 bg-teal-500 text-black text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                    Best Value</div>
+                <h3 class="text-xl font-semibold text-white mb-2">Annual Subscription</h3>
+                <div class="text-4xl font-bold text-teal-400 mb-4">₹10,000<span
+                        class="text-lg text-gray-400 font-normal">/yr</span></div>
+                <p class="text-sm text-green-400 mb-6">Save ₹1,988 per year</p>
+                <ul class="text-gray-300 space-y-3 mb-8 w-full">
+                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> All Monthly Features</li>
+                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Priority Support</li>
+                    <li class="flex items-center gap-2"><span class="text-teal-500">✓</span> Advanced Analytics</li>
+                </ul>
+                <a href="./signup.html"
+                    class="w-full bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg text-center transition-transform transform hover:scale-105">Start
+                    Annual Demo</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth } from "./js/services/auth.js";
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
+        // Simple auth check to enable buttons
         const loadingView = document.getElementById('loading-view');
         const actionView = document.getElementById('action-view');
+        const pricingView = document.getElementById('pricing-view');
+
+        // Short timeout to simulate initialization if not instant
+        setTimeout(() => {
+            loadingView.classList.add('hidden');
+            actionView.classList.remove('hidden');
+            pricingView.classList.remove('hidden');
+        }, 800);
 
         onAuthStateChanged(auth, async (user) => {
-            try {
-                if (user) {
-                    // User is signed in, check their role and redirect
+            if (user) {
+                // Determine role and redirect
+                const db = getFirestore();
+                try {
                     const userDoc = await getDoc(doc(db, "users", user.uid));
                     if (userDoc.exists()) {
-                        const { role } = userDoc.data();
-                        const normalizedRole = (role || '').toString().trim().toLowerCase();
-                        if (normalizedRole === 'patient') {
-                            window.location.replace('./patient-dashboard.html');
-                            return;
-                        } else if (normalizedRole === 'doctor') {
-                            window.location.replace('./doctor-dashboard.html');
-                            return;
-                        }
+                        const role = userDoc.data().role;
+                        if (role === 'doctor') window.location.href = './doctor-dashboard.html';
+                        else window.location.href = './patient-dashboard.html';
                     }
-                    // If role is unknown or user doesn't exist in Firestore, show action buttons
-                    loadingView.classList.add('hidden');
-                    actionView.classList.remove('hidden');
-                    const errorBox = document.getElementById('error-box');
-                    errorBox.textContent = 'Your account is missing a role. Please sign out and sign up again to set your role.';
-                    errorBox.classList.remove('hidden');
-                } else {
-                    // No user is signed in, show login/signup actions
-                    loadingView.classList.add('hidden');
-                    actionView.classList.remove('hidden');
-                    const params = new URLSearchParams(window.location.search);
-                    const err = params.get('err');
-                    if (err) {
-                        const errorBox = document.getElementById('error-box');
-                        let msg = '';
-                        if (err === 'notLoggedIn') msg = 'Please log in to continue.';
-                        else if (err === 'notDoctor') msg = 'Access denied: doctor account required.';
-                        else if (err === 'authError') msg = 'Authentication error. Please try again.';
-                        if (msg) {
-                            errorBox.textContent = msg;
-                            errorBox.classList.remove('hidden');
-                        }
-                        // Clean URL
-                        const url = new URL(window.location);
-                        url.searchParams.delete('err');
-                        window.history.replaceState({}, '', url);
-                    }
+                } catch (e) {
+                    console.error("Error checking role on landing:", e);
                 }
-            } catch (error) {
-                console.error('Auth state change error:', error);
-                // On error, show action buttons
-                loadingView.classList.add('hidden');
-                actionView.classList.remove('hidden');
             }
         });
     </script>

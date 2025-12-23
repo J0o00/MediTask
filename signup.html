@@ -12,6 +12,7 @@
             font-family: 'Inter', sans-serif;
         }
     </style>
+    <link rel="icon" href="data:,">
 </head>
 
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
@@ -39,16 +40,12 @@
             Already have an account? <a href="./login.html"
                 class="font-semibold text-teal-400 hover:underline">Login</a>
         </p>
+        <p class="mt-4 text-center text-sm">
+            <a href="./index.html" class="text-gray-500 hover:text-gray-300">← Back to Home</a>
+        </p>
     </div>
     <script type="module">
-        const firebaseConfig = {
-            apiKey: "AIzaSyBwqiEYkycDoxGdovRwvlXjCFscUKU6Xr8",
-            authDomain: "meditask-webapp.firebaseapp.com",
-            projectId: "meditask-webapp",
-            storageBucket: "meditask-webapp.appspot.com",
-            messagingSenderId: "550925294842",
-            appId: "1:550925294842:web:ca3b6a004801ccf635bd43"
-        };
+        import { firebaseConfig } from "./js/config.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -63,10 +60,11 @@
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
                     const { role } = userDoc.data();
-                    if (role === 'patient') {
+                    const normalizedRole = (role || '').toString().trim().toLowerCase();
+                    if (normalizedRole === 'patient') {
                         window.location.replace('./patient-dashboard.html');
                         return;
-                    } else if (role === 'doctor') {
+                    } else if (normalizedRole === 'doctor') {
                         window.location.replace('./doctor-dashboard.html');
                         return;
                     }
@@ -87,13 +85,25 @@
             const role = document.getElementById('signup-role').value;
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                // Write role doc immediately 
+                const normalizedRole = (role || '').toString().trim().toLowerCase();
                 await setDoc(doc(db, "users", userCredential.user.uid), {
                     email: userCredential.user.email,
-                    role: role,
-                    uid: userCredential.user.uid
+                    role: normalizedRole,
+                    uid: userCredential.user.uid,
+                    createdAt: new Date(),
+                    points: 0
                 });
+                // Redirect 
+                if (normalizedRole === 'doctor') {
+                    window.location.replace('./doctor-dashboard.html');
+                } else {
+                    window.location.replace('./patient-dashboard.html');
+                }
             } catch (error) {
+                console.error("Signup error:", error);
                 errorEl.textContent = error.message.replace('Firebase: ', '');
+                if (auth.currentUser) await auth.signOut();
             }
         });
     </script>

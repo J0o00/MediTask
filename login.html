@@ -12,6 +12,7 @@
             font-family: 'Inter', sans-serif;
         }
     </style>
+    <link rel="icon" href="data:,">
 </head>
 
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4 antialiased">
@@ -33,77 +34,32 @@
             Don't have an account? <a href="./signup.html" class="font-semibold text-teal-400 hover:underline">Sign
                 Up</a>
         </p>
+        <p class="mt-4 text-center text-sm">
+            <a href="./index.html" class="text-gray-500 hover:text-gray-300">← Back to Home</a>
+        </p>
     </div>
     <script type="module">
-        const firebaseConfig = {
-            apiKey: "AIzaSyBwqiEYkycDoxGdovRwvlXjCFscUKU6Xr8",
-            authDomain: "meditask-webapp.firebaseapp.com",
-            projectId: "meditask-webapp",
-            storageBucket: "meditask-webapp.appspot.com",
-            messagingSenderId: "550925294842",
-            appId: "1:550925294842:web:ca3b6a004801ccf635bd43"
-        };
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { login, checkAuthAndRedirect } from "./js/services/auth.js";
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // If already logged in, send to the correct dashboard directly.
-        onAuthStateChanged(auth, async (user) => {
-            if (!user) return;
-            try {
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists()) {
-                    const { role } = userDoc.data();
-                    const normalizedRole = (role || '').toString().trim().toLowerCase();
-                    if (normalizedRole === 'patient') {
-                        window.location.replace('./patient-dashboard.html');
-                        return;
-                    } else if (normalizedRole === 'doctor') {
-                        window.location.replace('./doctor-dashboard.html');
-                        return;
-                    }
-                    // Unknown role: keep user on login
-                }
-            } catch (e) {
-                console.error('Login auth check error:', e);
-                // On error, stay on login page
-            }
-        });
+        // Auto-redirect if already logged in
+        checkAuthAndRedirect();
 
         const loginForm = document.getElementById('login-form');
-        loginForm.addEventListener('submit', (e) => {
+        const errorEl = document.getElementById('login-error');
+
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const errorEl = document.getElementById('login-error');
-            errorEl.textContent = '';
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
-            signInWithEmailAndPassword(auth, email, password)
-                .then(async ({ user }) => {
-                    try {
-                        const userDoc = await getDoc(doc(db, "users", user.uid));
-                        if (!userDoc.exists()) {
-                            errorEl.textContent = 'No role set for this account. Please sign up again.';
-                            return;
-                        }
-                        const normalizedRole = (userDoc.data().role || '').toString().trim().toLowerCase();
-                        if (normalizedRole === 'doctor') {
-                            window.location.replace('./doctor-dashboard.html');
-                        } else if (normalizedRole === 'patient') {
-                            window.location.replace('./patient-dashboard.html');
-                        } else {
-                            errorEl.textContent = 'Unknown role. Please contact support or sign up again.';
-                        }
-                    } catch (e) {
-                        errorEl.textContent = 'Error loading account role. Try again.';
-                    }
-                })
-                .catch(error => {
-                    errorEl.textContent = error.message.replace('Firebase: ', '');
-                });
+            errorEl.textContent = '';
+
+            try {
+                await login(email, password);
+                // Redirect handled by checkAuthAndRedirect listener
+            } catch (error) {
+                console.error("Login error:", error);
+                errorEl.textContent = 'Invalid email or password.';
+            }
         });
     </script>
 </body>

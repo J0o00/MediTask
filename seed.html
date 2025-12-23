@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Seed Data - Meditask</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen">
+    <div class="bg-gray-800 p-8 rounded-xl shadow-xl max-w-md text-center">
+        <h1 class="text-3xl font-bold text-teal-400 mb-4">🌱 Seed Sample Data</h1>
+        <p class="text-gray-400 mb-6">Click below to populate your Doctor Dashboard with sample patients and exercise
+            history.</p>
+
+        <div class="space-y-4">
+            <button id="seed-btn"
+                class="w-full bg-teal-500 hover:bg-teal-600 text-black font-bold py-3 rounded-lg transition">
+                Generate Sample Patients & Data
+            </button>
+            <div id="status" class="text-sm p-4 rounded text-left hidden font-mono"></div>
+            <a href="./doctor-dashboard.html" id="link-dashboard"
+                class="hidden block text-teal-400 hover:underline mt-4">Go to Doctor Dashboard -></a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { db } from "./js/services/auth.js";
+        import { doc, setDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const statusDiv = document.getElementById('status');
+        const linkDashboard = document.getElementById('link-dashboard');
+
+        function log(msg, type = 'info') {
+            const color = type === 'error' ? 'text-red-400' : 'text-green-400';
+            statusDiv.innerHTML += `<div class="${color}">> ${msg}</div>`;
+            statusDiv.classList.remove('hidden');
+        }
+
+        document.getElementById('seed-btn').addEventListener('click', async () => {
+            document.getElementById('seed-btn').disabled = true;
+            document.getElementById('seed-btn').classList.add('opacity-50');
+            statusDiv.innerHTML = '';
+
+            const dummyPatients = [
+                { uid: 'sample_alice_' + Date.now(), email: 'alice@example.com', name: 'Alice' },
+                { uid: 'sample_bob_' + Date.now(), email: 'bob@example.com', name: 'Bob' },
+                { uid: 'sample_charlie_' + Date.now(), email: 'charlie@example.com', name: 'Charlie' }
+            ];
+
+            try {
+                log("Creating 3 sample patient profiles...");
+
+                for (const p of dummyPatients) {
+                    // Create User Doc (Visible in Doctor List)
+                    await setDoc(doc(db, "users", p.uid), {
+                        email: p.email,
+                        role: 'patient',
+                        createdAt: serverTimestamp(),
+                        points: Math.floor(Math.random() * 500)
+                    });
+                    log(`Created patient: ${p.name}`);
+
+                    // Add Random Exercise History
+                    const exercises = ["Right Hand Raise", "Shoulder Abduction", "Squat"];
+                    for (let i = 0; i < 3; i++) {
+                        const isCorrect = Math.random() > 0.3;
+                        await addDoc(collection(db, "exercise_logs"), {
+                            patientId: p.uid,
+                            patientEmail: p.email,
+                            exercise: exercises[Math.floor(Math.random() * exercises.length)],
+                            feedback: isCorrect ? "Great job!" : "Correct your posture.",
+                            isCorrect: isCorrect,
+                            timestamp: serverTimestamp()
+                        });
+                    }
+                    log(`Added history for: ${p.name}`);
+                }
+
+                log("✅ Seeding Complete!", 'success');
+                linkDashboard.classList.remove('hidden');
+
+            } catch (e) {
+                console.error(e);
+                log("Error seeding data: " + e.message, 'error');
+                log("Note: You must have permissions enabled.", 'error');
+            } finally {
+                document.getElementById('seed-btn').disabled = false;
+                document.getElementById('seed-btn').classList.remove('opacity-50');
+            }
+        });
+    </script>
+</body>
+
+</html>

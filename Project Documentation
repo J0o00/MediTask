@@ -1,0 +1,31 @@
+Meditask - AI Tele-Rehabilitation Prototype
+This project is a web-based prototype for Meditask, an AI-powered platform designed to revolutionize tele-rehabilitation for patients and clinicians.
+
+🎯 Goal
+The prototype demonstrates the core functionality of the Meditask platform:
+
+Dual-Role Authentication: Separate login and sign-up for Patients and Doctors using Firebase Auth.
+
+Real-Time Pose Analysis: Uses a patient's webcam and MediaPipe Pose to analyze a simple "Right Hand Raise" exercise.
+
+Live Feedback: Provides immediate, on-screen feedback to the patient about their exercise form.
+
+Clinical Data Logging: Securely saves exercise results and feedback to a Firestore database.
+
+Doctor Dashboard: Allows doctors to log in, view their list of patients, and review detailed exercise history reports.
+
+🛠️ Tech Stack
+Frontend: HTML, Tailwind CSS, JavaScript
+
+AI / Computer Vision: Google's MediaPipe Pose
+
+Backend & Database: Firebase Authentication & Firestore
+
+🚀 How to Run
+Set up Firebase: Create a Firebase project, enable Authentication (Email/Password), and set up a Firestore database.
+
+Configure: Copy your Firebase web app configuration object.
+
+Paste Config: Open index.html and paste your Firebase config into the firebaseConfig placeholder object within the <script type="module"> tag.
+
+Launch: Open the index.html file in a modern web browser (like Google Chrome).

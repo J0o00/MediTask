@@ -1,0 +1,23 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "prescriptions",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "isCompleted",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "patientId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "assignedAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}
