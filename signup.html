@@ -293,13 +293,14 @@
 
     <script type="module">
         import { firebaseConfig } from "./js/config.js";
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { auth, db } from "./js/services/auth.js";
+        import { createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        // Remove local initialization to use shared instances
+        // const app = initializeApp(firebaseConfig);
+        // const auth = getAuth(app); 
+        // const db = getFirestore(app);
 
         const signupForm = document.getElementById('signup-form');
         const errorBox = document.getElementById('signup-error');
