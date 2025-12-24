@@ -93,6 +93,7 @@ async function loadPatientReport(patientId, patientEmail) {
     reportContainer.innerHTML = `<div class="loader mx-auto"></div>`;
 
     const logs = await getExerciseHistory(patientId);
+    const feedbackLogs = logs.filter(l => l.type === 'feedback');
 
     let reportHTML = `
         <div class="flex justify-between items-center mb-6">
@@ -105,7 +106,10 @@ async function loadPatientReport(patientId, patientEmail) {
                      <p class="text-xs text-slate-500">Patient ID: ${patientId.slice(0, 8)}...</p>
                 </div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
+                <button id="export-pdf-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg text-sm shadow-md transition-all">
+                    📄 Export PDF
+                </button>
                 <button id="open-chat-btn" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm shadow-sm transition-all">
                     Message
                 </button>
@@ -150,6 +154,13 @@ async function loadPatientReport(patientId, patientEmail) {
     };
     document.getElementById('open-chat-btn').onclick = () => {
         openChat(patientId, patientEmail);
+    };
+    document.getElementById('export-pdf-btn').onclick = () => {
+        if (typeof window.exportPatientPDF === 'function') {
+            window.exportPatientPDF(patientEmail, logs, feedbackLogs);
+        } else {
+            alert('PDF export is loading, please try again.');
+        }
     };
 }
 

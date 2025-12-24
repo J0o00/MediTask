@@ -1,5 +1,5 @@
 import { auth, checkAuthAndRedirect, logout, db } from "./services/auth.js";
-import { getPatientPrescriptions, subscribeToChat, sendMessage, logExerciseRep, completeExercise } from "./services/db.js";
+import { getPatientPrescriptions, subscribeToChat, sendMessage, logExerciseRep, completeExercise, saveExerciseFeedback, getExerciseStats } from "./services/db.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 // db imported from services/auth.js
@@ -37,6 +37,63 @@ let repThreshold = 1000;
 let currentPoints = 0;
 let chatUnsubscribe = null;
 
+// AI Form Accuracy State
+let currentAccuracy = 0;
+let jointStatuses = {};
+
+// --- Utility: Calculate angle between three points ---
+function calculateAngle(a, b, c) {
+    // a, b, c are {x, y} points. b is the vertex.
+    const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+    let angle = Math.abs(radians * 180.0 / Math.PI);
+    if (angle > 180) angle = 360 - angle;
+    return angle;
+}
+
+// --- Update Accuracy UI ---
+function updateAccuracyUI(accuracy, feedback, joints) {
+    currentAccuracy = accuracy;
+    jointStatuses = joints;
+
+    const ring = document.getElementById('accuracy-ring');
+    const percent = document.getElementById('accuracy-percent');
+    const feedbackEl = document.getElementById('form-feedback');
+    const jointIndicators = document.getElementById('joint-indicators');
+
+    if (!ring || !percent) return;
+
+    // Update circular gauge (circumference = 2 * PI * 45 = ~283)
+    const offset = 283 - (283 * accuracy / 100);
+    ring.style.strokeDashoffset = offset;
+
+    // Update color based on accuracy
+    if (accuracy >= 80) {
+        ring.style.stroke = '#22c55e'; // green
+        percent.className = 'text-2xl font-bold text-green-400';
+    } else if (accuracy >= 50) {
+        ring.style.stroke = '#eab308'; // yellow
+        percent.className = 'text-2xl font-bold text-yellow-400';
+    } else {
+        ring.style.stroke = '#ef4444'; // red
+        percent.className = 'text-2xl font-bold text-red-400';
+    }
+
+    percent.textContent = `${Math.round(accuracy)}%`;
+    feedbackEl.textContent = feedback;
+
+    // Update joint indicators
+    if (jointIndicators) {
+        jointIndicators.innerHTML = '';
+        for (const [joint, isCorrect] of Object.entries(joints)) {
+            const indicator = document.createElement('span');
+            indicator.className = `px-2 py-1 rounded text-xs font-medium ${isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`;
+            indicator.textContent = `${isCorrect ? '✓' : '✗'} ${joint}`;
+            jointIndicators.appendChild(indicator);
+        }
+    }
+}
+
+
 // --- Initialization ---
 
 onAuthStateChanged(auth, async (user) => {
@@ -53,6 +110,7 @@ onAuthStateChanged(auth, async (user) => {
             document.getElementById('rewards-card').classList.remove('hidden');
 
             await loadPrescriptions();
+            loadAnalytics(); // Load analytics dashboard
         } catch (error) {
             console.error("Init error:", error);
             loadingView.innerHTML = `<p class="text-red-500">Error loading dashboard: ${error.message}</p>`;
@@ -125,9 +183,74 @@ function createPrescriptionCard(prescription) {
         </div>
     `;
 
-    card.querySelector('.start-btn').onclick = () => startExercise(prescription);
+    card.querySelector('.start-btn').onclick = () => showExerciseDemo(prescription);
     prescriptionList.appendChild(card);
 }
+
+// Exercise demo content
+const exerciseDemos = {
+    'Right Hand Raise': {
+        emoji: '🙋‍♂️',
+        title: 'Right Hand Raise',
+        steps: [
+            '1. Stand straight with arms at your sides',
+            '2. Keep your right arm straight',
+            '3. Raise your right arm above your head',
+            '4. Hold briefly, then lower slowly'
+        ]
+    },
+    'Shoulder Abduction': {
+        emoji: '🧍‍♂️',
+        title: 'Shoulder Abduction (T-Pose)',
+        steps: [
+            '1. Stand with arms relaxed at sides',
+            '2. Raise both arms out to the sides',
+            '3. Stop when arms are at shoulder height',
+            '4. Hold the T-pose, then lower'
+        ]
+    },
+    'Squat': {
+        emoji: '🏋️',
+        title: 'Squat Exercise',
+        steps: [
+            '1. Stand with feet shoulder-width apart',
+            '2. Bend your knees and push hips back',
+            '3. Lower until thighs are parallel to floor',
+            '4. Push through heels to stand up'
+        ]
+    }
+};
+
+let pendingPrescription = null;
+
+function showExerciseDemo(prescription) {
+    pendingPrescription = prescription;
+
+    const demo = exerciseDemos[prescription.exercise] || {
+        emoji: '🏃',
+        title: prescription.exercise,
+        steps: ['Follow the on-screen instructions']
+    };
+
+    document.getElementById('demo-title').textContent = demo.title;
+    document.getElementById('demo-animation').textContent = demo.emoji;
+    document.getElementById('demo-instructions').innerHTML =
+        `<ul class="text-left space-y-2">${demo.steps.map(s => `<li class="flex gap-2"><span class="text-teal-400">•</span> ${s}</li>`).join('')}</ul>`;
+
+    document.getElementById('demo-modal').classList.remove('hidden');
+}
+
+document.getElementById('start-exercise-btn')?.addEventListener('click', () => {
+    document.getElementById('demo-modal').classList.add('hidden');
+    if (pendingPrescription) {
+        startExercise(pendingPrescription);
+    }
+});
+
+document.getElementById('cancel-demo-btn')?.addEventListener('click', () => {
+    document.getElementById('demo-modal').classList.add('hidden');
+    pendingPrescription = null;
+});
 
 function startExercise(prescription) {
     if (!prescription) return;
@@ -214,15 +337,18 @@ async function onPoseResults(results) {
 
     if (results.poseLandmarks && results.poseLandmarks.length > 0) {
         const landmarks = results.poseLandmarks;
-        let isCorrect = false;
+        let analysisResult = { isCorrect: false, accuracy: 0, feedback: '', joints: {} };
 
         switch (currentPrescription.exercise) {
-            case 'Right Hand Raise': isCorrect = analyzeHandRaise(landmarks); break;
-            case 'Shoulder Abduction': isCorrect = analyzeShoulderAbduction(landmarks); break;
-            case 'Squat': isCorrect = analyzeSquat(landmarks); break;
+            case 'Right Hand Raise': analysisResult = analyzeHandRaiseWithAccuracy(landmarks); break;
+            case 'Shoulder Abduction': analysisResult = analyzeShoulderAbductionWithAccuracy(landmarks); break;
+            case 'Squat': analysisResult = analyzeSquatWithAccuracy(landmarks); break;
         }
 
-        if (isCorrect) {
+        // Update the AI Accuracy UI
+        updateAccuracyUI(analysisResult.accuracy, analysisResult.feedback, analysisResult.joints);
+
+        if (analysisResult.isCorrect) {
             const now = Date.now();
             if (now - lastRepTime > repThreshold) {
                 currentReps++;
@@ -252,45 +378,188 @@ async function onPoseResults(results) {
             }
         } else {
             feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-yellow-800 text-yellow-200";
-            feedbackBox.textContent = getInstruction();
+            feedbackBox.textContent = analysisResult.feedback || getInstruction();
         }
 
+        // Draw skeleton with color-coded joints
         drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, { color: '#4ade80', lineWidth: 4 });
-        drawLandmarks(canvasCtx, landmarks, { color: '#f87171', lineWidth: 2, radius: 5 });
+
+        // Custom landmark drawing with color based on correctness
+        landmarks.forEach((landmark, idx) => {
+            if (landmark.visibility > 0.5) {
+                const x = landmark.x * canvasElement.width;
+                const y = landmark.y * canvasElement.height;
+                canvasCtx.beginPath();
+                canvasCtx.arc(x, y, 6, 0, 2 * Math.PI);
+
+                // Color key joints based on their status
+                let color = '#f87171'; // default red
+                if (analysisResult.accuracy >= 80) color = '#22c55e'; // green
+                else if (analysisResult.accuracy >= 50) color = '#eab308'; // yellow
+
+                canvasCtx.fillStyle = color;
+                canvasCtx.fill();
+            }
+        });
     } else {
         feedbackBox.textContent = "No person detected.";
         feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-red-800 text-red-200";
+        updateAccuracyUI(0, "Position yourself in front of the camera", {});
     }
     canvasCtx.restore();
 }
 
-function analyzeHandRaise(landmarks) {
+// --- Enhanced Exercise Analysis with Accuracy ---
+
+function analyzeHandRaiseWithAccuracy(landmarks) {
     const rightShoulder = landmarks[12];
+    const rightElbow = landmarks[14];
     const rightWrist = landmarks[16];
-    return rightShoulder.visibility > 0.5 && rightWrist.visibility > 0.5 && rightWrist.y < rightShoulder.y;
+    const rightHip = landmarks[24];
+
+    const visible = rightShoulder.visibility > 0.5 && rightElbow.visibility > 0.5 && rightWrist.visibility > 0.5;
+    if (!visible) return { isCorrect: false, accuracy: 0, feedback: "Can't see your right arm clearly", joints: {} };
+
+    // Calculate arm angle (shoulder-elbow-wrist)
+    const armAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+    const armStraight = armAngle > 150; // Arm should be relatively straight
+
+    // Check if hand is above shoulder
+    const handAboveShoulder = rightWrist.y < rightShoulder.y;
+    const heightDiff = (rightShoulder.y - rightWrist.y) * 100; // normalized
+
+    // Calculate accuracy
+    let accuracy = 0;
+    if (handAboveShoulder) {
+        accuracy += 50; // Base points for raising hand
+        accuracy += Math.min(heightDiff * 2, 30); // Bonus for height
+        if (armStraight) accuracy += 20; // Bonus for straight arm
+    } else {
+        accuracy = Math.max(0, 30 - (rightWrist.y - rightShoulder.y) * 100);
+    }
+    accuracy = Math.min(100, Math.max(0, accuracy));
+
+    const isCorrect = accuracy >= 80;
+
+    let feedback = '';
+    if (accuracy >= 80) feedback = "Excellent form! Hold the position.";
+    else if (accuracy >= 50) feedback = "Almost there! Raise your hand higher.";
+    else if (!handAboveShoulder) feedback = "⬆️ Raise your right hand above shoulder";
+    else if (!armStraight) feedback = "Straighten your arm";
+    else feedback = "Keep raising your hand higher";
+
+    return {
+        isCorrect,
+        accuracy,
+        feedback,
+        joints: {
+            'Shoulder': true,
+            'Elbow': armStraight,
+            'Wrist': handAboveShoulder
+        }
+    };
 }
 
-function analyzeShoulderAbduction(landmarks) {
-    return landmarks[11].y > landmarks[15].y && landmarks[12].y > landmarks[16].y; // approx check
+function analyzeShoulderAbductionWithAccuracy(landmarks) {
+    const leftShoulder = landmarks[11];
+    const leftElbow = landmarks[13];
+    const leftWrist = landmarks[15];
+    const rightShoulder = landmarks[12];
+    const rightElbow = landmarks[14];
+    const rightWrist = landmarks[16];
+    const leftHip = landmarks[23];
+    const rightHip = landmarks[24];
+
+    const visible = leftShoulder.visibility > 0.5 && rightShoulder.visibility > 0.5;
+    if (!visible) return { isCorrect: false, accuracy: 0, feedback: "Position both shoulders visible", joints: {} };
+
+    // Calculate angles for both arms relative to torso
+    const leftArmAngle = calculateAngle(leftHip, leftShoulder, leftElbow);
+    const rightArmAngle = calculateAngle(rightHip, rightShoulder, rightElbow);
+
+    // Target: arms at ~90 degrees from body (horizontal)
+    const leftScore = Math.max(0, 100 - Math.abs(90 - leftArmAngle));
+    const rightScore = Math.max(0, 100 - Math.abs(90 - rightArmAngle));
+
+    const accuracy = (leftScore + rightScore) / 2;
+    const isCorrect = accuracy >= 70;
+
+    let feedback = '';
+    if (accuracy >= 80) feedback = "Perfect T-pose! Hold it steady.";
+    else if (accuracy >= 50) feedback = "Raise both arms to shoulder height";
+    else feedback = "Spread arms out to the sides horizontally";
+
+    return {
+        isCorrect,
+        accuracy,
+        feedback,
+        joints: {
+            'Left Arm': leftScore >= 60,
+            'Right Arm': rightScore >= 60
+        }
+    };
 }
 
-function analyzeSquat(landmarks) {
-    return landmarks[25].y > landmarks[23].y + 0.1; // knee below hip roughly
+function analyzeSquatWithAccuracy(landmarks) {
+    const leftHip = landmarks[23];
+    const leftKnee = landmarks[25];
+    const leftAnkle = landmarks[27];
+    const rightHip = landmarks[24];
+    const rightKnee = landmarks[26];
+    const rightAnkle = landmarks[28];
+
+    const visible = leftKnee.visibility > 0.5 && rightKnee.visibility > 0.5;
+    if (!visible) return { isCorrect: false, accuracy: 0, feedback: "Can't see your legs clearly", joints: {} };
+
+    // Calculate knee angles
+    const leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+    const rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+    const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
+
+    // Target: ~90 degrees for a proper squat
+    // Score based on how close to 90 degrees
+    let accuracy = 0;
+    if (avgKneeAngle <= 110) {
+        accuracy = Math.max(0, 100 - Math.abs(90 - avgKneeAngle) * 2);
+    } else {
+        // Standing - encourage going lower
+        accuracy = Math.max(0, 50 - (avgKneeAngle - 110));
+    }
+    accuracy = Math.min(100, Math.max(0, accuracy));
+
+    const isCorrect = accuracy >= 70;
+
+    let feedback = '';
+    if (accuracy >= 80) feedback = "Great squat depth! Hold and rise.";
+    else if (accuracy >= 50) feedback = "Good start, go a bit lower";
+    else if (avgKneeAngle > 150) feedback = "Bend your knees to start the squat";
+    else feedback = "Lower your hips more";
+
+    return {
+        isCorrect,
+        accuracy,
+        feedback,
+        joints: {
+            'Left Knee': leftKneeAngle <= 110,
+            'Right Knee': rightKneeAngle <= 110,
+            'Depth': avgKneeAngle <= 100
+        }
+    };
 }
 
 function getInstruction() {
-    if (currentPrescription.exercise === 'Right Hand Raise') return '⬆️ Raise right hand';
-    return 'Perform exercise';
+    if (currentPrescription.exercise === 'Right Hand Raise') return '⬆️ Raise right hand above shoulder';
+    if (currentPrescription.exercise === 'Shoulder Abduction') return '↔️ Spread arms out horizontally';
+    if (currentPrescription.exercise === 'Squat') return '⬇️ Bend knees and lower your hips';
+    return 'Perform the exercise correctly';
 }
 
 async function finishExercise() {
     const points = await completeExercise(auth.currentUser.uid, auth.currentUser.email, currentPrescription.id, currentPrescription.exercise, totalReps, currentPoints);
     updatePointsUI(currentPoints + points);
-    showRewardNotification(points);
-    setTimeout(() => {
-        showPrescriptionList();
-        loadPrescriptions();
-    }, 3000);
+
+    // Show the feedback modal instead of immediately redirecting
+    showFeedbackModal(points);
 }
 
 function updatePointsUI(points) {
@@ -352,4 +621,148 @@ function loadChatMessages() {
         });
         chatMessages.scrollTop = chatMessages.scrollHeight;
     });
+}
+
+// --- Post-Exercise Feedback Modal ---
+let selectedDifficulty = null;
+let pendingPoints = 0;
+
+function showFeedbackModal(points) {
+    pendingPoints = points;
+    selectedDifficulty = null;
+
+    // Reset modal state
+    document.getElementById('pain-slider').value = 1;
+    document.getElementById('pain-value').textContent = '1';
+    document.getElementById('feedback-notes').value = '';
+    document.querySelectorAll('.difficulty-btn').forEach(btn => {
+        btn.classList.remove('border-teal-500', 'bg-teal-500/20');
+        btn.classList.add('border-gray-700');
+    });
+
+    // Show modal
+    document.getElementById('feedback-modal').classList.remove('hidden');
+}
+
+function closeFeedbackModal() {
+    document.getElementById('feedback-modal').classList.add('hidden');
+    showRewardNotification(pendingPoints);
+
+    setTimeout(() => {
+        showPrescriptionList();
+        loadPrescriptions();
+    }, 2000);
+}
+
+// Pain slider update
+document.getElementById('pain-slider')?.addEventListener('input', (e) => {
+    document.getElementById('pain-value').textContent = e.target.value;
+});
+
+// Difficulty button selection
+document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Remove selection from all
+        document.querySelectorAll('.difficulty-btn').forEach(b => {
+            b.classList.remove('border-teal-500', 'bg-teal-500/20');
+            b.classList.add('border-gray-700');
+        });
+        // Add selection to clicked
+        btn.classList.add('border-teal-500', 'bg-teal-500/20');
+        btn.classList.remove('border-gray-700');
+        selectedDifficulty = btn.dataset.difficulty;
+    });
+});
+
+// Submit feedback
+document.getElementById('submit-feedback-btn')?.addEventListener('click', async () => {
+    const painLevel = parseInt(document.getElementById('pain-slider').value);
+    const notes = document.getElementById('feedback-notes').value.trim();
+
+    if (!selectedDifficulty) {
+        alert('Please select a difficulty level');
+        return;
+    }
+
+    try {
+        await saveExerciseFeedback(
+            auth.currentUser.uid,
+            auth.currentUser.email,
+            currentPrescription.exercise,
+            painLevel,
+            selectedDifficulty,
+            notes
+        );
+        console.log('Feedback saved successfully');
+    } catch (e) {
+        console.error('Error saving feedback:', e);
+    }
+
+    closeFeedbackModal();
+});
+
+// Skip feedback
+document.getElementById('skip-feedback-btn')?.addEventListener('click', () => {
+    closeFeedbackModal();
+});
+
+// --- Analytics Dashboard ---
+let weeklyChart = null;
+
+async function loadAnalytics() {
+    try {
+        const stats = await getExerciseStats(auth.currentUser.uid);
+
+        // Update stat cards
+        document.getElementById('stat-total-exercises').textContent = stats.totalExercises || 0;
+        document.getElementById('stat-streak').textContent = stats.streak || 0;
+        document.getElementById('stat-adherence').textContent = `${stats.adherenceRate || 0}%`;
+
+        // Render weekly chart if Chart.js is available
+        const canvas = document.getElementById('weekly-chart');
+        if (canvas && typeof Chart !== 'undefined' && stats.weeklyData && stats.weeklyData.length > 0) {
+            const ctx = canvas.getContext('2d');
+
+            // Destroy existing chart if any
+            if (weeklyChart) weeklyChart.destroy();
+
+            weeklyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: stats.weeklyData.map(d => d.day),
+                    datasets: [{
+                        label: 'Exercises Completed',
+                        data: stats.weeklyData.map(d => d.count),
+                        backgroundColor: 'rgba(20, 184, 166, 0.7)',
+                        borderColor: 'rgba(20, 184, 166, 1)',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#9ca3af',
+                                stepSize: 1
+                            },
+                            grid: { color: 'rgba(75, 85, 99, 0.3)' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.error("Error loading analytics:", e);
+    }
 }

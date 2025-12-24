@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#14b8a6">
+    <meta name="description"
+        content="MediTask - AI-powered rehabilitation companion for tracking exercises and recovery progress">
+    <link rel="manifest" href="./manifest.json">
     <title>Patient Dashboard - MediTask</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -175,6 +179,43 @@
                 <div id="prescription-list" class="grid gap-4">
                     <!-- Prescriptions will be loaded here -->
                 </div>
+
+                <!-- Progress Analytics Section -->
+                <div class="mt-8">
+                    <h3 class="text-xl font-bold text-cyan-400 mb-4">📊 Your Progress</h3>
+
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="glass p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-1">🏃</div>
+                            <p id="stat-total-exercises" class="text-2xl font-bold text-teal-400">0</p>
+                            <p class="text-xs text-gray-400">Exercises Done</p>
+                        </div>
+                        <div class="glass p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-1">🔥</div>
+                            <p id="stat-streak" class="text-2xl font-bold text-orange-400">0</p>
+                            <p class="text-xs text-gray-400">Day Streak</p>
+                        </div>
+                        <div class="glass p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-1">💯</div>
+                            <p id="stat-adherence" class="text-2xl font-bold text-green-400">0%</p>
+                            <p class="text-xs text-gray-400">Adherence Rate</p>
+                        </div>
+                        <div class="glass p-4 rounded-xl text-center">
+                            <div class="text-3xl mb-1">⭐</div>
+                            <p id="stat-avg-accuracy" class="text-2xl font-bold text-yellow-400">--%</p>
+                            <p class="text-xs text-gray-400">Avg. Form Score</p>
+                        </div>
+                    </div>
+
+                    <!-- Weekly Progress Chart -->
+                    <div class="glass-strong rounded-2xl p-6 glow-teal">
+                        <h4 class="font-bold mb-4 text-gray-300">Weekly Activity</h4>
+                        <div class="h-48">
+                            <canvas id="weekly-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Exercise Session View -->
@@ -229,6 +270,30 @@
                                 <div id="progress-bar"
                                     class="bg-gradient-to-r from-teal-500 to-cyan-500 h-3 rounded-full transition-all duration-500 ease-out glow-teal"
                                     style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- AI Form Accuracy Meter -->
+                        <div class="glass p-4 rounded-xl mt-4">
+                            <h5 class="font-bold mb-3 text-cyan-400">🤖 AI Form Analysis</h5>
+                            <div class="flex items-center gap-4">
+                                <div class="relative w-24 h-24">
+                                    <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="45" stroke="#374151" stroke-width="8" fill="none" />
+                                        <circle id="accuracy-ring" cx="50" cy="50" r="45" stroke="#14b8a6"
+                                            stroke-width="8" fill="none" stroke-dasharray="283" stroke-dashoffset="283"
+                                            stroke-linecap="round" class="transition-all duration-300" />
+                                    </svg>
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <span id="accuracy-percent" class="text-2xl font-bold text-teal-400">0%</span>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <p id="form-feedback" class="text-sm text-gray-300 mb-2">Analyzing your form...</p>
+                                    <div id="joint-indicators" class="flex flex-wrap gap-1">
+                                        <!-- Joint status indicators will be added here -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -292,13 +357,117 @@
                 </button>
             </div>
         </div>
+
+        <!-- Post-Exercise Feedback Modal -->
+        <div id="feedback-modal"
+            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-md glow-teal">
+                <h3 class="text-2xl font-bold text-teal-400 mb-6 text-center">📝 How was your exercise?</h3>
+
+                <!-- Pain Level -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-3">Pain Level</label>
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">😊</span>
+                        <input type="range" id="pain-slider" min="1" max="10" value="1"
+                            class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-teal-500">
+                        <span class="text-2xl">😖</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>No Pain</span>
+                        <span id="pain-value" class="text-teal-400 font-bold">1</span>
+                        <span>Severe</span>
+                    </div>
+                </div>
+
+                <!-- Difficulty Rating -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-3">Difficulty Level</label>
+                    <div id="difficulty-buttons" class="grid grid-cols-3 gap-2">
+                        <button data-difficulty="easy"
+                            class="difficulty-btn glass hover:glass-strong py-3 px-4 rounded-xl border border-gray-700 transition-all text-center">
+                            <span class="text-2xl block mb-1">💪</span>
+                            <span class="text-sm">Easy</span>
+                        </button>
+                        <button data-difficulty="medium"
+                            class="difficulty-btn glass hover:glass-strong py-3 px-4 rounded-xl border border-gray-700 transition-all text-center">
+                            <span class="text-2xl block mb-1">🏋️</span>
+                            <span class="text-sm">Medium</span>
+                        </button>
+                        <button data-difficulty="hard"
+                            class="difficulty-btn glass hover:glass-strong py-3 px-4 rounded-xl border border-gray-700 transition-all text-center">
+                            <span class="text-2xl block mb-1">🔥</span>
+                            <span class="text-sm">Hard</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Optional Notes -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Notes (optional)</label>
+                    <textarea id="feedback-notes" rows="2" placeholder="Any discomfort or comments..."
+                        class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white resize-none transition-all"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button id="submit-feedback-btn"
+                    class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] glow-teal">
+                    Submit Feedback
+                </button>
+
+                <button id="skip-feedback-btn"
+                    class="w-full mt-3 text-gray-500 hover:text-gray-300 text-sm transition-colors">
+                    Skip for now
+                </button>
+            </div>
+        </div>
+
+        <!-- Exercise Demo Modal -->
+        <div id="demo-modal"
+            class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-lg glow-teal">
+                <h3 id="demo-title" class="text-2xl font-bold text-teal-400 mb-4 text-center">Exercise Demo</h3>
+
+                <div id="demo-content" class="mb-6">
+                    <!-- Demo animation/instructions will be shown here -->
+                    <div
+                        class="aspect-video bg-gray-800 rounded-xl flex items-center justify-center mb-4 overflow-hidden">
+                        <div id="demo-animation" class="text-6xl animate-bounce">🏋️</div>
+                    </div>
+                    <div id="demo-instructions" class="text-gray-300 text-center">
+                        <p class="mb-2">Loading exercise instructions...</p>
+                    </div>
+                </div>
+
+                <button id="start-exercise-btn"
+                    class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] glow-teal">
+                    Start Exercise
+                </button>
+                <button id="cancel-demo-btn"
+                    class="w-full mt-3 text-gray-500 hover:text-gray-300 text-sm transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="./js/patient-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('MediTask SW registered'))
+                    .catch(err => console.log('SW registration failed:', err));
+            });
+        }
+    </script>
 </body>
 
 </html>
