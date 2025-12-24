@@ -20,7 +20,15 @@ export async function checkAuthAndRedirect(requiredRole = null) {
         }
 
         try {
-            const userDoc = await getDoc(doc(db, "users", user.uid));
+            let userDoc = await getDoc(doc(db, "users", user.uid));
+
+            // Retry logic: If doc doesn't exist, wait and try again (handling race condition)
+            if (!userDoc.exists()) {
+                console.log("User profile not found immediately. Retrying in 1.5s...");
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                userDoc = await getDoc(doc(db, "users", user.uid));
+            }
+
             if (userDoc.exists()) {
                 const { role } = userDoc.data();
                 const normalizedRole = (role || '').toString().trim().toLowerCase();
@@ -38,22 +46,9 @@ export async function checkAuthAndRedirect(requiredRole = null) {
                     else if (normalizedRole === 'patient') window.location.replace('./patient-dashboard.html');
                 }
             } else {
-                console.warn("User doc missing. Attempting self-healing...");
-                // Self-healing: Create default patient profile to fix broken account
-                try {
-                    await setDoc(doc(db, "users", user.uid), {
-                        email: user.email,
-                        role: 'patient', // Default to patient for safety
-                        createdAt: serverTimestamp(),
-                        points: 0,
-                        isHealed: true
-                    });
-                    console.log("Self-healing successful. Redirecting...");
-                    window.location.replace('./patient-dashboard.html');
-                } catch (healingError) {
-                    console.error("Self-healing failed:", healingError);
-                    alert("Account error: Profile missing and auto-repair failed. Please contact support.");
-                }
+                console.warn("User profile still missing after retry. Check Firestore permissions or creation logic.");
+                // Do NOT auto-heal to patient. Let the user stay on the page or show a specific error if appropriate.
+                // For now, we simply don't redirect, allowing the script to fail gracefully or the user to retry.
             }
         } catch (error) {
             console.error("Auth check error:", error);
