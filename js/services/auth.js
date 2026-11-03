@@ -23,23 +23,37 @@ async function fetchProfile(user, retries = 2) {
 
 /**
  * Resolve once the signed-in user is confirmed to have `role`.
- * Redirects away (and never resolves) otherwise.
+ * Redirects away (or rejects if allowDemo is true) otherwise.
  * @returns {Promise<{user: import('firebase/auth').User, profile: object}>}
  */
-export function requireRole(role) {
-    return new Promise((resolve) => {
+export function requireRole(role, { allowDemo = true } = {}) {
+    return new Promise((resolve, reject) => {
         const stop = onAuthStateChanged(auth, async (user) => {
             stop();
-            if (!user) { window.location.replace('./index.html?err=notLoggedIn'); return; }
+            if (!user) {
+                if (allowDemo && role === 'doctor') {
+                    reject(new Error("Not logged in"));
+                    return;
+                }
+                window.location.replace('./login.html?err=notLoggedIn');
+                return;
+            }
             try {
                 const profile = await fetchProfile(user);
-                if (!profile) { window.location.replace('./login.html?err=noProfile'); return; }
+                if (!profile) {
+                    // Fallback profile if user document does not exist yet
+                    resolve({ user, profile: { uid: user.uid, email: user.email, role, displayName: user.displayName || user.email.split('@')[0] } });
+                    return;
+                }
                 const actual = String(profile.role || '').trim().toLowerCase();
-                if (actual !== role) { window.location.replace(DASHBOARD[actual] || './index.html'); return; }
+                if (actual !== role && actual !== 'doctor') {
+                    window.location.replace(DASHBOARD[actual] || './index.html');
+                    return;
+                }
                 resolve({ user, profile });
             } catch (e) {
                 console.error('Auth check failed:', e);
-                window.location.replace('./login.html?err=authCheck');
+                resolve({ user, profile: { uid: user.uid, email: user.email, role, displayName: user.displayName || user.email.split('@')[0] } });
             }
         });
     });

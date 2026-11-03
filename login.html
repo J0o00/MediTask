@@ -46,7 +46,10 @@
                 <button type="submit" id="login-btn" class="btn btn-primary btn-lg btn-block">
                     <span id="btn-spinner" class="spinner hidden"></span><span id="btn-text">Sign in</span>
                 </button>
-                <p class="small muted">New to MediTask? <a href="./signup.html">Create an account</a></p>
+                <div class="row between mt-2">
+                    <p class="small muted">New to MediTask? <a href="./signup.html">Create an account</a></p>
+                    <a href="./doctor-dashboard.html" class="small strong">Clinical Dashboard ›</a>
+                </div>
             </form>
         </main>
     </div>
@@ -54,7 +57,8 @@
     <script type="module">
         import { hydrateIcons } from "./js/ui/icons.js";
         hydrateIcons();
-        import { login, checkAuthAndRedirect } from "./js/services/auth.js";
+        import { auth, db, login, checkAuthAndRedirect } from "./js/services/auth.js";
+        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // Signed-in users go straight to their dashboard.
         checkAuthAndRedirect();
@@ -62,6 +66,13 @@
         const $ = (id) => document.getElementById(id);
         const showError = (m) => { $('error-text').textContent = m; $('login-error').classList.remove('hidden'); };
         const hideError = () => $('login-error').classList.add('hidden');
+
+        // Check URL parameters for messages
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('err') === 'notLoggedIn') {
+            showError('Please sign in to access your dashboard.');
+        }
+
         function setLoading(on) {
             $('login-btn').disabled = on;
             $('btn-text').textContent = on ? 'Signing in…' : 'Sign in';
@@ -75,8 +86,21 @@
             if (!email || !password) { showError('Enter your email and password.'); return; }
             setLoading(true);
             try {
-                await login(email, password);
-                $('btn-text').textContent = 'Opening your dashboard…';   // redirect handled by checkAuthAndRedirect
+                const cred = await login(email, password);
+                $('btn-text').textContent = 'Opening your dashboard…';
+                try {
+                    const snap = await getDoc(doc(db, "users", cred.user.uid));
+                    const role = snap.exists() ? String(snap.data().role || '').toLowerCase() : '';
+                    if (role === 'doctor') {
+                        window.location.replace('./doctor-dashboard.html');
+                        return;
+                    } else {
+                        window.location.replace('./patient-dashboard.html');
+                        return;
+                    }
+                } catch {
+                    window.location.replace('./patient-dashboard.html');
+                }
             } catch (error) {
                 console.error('Login error:', error);
                 setLoading(false);

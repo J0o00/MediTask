@@ -2,198 +2,555 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0E5A52">
-    <title>Patients - MediTask Clinical</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/app.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E5A52'/%3E%3Cpath d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <title>MediTask Clinical Dashboard</title>
+    <!-- Tailwind CSS v3 with Plugins -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            teal: '#0d9488',
+                            tealLight: '#2dd4bf',
+                            periwinkle: '#6b8afd',
+                            coral: '#f472b6',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js & jsPDF for telemetry rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style data-purpose="ambient-canvas-and-glass">
+        /* Lumis aesthetic background gradient mesh */
+        body {
+            background: radial-gradient(circle at 15% 15%, #5d75bc 0%, #465f9e 35%, #505c87 70%, #2f3755 100%),
+                linear-gradient(135deg, #7c94d6 0%, #b2a8d3 40%, #e2b4cb 75%, #a6badf 100%);
+            background-blend-mode: overlay, normal;
+            background-attachment: fixed;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Glassmorphism translucent panels replicating Lumis UI */
+        .lumis-glass {
+            background: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            box-shadow: 0 16px 40px -10px rgba(18, 25, 48, 0.18),
+                inset 0 1px 1px 0 rgba(255, 255, 255, 0.5);
+        }
+
+        .lumis-glass-subtle {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .lumis-pill-active {
+            background: rgba(255, 255, 255, 0.92);
+            color: #1e293b;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+
+        .lumis-pill-inactive {
+            background: rgba(255, 255, 255, 0.16);
+            color: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* iOS safe areas */
+        .safe-top {
+            padding-top: env(safe-area-inset-top, 14px);
+        }
+
+        .safe-bottom {
+            padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 72px);
+        }
+
+        /* Smooth scroll behavior */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .glow-dot-green {
+            box-shadow: 0 0 10px #4ade80, 0 0 2px #22c55e;
+        }
+
+        .glow-dot-amber {
+            box-shadow: 0 0 10px #fbbf24, 0 0 2px #f59e0b;
+        }
+
+        .glow-dot-red {
+            box-shadow: 0 0 10px #f87171, 0 0 2px #ef4444;
+        }
+
+        /* Modal backdrop transitions */
+        .backdrop-enter {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+        }
+    </style>
 </head>
 
-<body>
-    <header class="topbar">
-        <div class="topbar-inner">
-            <a class="brand" href="./doctor-dashboard.html" aria-label="MediTask Clinical home">
-                <span class="brand-mark"><span data-icon="logo"></span></span>
-                <span class="brand-name">MediTask</span>
-                <span class="brand-tag">Clinical</span>
-            </a>
-            <div class="topbar-actions">
-                <button id="link-patient-btn" class="btn btn-secondary btn-sm" type="button"><span data-icon="link"></span><span class="hide-sm">Invite patient</span></button>
-                <button id="add-patient-btn" class="btn btn-primary btn-sm" type="button"><span data-icon="userPlus"></span><span class="hide-sm">New patient</span></button>
-                <div class="user-chip">
-                    <span id="doctor-avatar" class="avatar" aria-hidden="true"></span>
-                    <span id="doctor-line" class="small strong hide-sm"></span>
-                </div>
-                <button id="logout-btn" class="icon-btn" type="button" aria-label="Sign out" title="Sign out"><span data-icon="logout"></span></button>
-            </div>
+<body class="text-white font-sans selection:bg-teal-400 selection:text-white">
+    <!-- Ambient Background Glow Lights -->
+    <div aria-hidden="true" class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div class="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-indigo-300/30 blur-3xl"></div>
+        <div class="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-rose-200/25 blur-3xl"></div>
+        <div class="absolute -bottom-20 left-10 w-96 h-96 rounded-full bg-blue-300/20 blur-3xl"></div>
+    </div>
+
+    <!-- Main Responsive Container -->
+    <main class="relative z-10 max-w-lg md:max-w-4xl lg:max-w-5xl mx-auto min-h-screen flex flex-col px-4 safe-top safe-bottom">
+
+        <!-- Demo Mode Indicator Bar (if in demo mode) -->
+        <div id="demo-banner" class="hidden mb-2 py-1.5 px-3 rounded-full lumis-glass-subtle flex items-center justify-between text-xs text-teal-200">
+            <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-teal-300 animate-pulse"></span>
+                <span>Clinician Demo Mode</span>
+            </span>
+            <a href="./login.html" class="underline text-white font-medium hover:text-teal-200">Sign in to Firebase</a>
         </div>
-    </header>
 
-    <div id="loading-view" class="loading" role="status"><div><div class="spinner"></div>Loading your patients…</div></div>
-
-    <main id="main-content" class="page hidden">
-        <div class="clinic">
-            <!-- Patient list -->
-            <aside id="sidebar" class="panel rail" aria-label="Patients">
-                <div class="panel-head">
-                    <h2>Patients <span id="patient-count" class="muted small num"></span></h2>
-                    <button id="mobile-menu-btn" class="icon-btn mobile-only" type="button" aria-label="Show or hide patient list"><span data-icon="menu"></span></button>
-                </div>
-                <div class="rail-search">
-                    <label class="sr-only" for="patient-search">Search patients</label>
-                    <input id="patient-search" type="search" class="input" placeholder="Search by name or email">
-                </div>
-                <div id="patient-list" class="patient-list"><p class="empty small">Loading…</p></div>
-                <div class="rail-foot">
-                    <h3 class="small">Pending invitations</h3>
-                    <div id="pending-links" class="stack small mt-2"></div>
-                </div>
-            </aside>
-
-            <!-- Patient record -->
-            <section aria-live="polite">
-                <div id="report-placeholder" class="panel empty empty-lg">
-                    <h3>Select a patient</h3>
-                    <p>Their rehabilitation record, session results and prescriptions open here.</p>
-                </div>
-
-                <div id="patient-detail" class="hidden">
-                    <div class="record-head">
-                        <span id="pt-avatar" class="avatar lg" aria-hidden="true"></span>
-                        <div class="grow">
-                            <h1 id="pt-name"></h1>
-                            <div id="pt-meta" class="meta mt-1"></div>
-                        </div>
-                        <div class="record-actions">
-                            <button id="open-chat-btn" class="btn btn-secondary" type="button"><span data-icon="chat"></span>Message</button>
-                            <button id="export-pdf-btn" class="btn btn-secondary" type="button"><span data-icon="file"></span>Export report</button>
-                            <button id="unlink-btn" class="btn btn-ghost" type="button">Discharge</button>
-                        </div>
+        <!-- TopBar / Header -->
+        <header class="pt-3 pb-3 flex items-center justify-between" data-purpose="top-navigation-bar">
+            <!-- Brand & Status -->
+            <div class="flex items-center space-x-2.5">
+                <a href="./index.html" class="w-9 h-9 rounded-2xl lumis-glass flex items-center justify-center text-teal-300 shadow-inner hover:scale-105 transition" title="Back to Home">
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                    </svg>
+                </a>
+                <div>
+                    <div class="flex items-center space-x-1.5">
+                        <h1 class="text-base font-semibold tracking-tight text-white">MediTask</h1>
+                        <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full bg-teal-400/25 text-teal-200 border border-teal-300/30">Clinical</span>
                     </div>
+                    <p id="doctor-line" class="text-[11px] text-white/70 font-light">Dr. R. Reynolds, MD</p>
+                </div>
+            </div>
+            <!-- Actions & Clinician Avatar -->
+            <div class="flex items-center space-x-2">
+                <button id="export-pdf-btn" aria-label="Export report" class="lumis-glass-subtle w-9 h-9 rounded-2xl flex items-center justify-center text-white/90 active:scale-95 transition-transform" title="Export PDF Report">
+                    <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+                <div id="doctor-avatar" class="w-9 h-9 rounded-2xl border border-white/40 overflow-hidden shadow-sm bg-indigo-200/40 flex items-center justify-center text-xs font-semibold text-white">
+                    RR
+                </div>
+                <button id="logout-btn" class="lumis-glass-subtle w-9 h-9 rounded-2xl flex items-center justify-center text-rose-300 hover:text-rose-200 active:scale-95 transition" title="Sign out">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
 
-                    <div id="alerts-box" class="stack alerts"></div>
+        <!-- Quick Header Actions -->
+        <section class="mt-1 mb-3 flex items-center justify-between gap-2" data-purpose="quick-action-bar">
+            <button id="add-patient-btn" class="flex-1 py-2 px-3 rounded-2xl lumis-glass text-xs font-medium flex items-center justify-center gap-1.5 active:scale-98 transition text-white/95 hover:bg-white/25">
+                <svg class="w-3.5 h-3.5 text-teal-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span>New Patient</span>
+            </button>
+            <button id="link-patient-btn" class="flex-1 py-2 px-3 rounded-2xl lumis-glass-subtle text-xs font-medium flex items-center justify-center gap-1.5 active:scale-98 transition text-white/80 hover:text-white">
+                <svg class="w-3.5 h-3.5 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span>Invite Patient</span>
+            </button>
+        </section>
 
-                    <div class="tabs" role="tablist">
-                        <button data-tab="overview" class="tab tab-btn" role="tab" type="button">Progress</button>
-                        <button data-tab="sessions" class="tab tab-btn" role="tab" type="button">Sessions</button>
-                        <button data-tab="prescriptions" class="tab tab-btn" role="tab" type="button">Prescriptions</button>
-                    </div>
+        <!-- Filter Pills -->
+        <nav aria-label="Patient Categories" class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1 mb-4">
+            <button id="pill-overview" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-active shrink-0">Overview</button>
+            <button id="pill-sessions" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0">Sessions History</button>
+            <button id="pill-protocols" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0">Prescriptions</button>
+            <button id="pill-invites" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0">Pending Invites</button>
+        </nav>
 
-                    <!-- Digital twin -->
-                    <div id="tab-overview" class="tab-panel stack-lg">
-                        <div class="row wrap">
-                            <label for="twin-exercise" class="label">Exercise</label>
-                            <select id="twin-exercise" class="select select-sm"></select>
-                            <span id="twin-baseline-note" class="small muted"></span>
+        <!-- Hero Clinician Banner -->
+        <section class="mb-4" data-purpose="hero-title-section">
+            <p class="text-xs uppercase tracking-widest text-teal-200/90 font-semibold mb-1">Rehabilitation Telemetry</p>
+            <h2 class="text-2xl font-light tracking-tight text-white leading-tight">
+                Patient Recovery Looks <br />
+                <span class="font-serif italic font-normal text-white drop-shadow-sm">Promising</span>
+            </h2>
+        </section>
+
+        <!-- VIEW: Overview Tab -->
+        <div id="view-overview" class="space-y-4">
+
+            <!-- Featured Active Patient Telemetry Card -->
+            <section class="lumis-glass rounded-3xl p-4 relative overflow-hidden" data-purpose="primary-patient-card">
+                <div class="absolute -right-8 -top-8 w-36 h-36 bg-pink-300/20 rounded-full blur-2xl pointer-events-none"></div>
+
+                <!-- Patient Header -->
+                <div class="flex items-start justify-between relative z-10 mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-white/30 to-white/10 border border-white/40 flex items-center justify-center font-medium text-white shadow-inner">
+                            AQ
                         </div>
-                        <div id="twin-tiles" class="strip"></div>
-                        <div class="grid cols-2">
-                            <div class="panel">
-                                <div class="panel-head"><h3>Joint mobility, best range per session</h3></div>
-                                <div class="panel-body"><div class="chart"><canvas id="rom-chart"></canvas></div></div>
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <h3 id="pt-name" class="text-base font-semibold text-white tracking-tight">Aarav Q.</h3>
+                                <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 glow-dot-green"></span>
                             </div>
-                            <div class="panel">
-                                <div class="panel-head"><h3>Quality, consistency, asymmetry and pain</h3></div>
-                                <div class="panel-body"><div class="chart"><canvas id="quality-chart"></canvas></div></div>
-                            </div>
+                            <p id="pt-meta" class="text-xs text-white/70">aq@gmail.com • ACL Rehab Wk 4</p>
                         </div>
-                        <div class="panel">
-                            <div class="panel-head"><h3>Most frequent movement deviations</h3><span class="small muted">Last 10 sessions</span></div>
-                            <div id="error-breakdown" class="panel-body small"></div>
+                    </div>
+                    <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span id="pt-status-text">On Track</span>
+                    </span>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-2 gap-2.5 mb-3.5 relative z-10">
+                    <!-- AI Pose Accuracy -->
+                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-normal text-white/70">Pose Accuracy</span>
+                            <span id="pt-accuracy-delta" class="text-[10px] text-teal-300 font-medium">+4.2%</span>
                         </div>
-                        <p class="tiny muted">Measurements come from webcam pose estimation and have not been clinically validated. Use them alongside, not instead of, your own assessment.</p>
+                        <div class="mt-2 flex items-baseline space-x-1">
+                            <span id="pt-accuracy-val" class="text-2xl font-light text-white tracking-tight">92</span>
+                            <span class="text-xs text-white/60">/100</span>
+                        </div>
+                        <div class="w-full bg-white/15 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div id="pt-accuracy-bar" class="bg-gradient-to-r from-teal-300 to-emerald-400 h-full rounded-full" style="width: 92%"></div>
+                        </div>
                     </div>
 
-                    <!-- Sessions -->
-                    <div id="tab-sessions" class="tab-panel hidden">
-                        <div id="session-list" class="panel"></div>
-                    </div>
-
-                    <!-- Prescriptions -->
-                    <div id="tab-prescriptions" class="tab-panel hidden">
-                        <div class="grid cols-main align-start">
-                            <div class="panel">
-                                <div class="panel-head"><h3>Active prescriptions</h3></div>
-                                <div id="rx-list"></div>
-                            </div>
-                            <form id="prescription-form" class="panel">
-                                <div class="panel-head"><h3>Assign an exercise</h3></div>
-                                <div class="panel-body stack">
-                                    <div class="field">
-                                        <label for="exercise-select">Exercise</label>
-                                        <select id="exercise-select" class="select"></select>
-                                        <p id="exercise-desc" class="hint"></p>
-                                    </div>
-                                    <div class="grid cols-2 gap-sm">
-                                        <div class="field"><label for="sets-input">Sets</label><input type="number" id="sets-input" class="input" value="3" min="1" max="20" required></div>
-                                        <div class="field"><label for="reps-input">Reps per set</label><input type="number" id="reps-input" class="input" value="10" min="1" max="100" required></div>
-                                    </div>
-                                    <div class="field">
-                                        <label for="notes-input">Instructions for the patient</label>
-                                        <textarea id="notes-input" class="textarea" rows="2" maxlength="500" placeholder="Optional, e.g. keep within a pain-free range"></textarea>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary btn-block">Assign exercise</button>
-                                </div>
-                            </form>
+                    <!-- Exercises Completed -->
+                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-normal text-white/70">Exercises Today</span>
+                            <span id="pt-adherence-pct" class="text-[10px] text-pink-200 font-medium">83%</span>
+                        </div>
+                        <div class="mt-2 flex items-baseline space-x-1">
+                            <span id="pt-completed-val" class="text-2xl font-light text-white tracking-tight">5</span>
+                            <span id="pt-target-val" class="text-xs text-white/60">/6 completed</span>
+                        </div>
+                        <div class="w-full bg-white/15 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div id="pt-adherence-bar" class="bg-gradient-to-r from-pink-300 to-rose-400 h-full rounded-full" style="width: 83.3%"></div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Range of Motion Waveform / Chart -->
+                <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10" data-purpose="telemetry-chart">
+                    <div class="flex items-center justify-between mb-1">
+                        <div>
+                            <p id="rom-title" class="text-xs font-medium text-white">Range of Motion (Knee Extension)</p>
+                            <p id="twin-baseline-note" class="text-[10px] text-white/60">Live Sensor Stream • Smart Knee Sleeve</p>
+                        </div>
+                        <span id="rom-degrees" class="text-xs font-semibold text-teal-300">124° <span class="text-[9px] font-normal text-white/60">/ 130°</span></span>
+                    </div>
+
+                    <!-- Chart Canvas / SVG Container -->
+                    <div class="h-28 w-full flex items-center justify-center">
+                        <canvas id="rom-chart" class="w-full h-full"></canvas>
+                    </div>
+
+                    <div class="flex justify-between text-[9px] text-white/50 tracking-wider uppercase pt-1">
+                        <span>Warmup</span>
+                        <span>Set 1</span>
+                        <span>Set 2</span>
+                        <span>Peak Extension</span>
+                        <span>Cooldown</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons: Chat & Telemetry Review -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="open-chat-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-white flex items-center justify-center gap-1.5 hover:bg-white/25 active:scale-98 transition">
+                        <svg class="w-4 h-4 text-pink-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                        <span>Message</span>
+                    </button>
+                    <button id="review-telemetry-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-white flex items-center justify-center gap-1.5 hover:bg-white/25 active:scale-98 transition">
+                        <svg class="w-4 h-4 text-teal-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                        <span>Full Telemetry</span>
+                    </button>
                 </div>
             </section>
+
+            <!-- Active Clinical Roster -->
+            <section data-purpose="patient-queue-section">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <h3 class="text-sm font-semibold text-white tracking-tight">Active Clinical Roster</h3>
+                    <span id="patient-count" class="text-xs text-teal-200/80 font-light">4 under monitoring</span>
+                </div>
+
+                <div class="mb-2">
+                    <input id="patient-search" type="search" class="w-full py-2 px-3.5 rounded-xl lumis-glass-subtle text-xs text-white placeholder-white/50 border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="Search patients by name or condition...">
+                </div>
+
+                <div id="patient-list" class="space-y-2">
+                    <!-- Populated dynamically -->
+                </div>
+            </section>
+
+            <!-- Quick Prescription & AI Protocol Bar -->
+            <section class="lumis-glass rounded-3xl p-3.5 flex items-center justify-between" data-purpose="quick-prescription-module">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-teal-400/20 border border-teal-300/40 flex items-center justify-center text-teal-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-white">Prescribe Routine</p>
+                        <p class="text-[10px] text-white/65">Update biomechanical exercise plan</p>
+                    </div>
+                </div>
+                <button id="open-prescribe-modal-btn" class="px-3 py-1.5 rounded-full lumis-glass text-xs font-medium text-white hover:bg-white/30 active:scale-95 transition flex items-center space-x-1">
+                    <span>Assign</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </section>
+
         </div>
+
+        <!-- VIEW: Sessions History Tab -->
+        <div id="view-sessions" class="hidden space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <h3 class="text-sm font-semibold text-white">Rehabilitation Sessions History</h3>
+                <span class="text-xs text-white/60">Live AI telemetry</span>
+            </div>
+            <div id="session-list" class="space-y-2.5">
+                <!-- Session cards rendered here -->
+            </div>
+        </div>
+
+        <!-- VIEW: Prescriptions Tab -->
+        <div id="view-protocols" class="hidden space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <h3 class="text-sm font-semibold text-white">Active Prescriptions</h3>
+                <button id="prescribe-tab-add-btn" class="text-xs text-teal-300 font-medium hover:underline">+ New Prescription</button>
+            </div>
+            <div id="rx-list" class="space-y-2.5">
+                <!-- Prescriptions list rendered here -->
+            </div>
+        </div>
+
+        <!-- VIEW: Pending Invites Tab -->
+        <div id="view-invites" class="hidden space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <h3 class="text-sm font-semibold text-white">Pending Patient Invitations</h3>
+            </div>
+            <div id="pending-links" class="space-y-2">
+                <!-- Pending links rendered here -->
+            </div>
+        </div>
+
     </main>
 
-    <!-- Chat -->
-    <aside id="chat-modal" class="drawer hidden" aria-label="Messages">
-        <div class="drawer-head">
-            <h2 id="chat-patient-name" class="grow truncate">Messages</h2>
-            <button id="close-chat-btn" class="icon-btn" type="button" aria-label="Close messages"><span data-icon="x"></span></button>
+    <!-- Bottom Floating Dock Navigation -->
+    <aside aria-label="Bottom Navigation" class="fixed bottom-3 left-0 right-0 max-w-xs mx-auto px-2 z-40">
+        <nav class="lumis-glass rounded-full px-4 py-2.5 flex items-center justify-around shadow-2xl border border-white/40">
+            <button id="dock-patients" class="flex flex-col items-center text-teal-300 transition-colors" title="Patients">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
+                </svg>
+                <span class="text-[9px] font-semibold mt-0.5">Patients</span>
+            </button>
+            <button id="dock-sessions" class="flex flex-col items-center text-white/60 hover:text-white transition-colors" title="Telemetry">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span class="text-[9px] font-medium mt-0.5">Sessions</span>
+            </button>
+            <button id="dock-protocols" class="flex flex-col items-center text-white/60 hover:text-white transition-colors" title="Prescriptions">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span class="text-[9px] font-medium mt-0.5">Protocols</span>
+            </button>
+            <button id="dock-chat" class="flex flex-col items-center text-white/60 hover:text-white transition-colors relative" title="Messages">
+                <div class="relative">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span id="chat-unread-dot" class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-pink-400"></span>
+                </div>
+                <span class="text-[9px] font-medium mt-0.5">Chats</span>
+            </button>
+        </nav>
+    </aside>
+
+    <!-- MODAL: Telemetry & AI Pose Details -->
+    <div id="telemetry-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <div class="lumis-glass rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto no-scrollbar p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-white/20 pb-3">
+                <div>
+                    <h3 class="text-base font-semibold text-white">Clinical Telemetry & AI Form</h3>
+                    <p id="telemetry-patient-name" class="text-xs text-white/70">Aarav Q. • Movement Analysis</p>
+                </div>
+                <button id="close-telemetry-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+            </div>
+
+            <!-- Quality & Deviation Chart -->
+            <div class="lumis-glass-subtle rounded-2xl p-3 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-white">Movement Quality & Symmetry</span>
+                    <span class="text-[10px] text-teal-300">Biomechanical Score</span>
+                </div>
+                <div class="h-32 w-full">
+                    <canvas id="quality-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Most frequent deviations -->
+            <div class="lumis-glass-subtle rounded-2xl p-3">
+                <p class="text-xs font-semibold text-white mb-2">Frequent Movement Deviations (Last 10 sessions)</p>
+                <div id="error-breakdown" class="text-xs text-white/80 space-y-1">
+                    <p class="text-white/60 text-xs">No significant deviations detected.</p>
+                </div>
+            </div>
+
+            <button id="unlink-btn" class="w-full py-2.5 rounded-xl lumis-glass text-xs font-medium text-rose-300 hover:text-rose-200 hover:bg-rose-500/20 transition">
+                Discharge Patient from Clinic
+            </button>
         </div>
-        <div id="chat-messages" class="drawer-body"></div>
-        <div class="drawer-foot">
-            <label class="sr-only" for="chat-input">Message</label>
-            <input type="text" id="chat-input" class="input" maxlength="2000" placeholder="Write a message">
-            <button id="send-msg-btn" class="btn btn-primary" type="button" aria-label="Send"><span data-icon="send"></span></button>
+    </div>
+
+    <!-- MODAL: New Patient -->
+    <div id="add-patient-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <form id="add-patient-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-white/20 pb-3">
+                <h3 class="text-base font-semibold text-white">Create Patient Account</h3>
+                <button type="button" id="cancel-add-patient-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-white/80 mb-1">Full Name</label>
+                    <input id="new-patient-name" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="e.g. Elena Rostova" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-white/80 mb-1">Email Address</label>
+                    <input type="email" id="new-patient-email" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="patient@example.com" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-white/80 mb-1">Temporary Password</label>
+                    <input type="password" id="new-patient-password" minlength="8" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="At least 8 characters" required>
+                </div>
+                <div id="add-patient-error" class="hidden text-xs text-rose-300 bg-rose-500/20 p-2 rounded-lg"></div>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="cancel-add-patient-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-white/80 hover:text-white">Cancel</button>
+                <button type="submit" id="submit-add-patient-btn" class="flex-1 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-xs font-semibold text-slate-900 transition">Create Account</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: Invite Existing Patient -->
+    <div id="link-patient-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <form id="link-patient-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-white/20 pb-3">
+                <h3 class="text-base font-semibold text-white">Invite Patient</h3>
+                <button type="button" id="cancel-link-patient-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-white/80 mb-1">Patient's Registered Email</label>
+                    <input type="email" id="link-patient-email" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="patient@example.com" required>
+                </div>
+                <div id="link-patient-error" class="hidden text-xs text-rose-300 bg-rose-500/20 p-2 rounded-lg"></div>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="cancel-link-patient-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-white/80 hover:text-white">Cancel</button>
+                <button type="submit" id="submit-link-patient-btn" class="flex-1 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-xs font-semibold text-slate-900 transition">Send Invitation</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL: Prescribe Routine Form -->
+    <div id="prescribe-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <form id="prescription-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-white/20 pb-3">
+                <h3 class="text-base font-semibold text-white">Prescribe Routine</h3>
+                <button type="button" id="close-prescribe-modal-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-white/80 mb-1">Exercise</label>
+                    <select id="exercise-select" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-slate-900 bg-white/90 border-0 outline-none">
+                    </select>
+                    <p id="exercise-desc" class="text-[10px] text-white/60 mt-1"></p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-medium text-white/80 mb-1">Sets</label>
+                        <input type="number" id="sets-input" value="3" min="1" max="20" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-white/80 mb-1">Reps per set</label>
+                        <input type="number" id="reps-input" value="10" min="1" max="100" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 outline-none" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-white/80 mb-1">Instructions for Patient</label>
+                    <textarea id="notes-input" rows="2" maxlength="500" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 outline-none placeholder-white/50" placeholder="e.g. Move slowly through pain-free range"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="close-prescribe-modal-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-white/80 hover:text-white">Cancel</button>
+                <button type="submit" class="flex-1 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-xs font-semibold text-slate-900 transition">Assign Prescription</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- MODAL / DRAWER: Patient Chat -->
+    <aside id="chat-modal" class="fixed inset-y-0 right-0 max-w-sm w-full z-50 lumis-glass shadow-2xl flex flex-col p-4 border-l border-white/30 hidden">
+        <div class="flex items-center justify-between border-b border-white/20 pb-3">
+            <div>
+                <h3 class="text-sm font-semibold text-white">Patient Messages</h3>
+                <p id="chat-patient-name" class="text-xs text-teal-300">Aarav Q.</p>
+            </div>
+            <button id="close-chat-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto no-scrollbar py-3 space-y-2">
+            <!-- Messages rendered here -->
+        </div>
+        <div class="pt-2 flex gap-2">
+            <input type="text" id="chat-input" maxlength="2000" class="flex-1 py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white placeholder-white/50 border-0 outline-none" placeholder="Write clinical message...">
+            <button id="send-msg-btn" class="p-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-900 flex items-center justify-center">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+            </button>
         </div>
     </aside>
 
-    <!-- New patient -->
-    <div id="add-patient-modal" class="backdrop hidden">
-        <form id="add-patient-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="add-title">
-            <div class="modal-head"><h2 id="add-title">New patient account</h2><p>Creates a login linked to you. Share the temporary password securely and ask the patient to change it.</p></div>
-            <div class="modal-body">
-                <div class="field"><label for="new-patient-name">Full name</label><input id="new-patient-name" class="input" maxlength="80" autocomplete="off"></div>
-                <div class="field"><label for="new-patient-email">Email</label><input type="email" id="new-patient-email" class="input" required autocomplete="off"></div>
-                <div class="field"><label for="new-patient-password">Temporary password</label><input type="password" id="new-patient-password" class="input" required minlength="8" autocomplete="new-password"><p class="hint">At least 8 characters.</p></div>
-                <div id="add-patient-error" class="form-error hidden" role="alert"></div>
-            </div>
-            <div class="modal-foot">
-                <button type="button" id="cancel-add-patient-btn" class="btn btn-ghost">Cancel</button>
-                <button type="submit" id="submit-add-patient-btn" class="btn btn-primary">Create account</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Invite patient -->
-    <div id="link-patient-modal" class="backdrop hidden">
-        <form id="link-patient-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="link-title">
-            <div class="modal-head"><h2 id="link-title">Invite an existing patient</h2><p>The patient sees the invitation on their dashboard. You can see their records only after they accept.</p></div>
-            <div class="modal-body">
-                <div class="field"><label for="link-patient-email">Patient's email</label><input type="email" id="link-patient-email" class="input" required></div>
-                <div id="link-patient-error" class="form-error hidden" role="alert"></div>
-            </div>
-            <div class="modal-foot">
-                <button type="button" id="cancel-link-patient-btn" class="btn btn-ghost">Cancel</button>
-                <button type="submit" id="submit-link-patient-btn" class="btn btn-primary">Send invitation</button>
-            </div>
-        </form>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- App Module Script -->
     <script type="module" src="./js/doctor-app.js"></script>
 </body>
 

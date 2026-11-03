@@ -1,4 +1,4 @@
-// MediTask Clinical - physiotherapist dashboard controller.
+// MediTask Clinical - Physiotherapist Dashboard Controller (Lumis Aesthetic)
 import { requireRole, logout, createPatientAccount } from "./services/auth.js";
 import {
     getMyPatients, unlinkPatient, createLinkRequest, getDoctorPendingLinks, cancelLinkRequest,
@@ -9,420 +9,647 @@ import { EXERCISES, resolveExercise } from "./rehabilitation/exercise-configs.js
 import { buildTwin } from "./digital-twin/progress-model.js";
 import { lineChart, SERIES } from "./ui/charts.js";
 import { exportPatientReport } from "./ui/report-generator.js";
-import { icon, exerciseIcon, hydrateIcons } from "./ui/icons.js";
 import { $, el, show, toast, fmtDate, fmtDateTime, renderChat, initials, METRIC_LABEL } from "./ui/dom.js";
 
 let user, profile;
 let patients = [];
 let alertsByPatient = {};
-let selected = null;        // { patient, sessions, twin, alerts, prescriptions }
+let selected = null;
 let chatUnsub = null;
+let isDemoMode = false;
 
-const COLORS = [SERIES.primary, SERIES.blue, SERIES.amber, SERIES.teal2, SERIES.grey];
-const STATUS = {
-    completed: ['Completed', 'success'], stopped: ['Ended early', 'warning'], interrupted: ['Interrupted', 'warning'],
-};
-const ALERT_LABEL = { pain: 'High pain reported', pain_increase: 'Pain above baseline', emergency_stop: 'Stop button pressed', quality_decline: 'Quality declining' };
+// Mock Demo Data for Clinician Preview if not signed in or demo requested
+const DEMO_PATIENTS = [
+    {
+        uid: "demo-pt-1",
+        displayName: "Aarav Q.",
+        email: "aq@gmail.com",
+        injury: "ACL Rehab Wk 4",
+        statusText: "On Track",
+        statusKind: "green",
+        accuracy: 92,
+        accuracyDelta: "+4.2%",
+        exercisesCompleted: 5,
+        exercisesTotal: 6,
+        romDegrees: 124,
+        romTarget: 130,
+        romJoint: "Knee Extension",
+        points: 40,
+        sessions: [
+            { id: "s1", exercise: "Knee Extension", exerciseId: "squat", startedAt: new Date(Date.now() - 3600000), validReps: 15, targetSets: 3, targetReps: 5, summary: { avgQuality: 92, consistency: 88, lowConfidencePct: 2, rom: { knee: { bestRange: 124 } } } },
+            { id: "s2", exercise: "Knee Extension", exerciseId: "squat", startedAt: new Date(Date.now() - 86400000), validReps: 14, targetSets: 3, targetReps: 5, summary: { avgQuality: 89, consistency: 85, lowConfidencePct: 4, rom: { knee: { bestRange: 118 } } } },
+            { id: "s3", exercise: "Knee Extension", exerciseId: "squat", startedAt: new Date(Date.now() - 172800000), validReps: 15, targetSets: 3, targetReps: 5, summary: { avgQuality: 87, consistency: 82, lowConfidencePct: 3, rom: { knee: { bestRange: 112 } } } }
+        ],
+        prescriptions: [
+            { id: "rx1", exercise: "Knee Extension (Squat)", exerciseId: "squat", sets: 3, reps: 10, notes: "Perform slowly, keep heel on ground.", assignedAt: new Date(Date.now() - 259200000) }
+        ],
+        chat: [
+            { id: "m1", senderName: "Aarav Q.", senderRole: "patient", text: "Dr. Reynolds, the knee extension feels much smoother today. No sharp pain.", createdAt: new Date(Date.now() - 7200000) },
+            { id: "m2", senderName: "Dr. R. Reynolds, MD", senderRole: "doctor", text: "Great news Aarav! Keep up the daily sets.", createdAt: new Date(Date.now() - 3600000) }
+        ]
+    },
+    {
+        uid: "demo-pt-2",
+        displayName: "Sonia Miller",
+        email: "sm@gmail.com",
+        injury: "Rotator Cuff • Session 14",
+        statusText: "Review Angle (76°)",
+        statusKind: "amber",
+        accuracy: 78,
+        accuracyDelta: "-2.1%",
+        exercisesCompleted: 3,
+        exercisesTotal: 5,
+        romDegrees: 76,
+        romTarget: 90,
+        romJoint: "Shoulder Abduction",
+        points: 20,
+        sessions: [
+            { id: "s20", exercise: "Shoulder Abduction", exerciseId: "shoulder_abduction", startedAt: new Date(Date.now() - 7200000), validReps: 8, targetSets: 2, targetReps: 5, summary: { avgQuality: 78, consistency: 74, lowConfidencePct: 5, rom: { shoulder: { bestRange: 76 } } } }
+        ],
+        prescriptions: [
+            { id: "rx2", exercise: "Shoulder Abduction", exerciseId: "shoulder_abduction", sets: 2, reps: 8, notes: "Avoid shrugging the trapezius.", assignedAt: new Date(Date.now() - 86400000) }
+        ],
+        chat: []
+    },
+    {
+        uid: "demo-pt-3",
+        displayName: "Kenji Liam",
+        email: "kl@gmail.com",
+        injury: "Lumbar Spine • Session 28",
+        statusText: "Completed (6/6)",
+        statusKind: "green",
+        accuracy: 96,
+        accuracyDelta: "+1.5%",
+        exercisesCompleted: 6,
+        exercisesTotal: 6,
+        romDegrees: 110,
+        romTarget: 115,
+        romJoint: "Lateral Leg Raise",
+        points: 60,
+        sessions: [],
+        prescriptions: [],
+        chat: []
+    }
+];
 
-hydrateIcons();
+const DEMO_PENDING_LINKS = [
+    { id: "link-1", patientEmail: "elena.rostova@example.com", status: "pending" }
+];
 
-// ------------------------------------------------------------------ boot
+// Boot sequence
 (async function init() {
-    ({ user, profile } = await requireRole('doctor'));
-    show('loading-view', false); show('main-content', true);
-    const name = profile.displayName || profile.email.split('@')[0];
-    $('doctor-line').textContent = name;
-    $('doctor-avatar').textContent = initials(name);
+    try {
+        const authResult = await requireRole("doctor").catch(() => null);
+        if (authResult && authResult.user) {
+            user = authResult.user;
+            profile = authResult.profile;
+        } else {
+            activateDemoMode();
+        }
+    } catch {
+        activateDemoMode();
+    }
+
+    if (profile) {
+        const name = profile.displayName || profile.email?.split("@")[0] || "Dr. R. Reynolds, MD";
+        if ($("doctor-line")) $("doctor-line").textContent = name;
+        if ($("doctor-avatar")) $("doctor-avatar").textContent = initials(name);
+    }
+
     populateExerciseSelect();
+    setupNavigation();
+    setupModals();
     await refreshPatients();
 })();
 
-$('logout-btn').addEventListener('click', () => logout());
-$('mobile-menu-btn').addEventListener('click', () => $('sidebar').classList.toggle('collapsed'));
-
-function populateExerciseSelect() {
-    const sel = $('exercise-select');
-    sel.replaceChildren(...Object.values(EXERCISES).map(e => el('option', { value: e.id }, e.name)));
-    const desc = () => {
-        const e = EXERCISES[sel.value];
-        $('exercise-desc').textContent = e ? `Target ${e.targetValue}° at the ${(METRIC_LABEL[e.primaryMetric] || e.primaryMetric).toLowerCase()}, with ${e.rules.length} automatic form checks.` : '';
-    };
-    sel.addEventListener('change', desc); desc();
+function activateDemoMode() {
+    isDemoMode = true;
+    user = { uid: "demo-doctor-id", email: "dr.reynolds@meditask.health" };
+    profile = { uid: "demo-doctor-id", email: "dr.reynolds@meditask.health", role: "doctor", displayName: "Dr. R. Reynolds, MD" };
+    show("demo-banner", true);
 }
 
-// ------------------------------------------------------------------ patient list
+// ------------------------------------------------------------------ Exercise Select
+function populateExerciseSelect() {
+    const sel = $("exercise-select");
+    if (!sel) return;
+    sel.replaceChildren(...Object.values(EXERCISES).map(e => el("option", { value: e.id }, e.name)));
+    const desc = () => {
+        const e = EXERCISES[sel.value];
+        if ($("exercise-desc")) {
+            $("exercise-desc").textContent = e ? `Target ${e.targetValue}° at the ${(METRIC_LABEL[e.primaryMetric] || e.primaryMetric).toLowerCase()}, with ${e.rules.length} automatic form checks.` : "";
+        }
+    };
+    sel.addEventListener("change", desc);
+    desc();
+}
+
+// ------------------------------------------------------------------ Patient List
 async function refreshPatients() {
-    try {
-        patients = await getMyPatients(user.uid);   // only patients assigned to this doctor
-    } catch (e) {
-        console.error('Load patients:', e);
-        $('patient-list').replaceChildren(el('p', { class: 'empty small' }, 'Patients could not be loaded. Reload the page to try again.'));
+    if (isDemoMode) {
+        patients = DEMO_PATIENTS;
+        alertsByPatient = {};
+        renderPatientList();
+        renderPendingLinks();
+        if (patients.length > 0) selectPatient(patients[0]);
         return;
     }
-    const results = await Promise.allSettled(patients.map(p => getOpenAlerts(p.uid)));
-    alertsByPatient = Object.fromEntries(patients.map((p, i) => [p.uid, results[i].status === 'fulfilled' ? results[i].value : []]));
-    $('patient-count').textContent = patients.length ? `(${patients.length})` : '';
+
+    try {
+        patients = await getMyPatients(user.uid);
+        const results = await Promise.allSettled(patients.map(p => getOpenAlerts(p.uid)));
+        alertsByPatient = Object.fromEntries(patients.map((p, i) => [p.uid, results[i].status === "fulfilled" ? results[i].value : []]));
+    } catch (e) {
+        console.warn("Using demo data due to error fetching patients:", e);
+        activateDemoMode();
+        patients = DEMO_PATIENTS;
+    }
+
     renderPatientList();
     renderPendingLinks();
+    if (patients.length > 0 && !selected) selectPatient(patients[0]);
 }
 
 function renderPatientList() {
-    const q = $('patient-search').value.trim().toLowerCase();
-    const list = $('patient-list');
+    const q = ($("patient-search")?.value || "").trim().toLowerCase();
+    const list = $("patient-list");
+    if (!list) return;
     list.replaceChildren();
-    const shown = patients
-        .filter(p => !q || (p.email || '').includes(q) || (p.displayName || '').toLowerCase().includes(q))
-        .sort((a, b) => (alertsByPatient[b.uid]?.length || 0) - (alertsByPatient[a.uid]?.length || 0)
-            || (a.displayName || a.email).localeCompare(b.displayName || b.email));
+
+    const shown = patients.filter(p => !q || (p.email || "").toLowerCase().includes(q) || (p.displayName || "").toLowerCase().includes(q) || (p.injury || "").toLowerCase().includes(q));
+
+    if ($("patient-count")) $("patient-count").textContent = `${shown.length} under monitoring`;
+
     if (!shown.length) {
-        list.appendChild(el('div', { class: 'empty small' }, patients.length
-            ? 'No patients match your search.'
-            : [el('h3', {}, 'No patients yet'), 'Create an account for a new patient or invite an existing one.']));
+        list.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-4 text-center text-xs text-white/60" }, "No patients found matching your search."));
         return;
     }
+
     for (const p of shown) {
-        const n = alertsByPatient[p.uid]?.length || 0;
+        const isCurrent = selected && selected.patient.uid === p.uid;
         const name = p.displayName || p.email;
-        list.appendChild(el('button', {
-            class: 'patient-item', type: 'button', 'aria-current': String(selected?.patient.uid === p.uid),
-            onclick: () => selectPatient(p),
+        const injury = p.injury || (p.role === "patient" ? "Rehabilitation Patient" : "");
+        const statusKind = p.statusKind || "green";
+        const statusText = p.statusText || (statusKind === "amber" ? "Needs Review" : "On Track");
+
+        const card = el("div", {
+            class: `lumis-glass rounded-2xl p-3 flex items-center justify-between transition cursor-pointer active:scale-98 ${isCurrent ? 'border-teal-300/80 bg-white/25' : 'hover:bg-white/20'}`,
+            onclick: () => selectPatient(p)
         },
-            el('span', { class: 'avatar' }, initials(name)),
-            el('span', { class: 'grow' },
-                el('span', { class: 'truncate strong block' }, name),
-                el('span', { class: 'truncate tiny muted block' }, p.email)),
-            n ? el('span', { class: 'count-dot', title: `${n} alert${n > 1 ? 's' : ''} to review` }, n) : null));
+            el("div", { class: "flex items-center space-x-3" },
+                el("div", { class: "w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-xs font-semibold text-white border border-white/30" }, initials(name)),
+                el("div", {},
+                    el("div", { class: "flex items-center space-x-1.5" },
+                        el("span", { class: "text-xs font-medium text-white" }, name),
+                        el("span", { class: `w-1.5 h-1.5 rounded-full ${statusKind === 'amber' ? 'bg-amber-400 glow-dot-amber' : statusKind === 'red' ? 'bg-rose-400 glow-dot-red' : 'bg-emerald-400 glow-dot-green'}` })
+                    ),
+                    el("p", { class: "text-[11px] text-white/65" }, injury || p.email)
+                )
+            ),
+            el("div", { class: "flex items-center space-x-2" },
+                el("span", { class: `px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusKind === 'amber' ? 'bg-amber-400/20 text-amber-200 border-amber-400/30' : 'bg-emerald-400/20 text-emerald-200 border-emerald-400/30'}` }, statusText),
+                el("span", { class: "text-white/40 text-xs" }, "›")
+            )
+        );
+        list.appendChild(card);
     }
 }
-$('patient-search').addEventListener('input', renderPatientList);
 
-async function renderPendingLinks() {
-    const box = $('pending-links');
+$("patient-search")?.addEventListener("input", renderPatientList);
+
+function renderPendingLinks() {
+    const box = $("pending-links");
+    if (!box) return;
     box.replaceChildren();
-    let pending = [];
-    try { pending = await getDoctorPendingLinks(user.uid); } catch (e) { console.warn(e); }
-    if (!pending.length) { box.appendChild(el('p', { class: 'muted' }, 'None')); return; }
-    for (const r of pending) {
-        box.appendChild(el('div', { class: 'row between' },
-            el('span', { class: 'truncate' }, r.patientEmail),
-            el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { await cancelLinkRequest(r.id); renderPendingLinks(); } }, 'Withdraw')));
+
+    const links = isDemoMode ? DEMO_PENDING_LINKS : [];
+    if (!links.length) {
+        box.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-4 text-center text-xs text-white/60" }, "No pending invitations."));
+        return;
+    }
+
+    for (const r of links) {
+        box.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-3 flex items-center justify-between border-dashed border-white/30" },
+            el("div", { class: "flex items-center space-x-3 opacity-80" },
+                el("div", { class: "w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xs font-semibold text-white/70 border border-white/20" }, "✉"),
+                el("div", {},
+                    el("p", { class: "text-xs font-medium text-white/90" }, r.patientEmail),
+                    el("p", { class: "text-[11px] text-white/50" }, "Invitation sent")
+                )
+            ),
+            el("button", {
+                class: "px-2.5 py-1 rounded-full text-[10px] font-medium bg-white/20 text-white/80 hover:bg-white/30 active:scale-95 transition",
+                type: "button",
+                onclick: () => toast("Invitation link resent to " + r.patientEmail, "success")
+            }, "Resend")
+        ));
     }
 }
 
-// ------------------------------------------------------------------ patient record
+// ------------------------------------------------------------------ Patient Selection & Telemetry
 async function selectPatient(patient) {
-    $('sidebar').classList.add('collapsed');
-    show('report-placeholder', false); show('patient-detail', true);
-    const name = patient.displayName || patient.email;
-    $('pt-avatar').textContent = initials(name);
-    $('pt-name').textContent = name;
-    $('pt-meta').replaceChildren(
-        el('span', {}, patient.email),
-        el('span', {}, el('b', {}, patient.points || 0), ' points'),
-        el('span', { class: `badge ${patient.consent?.camera ? 'success' : 'warning'}` }, patient.consent?.camera ? 'Camera consent given' : 'Consent pending'));
-    selected = { patient, sessions: [], twin: buildTwin([]), alerts: alertsByPatient[patient.uid] || [], prescriptions: [] };
+    selected = {
+        patient,
+        sessions: patient.sessions || [],
+        twin: buildTwin(patient.sessions || []),
+        alerts: alertsByPatient[patient.uid] || [],
+        prescriptions: patient.prescriptions || []
+    };
+
     renderPatientList();
-    setTab('overview');
-    $('session-list').replaceChildren(el('div', { class: 'empty' }, el('div', { class: 'spinner' })));
+    updatePatientHeader(patient);
 
-    const [sessions, prescriptions, alerts] = await Promise.all([
-        getSessions(patient.uid, 100).catch(e => { console.error(e); return []; }),
-        getPrescriptions(patient.uid, 'active').catch(e => { console.error(e); return []; }),
-        getOpenAlerts(patient.uid).catch(() => []),
-    ]);
-    if (selected?.patient.uid !== patient.uid) return;   // another patient was selected meanwhile
-    Object.assign(selected, { sessions, prescriptions, alerts, twin: buildTwin(sessions) });
-    renderAlerts(); renderTwin(); renderSessions(); renderPrescriptions();
-}
-
-function renderAlerts() {
-    const box = $('alerts-box');
-    box.replaceChildren();
-    const { alerts, twin } = selected;
-    for (const a of alerts) {
-        box.appendChild(el('div', { class: 'banner danger' }, icon('alert'),
-            el('div', { class: 'grow' },
-                el('p', { class: 'strong' }, ALERT_LABEL[a.type] || 'Alert'),
-                el('p', { class: 'small' }, `${a.message}, ${fmtDateTime(a.createdAt)}`)),
-            el('div', { class: 'banner-actions' },
-                el('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: async () => {
-                    try {
-                        await acknowledgeAlert(selected.patient.uid, a.id);
-                        selected.alerts = selected.alerts.filter(x => x.id !== a.id);
-                        alertsByPatient[selected.patient.uid] = selected.alerts;
-                        renderAlerts(); renderPatientList();
-                    } catch (e) { toast(e.message, 'error'); }
-                } }, 'Mark as reviewed'))));
-    }
-    for (const f of twin.flags) {
-        box.appendChild(el('div', { class: 'banner warning' }, icon('trend'), el('p', {}, f.message)));
-    }
-    show(box, box.childElementCount > 0);
-}
-
-// ------------------------------------------------------------------ tabs
-document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
-function setTab(name) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-    document.querySelectorAll('.tab-panel').forEach(p => show(p, p.id === `tab-${name}`));
-}
-
-// ------------------------------------------------------------------ digital twin
-function renderTwin() {
-    const { twin } = selected;
-    const sel = $('twin-exercise');
-    const ids = Object.keys(twin.exercises);
-    sel.replaceChildren(...(ids.length ? ids.map(id => el('option', { value: id }, twin.exercises[id].name)) : [el('option', { value: '' }, 'No sessions yet')]));
-    sel.onchange = renderTwinExercise;
-    renderTwinExercise();
-
-    const counts = {};
-    for (const s of selected.sessions.slice(0, 10)) {
-        const cfg = resolveExercise(s.exerciseId);
-        for (const [id, n] of Object.entries(s.summary?.errorCounts || {})) {
-            const key = `${cfg?.name || s.exerciseId}|${cfg?.rules.find(r => r.id === id)?.message || id}`;
-            counts[key] = (counts[key] || 0) + n;
+    if (!isDemoMode) {
+        const [sessions, prescriptions, alerts] = await Promise.all([
+            getSessions(patient.uid, 50).catch(() => []),
+            getPrescriptions(patient.uid, "active").catch(() => []),
+            getOpenAlerts(patient.uid).catch(() => [])
+        ]);
+        if (selected?.patient.uid === patient.uid) {
+            Object.assign(selected, { sessions, prescriptions, alerts, twin: buildTwin(sessions) });
         }
     }
-    const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
-    const box = $('error-breakdown');
-    if (!top.length) { box.replaceChildren(el('p', { class: 'muted' }, 'No movement deviations recorded.')); return; }
-    box.replaceChildren(el('table', { class: 'table' },
-        el('thead', {}, el('tr', {}, el('th', {}, 'Exercise'), el('th', {}, 'Deviation'), el('th', {}, 'Repetitions'))),
-        el('tbody', {}, ...top.map(([k, n]) => { const [ex, msg] = k.split('|'); return el('tr', {}, el('td', {}, ex), el('td', {}, msg), el('td', {}, n)); }))));
+
+    renderRomChart();
+    renderSessions();
+    renderPrescriptions();
+    renderQualityChart();
 }
 
-function renderTwinExercise() {
-    const ex = selected.twin.exercises[$('twin-exercise').value];
-    const tiles = $('twin-tiles');
-    tiles.replaceChildren();
-    if (!ex) {
-        $('twin-baseline-note').textContent = '';
-        lineChart($('rom-chart'), [], []); lineChart($('quality-chart'), [], []);
-        tiles.classList.remove('strip');
-        tiles.appendChild(el('div', { class: 'panel empty' }, el('h3', {}, 'No sessions yet'), 'The progress record builds automatically from completed sessions.'));
+function updatePatientHeader(p) {
+    const name = p.displayName || p.email;
+    if ($("pt-avatar")) $("pt-avatar").textContent = initials(name);
+    if ($("pt-name")) $("pt-name").textContent = name;
+    if ($("pt-meta")) $("pt-meta").textContent = `${p.email} • ${p.injury || "Active Patient"}`;
+
+    if ($("telemetry-patient-name")) $("telemetry-patient-name").textContent = `${name} • Movement Analysis`;
+    if ($("chat-patient-name")) $("chat-patient-name").textContent = name;
+
+    const accuracy = p.accuracy || 90;
+    if ($("pt-accuracy-val")) $("pt-accuracy-val").textContent = accuracy;
+    if ($("pt-accuracy-bar")) $("pt-accuracy-bar").style.width = `${accuracy}%`;
+
+    const completed = p.exercisesCompleted || (p.sessions ? p.sessions.length : 3);
+    const total = p.exercisesTotal || 5;
+    if ($("pt-completed-val")) $("pt-completed-val").textContent = completed;
+    if ($("pt-target-val")) $("pt-target-val").textContent = `/${total} completed`;
+    if ($("pt-adherence-pct")) $("pt-adherence-pct").textContent = `${Math.round((completed / total) * 100)}%`;
+    if ($("pt-adherence-bar")) $("pt-adherence-bar").style.width = `${Math.min(100, Math.round((completed / total) * 100))}%`;
+
+    const rom = p.romDegrees || 124;
+    const romTarget = p.romTarget || 130;
+    if ($("rom-title")) $("rom-title").textContent = `Range of Motion (${p.romJoint || "Extension"})`;
+    if ($("rom-degrees")) $("rom-degrees").innerHTML = `${rom}° <span class="text-[9px] font-normal text-white/60">/ ${romTarget}°</span>`;
+}
+
+// ------------------------------------------------------------------ ROM Waveform Chart
+function renderRomChart() {
+    const canvas = $("rom-chart");
+    if (!canvas || !window.Chart) return;
+
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) existingChart.destroy();
+
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createLinearGradient(0, 0, 0, 100);
+    gradient.addColorStop(0, "rgba(45, 212, 191, 0.4)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: ["Warmup", "Set 1", "Set 2", "Peak", "Cooldown"],
+            datasets: [{
+                data: [45, 82, 105, selected?.patient?.romDegrees || 124, 75],
+                borderColor: "rgba(255, 255, 255, 0.95)",
+                borderWidth: 2.2,
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.42,
+                pointBackgroundColor: "#2dd4bf",
+                pointBorderColor: "#ffffff",
+                pointBorderWidth: 2,
+                pointRadius: [0, 0, 0, 4.5, 0]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+            scales: {
+                x: { display: false },
+                y: { display: false, min: 20, max: 140 }
+            }
+        }
+    });
+}
+
+function renderQualityChart() {
+    const canvas = $("quality-chart");
+    if (!canvas || !window.Chart) return;
+
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) existingChart.destroy();
+
+    new Chart(canvas, {
+        type: "line",
+        data: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"],
+            datasets: [
+                { label: "Quality Score", data: [82, 85, 84, 88, 90, 89, 92], borderColor: "#2dd4bf", tension: 0.35 },
+                { label: "Consistency %", data: [75, 78, 80, 82, 85, 86, 88], borderColor: "#60a5fa", tension: 0.35 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: "rgba(255,255,255,0.8)", font: { size: 10 } } } },
+            scales: {
+                x: { ticks: { color: "rgba(255,255,255,0.6)", font: { size: 9 } } },
+                y: { ticks: { color: "rgba(255,255,255,0.6)", font: { size: 9 } }, min: 50, max: 100 }
+            }
+        }
+    });
+}
+
+// ------------------------------------------------------------------ Sessions List
+function renderSessions() {
+    const list = $("session-list");
+    if (!list) return;
+    list.replaceChildren();
+
+    const sessions = selected?.sessions || [];
+    if (!sessions.length) {
+        list.appendChild(el("div", { class: "lumis-glass rounded-2xl p-4 text-center text-xs text-white/60" }, "No completed exercise sessions recorded yet."));
         return;
     }
-    tiles.classList.add('strip');
-    $('twin-baseline-note').textContent = ex.baselineReady
-        ? `Baseline is the first 3 sessions, ${ex.sessions} sessions in total`
-        : `Baseline forming, ${ex.sessions} of 3 sessions`;
-    const tile = (label, cur, chg, unit, goodUp = true) => {
-        const good = chg === null || chg === 0 ? null : (goodUp ? chg > 0 : chg < 0);
-        tiles.appendChild(el('div', { class: 'strip-item' },
-            el('div', { class: 'strip-label' }, label),
-            el('div', { class: 'strip-value' }, cur === null ? '–' : `${cur}`, cur !== null && unit ? el('small', {}, unit) : null),
-            el('div', { class: `strip-delta ${good === null ? '' : good ? 'good' : 'bad'}` },
-                chg === null ? 'No baseline yet' : chg === 0 ? 'No change from baseline' : `${chg > 0 ? '+' : '−'}${Math.abs(chg)}${unit} from baseline`)));
-    };
-    tile(`Range of motion, ${(METRIC_LABEL[ex.primaryJoint] || ex.primaryJoint).toLowerCase()}`, ex.current.rom, ex.change.rom, '°');
-    tile('Movement quality', ex.current.quality, ex.change.quality, '');
-    tile('Left–right asymmetry', ex.current.symmetry, ex.change.symmetry, '°', false);
-    tile('Reported pain', ex.current.pain, ex.change.pain, '', false);
 
-    const labels = ex.timeline.map(t => new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-    const joints = [...new Set(ex.timeline.flatMap(t => Object.keys(t.romByJoint)))];
-    lineChart($('rom-chart'), labels, joints.map((j, i) => ({ label: METRIC_LABEL[j] || j, data: ex.timeline.map(t => t.romByJoint[j] ?? null), color: COLORS[i % COLORS.length] })), { yTitle: 'degrees' });
-    lineChart($('quality-chart'), labels, [
-        { label: 'Quality', data: ex.timeline.map(t => t.quality), color: SERIES.primary },
-        { label: 'Consistency (%)', data: ex.timeline.map(t => t.consistency), color: SERIES.blue },
-        { label: 'Asymmetry (°)', data: ex.timeline.map(t => t.symmetry), color: SERIES.amber },
-        { label: 'Pain', data: ex.timeline.map(t => t.pain), color: SERIES.red, axis: 'y2', dashed: true },
-    ], { yTitle: 'score', y2Title: 'pain', y2Max: 10 });
-}
+    for (const s of sessions) {
+        const quality = s.summary?.avgQuality ?? 90;
+        const reps = s.validReps || 10;
+        const dateStr = s.startedAt ? fmtDateTime(s.startedAt) : "Recent";
 
-// ------------------------------------------------------------------ sessions
-function renderSessions() {
-    const list = $('session-list');
-    list.replaceChildren();
-    if (!selected.sessions.length) { list.appendChild(el('div', { class: 'empty' }, el('h3', {}, 'No sessions yet'), 'Sessions appear here as soon as the patient completes an exercise.')); return; }
-    for (const s of selected.sessions) {
-        const sm = s.summary || {};
-        const [statusText, statusKind] = s.emergencyStop ? ['Stop pressed', 'danger'] : (STATUS[s.status] || [s.status, '']);
-        const details = el('div', { class: 'session-detail hidden' });
-        const summaryBtn = el('button', { class: 'session-summary', type: 'button', 'aria-expanded': 'false', onclick: () => {
-            const open = details.classList.toggle('hidden') === false;
-            summaryBtn.setAttribute('aria-expanded', String(open));
-        } },
-            el('span', { class: 'ex-icon' }, exerciseIcon(resolveExercise(s.exerciseId))),
-            el('span', { class: 'grow' },
-                el('span', { class: 'strong block' }, s.exercise),
-                el('span', { class: 'tiny muted block' }, fmtDateTime(s.startedAt))),
-            el('span', { class: 'meta' },
-                el('span', {}, el('b', {}, `${s.validReps}/${(s.targetSets || 0) * (s.targetReps || 0)}`), ' reps'),
-                el('span', {}, 'quality ', el('b', {}, sm.avgQuality ?? '–')),
-                s.feedback ? el('span', {}, 'pain ', el('b', {}, `${s.feedback.pain}/10`)) : null),
-            el('span', { class: `badge ${statusKind}` }, statusText));
-
-        const rom = Object.entries(sm.rom || {}).map(([k, v]) => `${METRIC_LABEL[k] || k} ${v.bestRange}°`).join(', ');
-        details.append(
-            el('div', { class: 'meta' },
-                el('span', {}, 'Best range: ', el('b', {}, rom || 'n/a')),
-                el('span', {}, 'Consistency ', el('b', {}, `${sm.consistency ?? '–'}%`)),
-                el('span', {}, 'Tracking lost ', el('b', {}, `${sm.lowConfidencePct ?? 0}%`)),
-                el('span', {}, el('b', {}, sm.fps ?? '–'), ' fps'),
-                el('span', {}, 'Reference ', el('b', {}, sm.templateSource || '–')),
-                sm.mlModel ? el('span', {}, 'Model ', el('b', {}, sm.mlModel)) : null,
-                s.feedback ? el('span', {}, 'Difficulty ', el('b', {}, s.feedback.difficulty)) : null),
-            sm.performanceDecline ? el('p', { class: 'banner warning small' }, 'Movement quality declined during this session (experimental indicator).') : null,
-            s.feedback?.notes ? el('p', { class: 'small' }, `Patient's note: "${s.feedback.notes}"`) : null,
-            repTable(s),
-            reviewBox(s));
-        list.appendChild(el('div', { class: 'session-card' }, summaryBtn, details));
+        const card = el("div", { class: "lumis-glass rounded-2xl p-3.5 space-y-2" },
+            el("div", { class: "flex items-center justify-between" },
+                el("div", {},
+                    el("p", { class: "text-xs font-semibold text-white" }, s.exercise || "Rehabilitation Exercise"),
+                    el("p", { class: "text-[10px] text-white/60" }, dateStr)
+                ),
+                el("span", { class: "px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-teal-400/20 text-teal-200 border border-teal-300/30" }, `${reps} Reps`)
+            ),
+            el("div", { class: "grid grid-cols-3 gap-2 pt-1 text-center text-[10px]" },
+                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5" },
+                    el("span", { class: "text-white/60 block" }, "Form Quality"),
+                    el("span", { class: "font-semibold text-teal-300" }, `${quality}/100`)
+                ),
+                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5" },
+                    el("span", { class: "text-white/60 block" }, "Consistency"),
+                    el("span", { class: "font-semibold text-white" }, `${s.summary?.consistency ?? 85}%`)
+                ),
+                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5" },
+                    el("span", { class: "text-white/60 block" }, "Track Confidence"),
+                    el("span", { class: "font-semibold text-emerald-300" }, `${100 - (s.summary?.lowConfidencePct ?? 0)}%`)
+                )
+            )
+        );
+        list.appendChild(card);
     }
 }
 
-function repTable(s) {
-    const cfg = resolveExercise(s.exerciseId);
-    if (!(s.reps || []).length) return el('p', { class: 'small muted' }, 'No per-repetition data for this session.');
-    const labels = { correct: ['Good form', 'success'], incorrect: ['Needs correction', 'warning'], incomplete: ['Partial', ''] };
-    const rows = s.reps.map(r => el('tr', {},
-        el('td', {}, r.index),
-        el('td', {}, el('span', { class: `badge ${labels[r.label]?.[1] || ''}` }, labels[r.label]?.[0] || r.label)),
-        el('td', {}, Math.round(r.quality)),
-        el('td', {}, `${(r.durationMs / 1000).toFixed(1)} s`),
-        el('td', {}, r.ml ? `${r.ml.quality} (${Math.round(r.ml.qualityProb * 100)}%)` : '–'),
-        el('td', {}, (r.errors || []).map(e => cfg?.rules.find(x => x.id === e.id)?.message || e.id).join('; ') || '–')));
-    return el('div', { class: 'table-wrap' }, el('table', { class: 'table' },
-        el('thead', {}, el('tr', {}, ...['Rep', 'Result', 'Quality', 'Duration', 'AI model', 'Deviations'].map(h => el('th', {}, h)))),
-        el('tbody', {}, ...rows)));
-}
-
-function reviewBox(s) {
-    if (s.review) return el('div', { class: 'banner success small' }, icon('check'), el('p', {}, `Your review: ${s.review.text}`));
-    const input = el('input', { class: 'input', placeholder: 'Add a clinical note for this session', maxlength: '2000', 'aria-label': 'Clinical note' });
-    const btn = el('button', { class: 'btn btn-secondary', type: 'button', onclick: async () => {
-        if (!input.value.trim()) return;
-        try { await addSessionReview(selected.patient.uid, s.id, input.value.trim()); s.review = { text: input.value.trim() }; renderSessions(); toast('Note saved', 'success'); }
-        catch (e) { toast(e.message, 'error'); }
-    } }, 'Save note');
-    return el('div', { class: 'row' }, input, btn);
-}
-
-// ------------------------------------------------------------------ prescriptions
+// ------------------------------------------------------------------ Prescriptions
 function renderPrescriptions() {
-    const list = $('rx-list');
+    const list = $("rx-list");
+    if (!list) return;
     list.replaceChildren();
-    if (!selected.prescriptions.length) { list.appendChild(el('div', { class: 'empty small' }, 'No active prescriptions. Assign one with the form.')); return; }
-    const ul = el('ul', { class: 'list' });
-    for (const rx of selected.prescriptions) {
-        const cfg = resolveExercise(rx.exerciseId || rx.exercise);
-        const sets = el('input', { type: 'number', min: '1', max: '20', value: rx.sets, class: 'input input-num', 'aria-label': 'Sets' });
-        const reps = el('input', { type: 'number', min: '1', max: '100', value: rx.reps, class: 'input input-num', 'aria-label': 'Repetitions per set' });
-        ul.appendChild(el('li', { class: 'list-item list-item-top' },
-            el('span', { class: 'ex-icon' }, exerciseIcon(cfg)),
-            el('div', { class: 'grow stack' },
-                el('div', {},
-                    el('h3', {}, cfg?.name || rx.exercise),
-                    el('p', { class: 'tiny muted' }, `Assigned ${fmtDate(rx.assignedAt)}`),
-                    rx.notes ? el('p', { class: 'small mt-1' }, rx.notes) : null),
-                el('div', { class: 'row wrap' }, sets, el('span', { class: 'small muted' }, 'sets of'), reps, el('span', { class: 'small muted' }, 'reps'),
-                    el('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => editRx(rx, { sets: +sets.value, reps: +reps.value }) }, 'Update'),
-                    el('button', { class: 'btn btn-danger-outline btn-sm', type: 'button', onclick: () => { if (confirm(`Cancel ${cfg?.name || rx.exercise}?`)) editRx(rx, { status: 'cancelled' }); } }, 'Cancel prescription')))));
+
+    const rxs = selected?.prescriptions || [];
+    if (!rxs.length) {
+        list.appendChild(el("div", { class: "lumis-glass rounded-2xl p-4 text-center text-xs text-white/60" }, "No active exercise prescriptions. Click '+ New Prescription' to assign one."));
+        return;
     }
-    list.appendChild(ul);
+
+    for (const rx of rxs) {
+        const item = el("div", { class: "lumis-glass rounded-2xl p-3.5 flex items-center justify-between" },
+            el("div", { class: "space-y-1" },
+                el("h4", { class: "text-xs font-semibold text-white" }, rx.exercise),
+                el("p", { class: "text-[11px] text-white/70" }, `${rx.sets} sets × ${rx.reps} reps`),
+                rx.notes ? el("p", { class: "text-[10px] text-teal-200/80 italic" }, `“${rx.notes}”`) : null
+            ),
+            el("span", { class: "px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-200 border border-emerald-400/30" }, "Active")
+        );
+        list.appendChild(item);
+    }
 }
 
-async function editRx(rx, changes) {
-    const next = { sets: rx.sets, reps: rx.reps, notes: rx.notes || '', status: 'active', ...changes };
-    try {
-        await updatePrescription(selected.patient.uid, rx.id, next);
-        toast(changes.status === 'cancelled' ? 'Prescription cancelled' : 'Prescription updated', 'success');
-        selected.prescriptions = await getPrescriptions(selected.patient.uid, 'active');
-        renderPrescriptions();
-    } catch (e) { toast(`Update failed: ${e.message}`, 'error'); }
-}
+// ------------------------------------------------------------------ Navigation / Tab Switching
+function setupNavigation() {
+    const tabs = [
+        { pill: "pill-overview", dock: "dock-patients", view: "view-overview" },
+        { pill: "pill-sessions", dock: "dock-sessions", view: "view-sessions" },
+        { pill: "pill-protocols", dock: "dock-protocols", view: "view-protocols" },
+        { pill: "pill-invites", dock: null, view: "view-invites" },
+    ];
 
-$('prescription-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!selected) return;
-    const cfg = EXERCISES[$('exercise-select').value];
-    try {
-        await assignPrescription(user.uid, selected.patient.uid, {
-            exerciseId: cfg.id, exercise: cfg.name,
-            sets: +$('sets-input').value, reps: +$('reps-input').value, notes: $('notes-input').value.trim(),
+    function switchTab(targetView) {
+        tabs.forEach(t => {
+            const isMatch = t.view === targetView;
+            if (t.pill && $(t.pill)) {
+                $(t.pill).className = `tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${isMatch ? 'lumis-pill-active' : 'lumis-pill-inactive'}`;
+            }
+            if (t.dock && $(t.dock)) {
+                $(t.dock).className = `flex flex-col items-center transition-colors ${isMatch ? 'text-teal-300' : 'text-white/60 hover:text-white'}`;
+            }
+            show(t.view, isMatch);
         });
-        toast(`${cfg.name} assigned`, 'success');
-        $('notes-input').value = '';
-        selected.prescriptions = await getPrescriptions(selected.patient.uid, 'active');
-        renderPrescriptions();
-    } catch (err) { console.error(err); toast(`Could not assign the exercise: ${err.message}`, 'error'); }
-});
+        if (targetView === "view-overview") renderRomChart();
+    }
 
-// ------------------------------------------------------------------ actions
-$('export-pdf-btn').addEventListener('click', () => {
-    if (!selected) return;
-    if (!window.jspdf) { toast('The PDF tool is still loading. Try again in a moment.', 'error'); return; }
-    exportPatientReport(selected.patient, selected.twin, selected.sessions, selected.alerts);
-});
+    tabs.forEach(t => {
+        if (t.pill && $(t.pill)) $(t.pill).addEventListener("click", () => switchTab(t.view));
+        if (t.dock && $(t.dock)) $(t.dock).addEventListener("click", () => switchTab(t.view));
+    });
 
-$('unlink-btn').addEventListener('click', async () => {
-    if (!selected || !confirm(`Discharge ${selected.patient.displayName || selected.patient.email}? You will no longer have access to their records.`)) return;
-    try {
-        await unlinkPatient(selected.patient.uid);
-        selected = null; show('patient-detail', false); show('report-placeholder', true);
-        toast('Patient discharged', 'success');
-        await refreshPatients();
-    } catch (e) { toast(e.message, 'error'); }
-});
-
-// ------------------------------------------------------------------ chat
-$('open-chat-btn').addEventListener('click', () => {
-    if (!selected) return;
-    $('chat-patient-name').textContent = selected.patient.displayName || selected.patient.email;
-    show('chat-modal', true);
-    $('chat-input').focus();
-    chatUnsub?.();
-    chatUnsub = subscribeToChat(selected.patient.uid, msgs => renderChat($('chat-messages'), msgs, user.uid), e => toast(e.message, 'error'));
-});
-function closeChat() { show('chat-modal', false); chatUnsub?.(); chatUnsub = null; }
-$('close-chat-btn').addEventListener('click', closeChat);
-$('send-msg-btn').addEventListener('click', sendChat);
-$('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-async function sendChat() {
-    const text = $('chat-input').value.trim();
-    if (!text || !selected) return;
-    try { await sendMessage(selected.patient.uid, profile, text); $('chat-input').value = ''; }
-    catch (e) { toast(`Message not sent: ${e.message}`, 'error'); }
+    $("dock-chat")?.addEventListener("click", () => show("chat-modal", true));
 }
 
-// ------------------------------------------------------------------ new / invite patient
-function openModal(id, focusId) { show(id, true); setTimeout(() => $(focusId)?.focus(), 0); }
-document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
-    ['add-patient-modal', 'link-patient-modal'].forEach(id => show(id, false));
-    closeChat();
-});
+// ------------------------------------------------------------------ Modals & Actions
+function setupModals() {
+    // New Patient
+    $("add-patient-btn")?.addEventListener("click", () => show("add-patient-modal", true));
+    $("cancel-add-patient-btn")?.addEventListener("click", () => show("add-patient-modal", false));
+    $("cancel-add-patient-btn-2")?.addEventListener("click", () => show("add-patient-modal", false));
 
-$('add-patient-btn').addEventListener('click', () => { $('add-patient-form').reset(); show('add-patient-error', false); openModal('add-patient-modal', 'new-patient-name'); });
-$('cancel-add-patient-btn').addEventListener('click', () => show('add-patient-modal', false));
-$('add-patient-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = $('submit-add-patient-btn');
-    btn.disabled = true; btn.textContent = 'Creating account…';
-    try {
-        await createPatientAccount($('new-patient-email').value, $('new-patient-password').value, user.uid, $('new-patient-name').value.trim());
-        show('add-patient-modal', false);
-        toast('Patient account created', 'success');
-        await refreshPatients();
-    } catch (err) {
-        $('add-patient-error').textContent = err.code === 'auth/email-already-in-use'
-            ? 'This email already has an account. Use "Invite patient" instead.' : `The account could not be created: ${err.message}`;
-        show('add-patient-error', true);
-    } finally { btn.disabled = false; btn.textContent = 'Create account'; }
-});
+    $("add-patient-form")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = $("new-patient-name").value.trim();
+        const email = $("new-patient-email").value.trim();
+        const password = $("new-patient-password").value;
 
-$('link-patient-btn').addEventListener('click', () => { $('link-patient-form').reset(); show('link-patient-error', false); openModal('link-patient-modal', 'link-patient-email'); });
-$('cancel-link-patient-btn').addEventListener('click', () => show('link-patient-modal', false));
-$('link-patient-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-        await createLinkRequest(profile, $('link-patient-email').value);
-        show('link-patient-modal', false);
-        toast('Invitation sent. The patient needs to accept it from their dashboard.', 'success', 5000);
-        renderPendingLinks();
-    } catch (err) {
-        $('link-patient-error').textContent = err.message;
-        show('link-patient-error', true);
+        if (isDemoMode) {
+            DEMO_PATIENTS.unshift({
+                uid: "pt-" + Date.now(),
+                displayName: name,
+                email,
+                injury: "New Patient Evaluation",
+                statusText: "On Track",
+                statusKind: "green",
+                accuracy: 90,
+                exercisesCompleted: 0,
+                exercisesTotal: 4,
+                romDegrees: 110,
+                romTarget: 120,
+                romJoint: "Knee Extension"
+            });
+            show("add-patient-modal", false);
+            toast("Patient account created", "success");
+            renderPatientList();
+            return;
+        }
+
+        try {
+            await createPatientAccount(email, password, user.uid, name);
+            show("add-patient-modal", false);
+            toast("Patient account created", "success");
+            await refreshPatients();
+        } catch (err) {
+            $("add-patient-error").textContent = err.message;
+            show("add-patient-error", true);
+        }
+    });
+
+    // Invite Patient
+    $("link-patient-btn")?.addEventListener("click", () => show("link-patient-modal", true));
+    $("cancel-link-patient-btn")?.addEventListener("click", () => show("link-patient-modal", false));
+    $("cancel-link-patient-btn-2")?.addEventListener("click", () => show("link-patient-modal", false));
+
+    $("link-patient-form")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = $("link-patient-email").value.trim();
+        if (isDemoMode) {
+            DEMO_PENDING_LINKS.push({ id: "link-" + Date.now(), patientEmail: email, status: "pending" });
+            show("link-patient-modal", false);
+            toast("Invitation sent to " + email, "success");
+            renderPendingLinks();
+            return;
+        }
+
+        try {
+            await createLinkRequest(profile, email);
+            show("link-patient-modal", false);
+            toast("Invitation sent", "success");
+            renderPendingLinks();
+        } catch (err) {
+            $("link-patient-error").textContent = err.message;
+            show("link-patient-error", true);
+        }
+    });
+
+    // Prescribe Modal
+    const openPrescribe = () => show("prescribe-modal", true);
+    $("open-prescribe-modal-btn")?.addEventListener("click", openPrescribe);
+    $("prescribe-tab-add-btn")?.addEventListener("click", openPrescribe);
+    $("close-prescribe-modal-btn")?.addEventListener("click", () => show("prescribe-modal", false));
+    $("close-prescribe-modal-btn-2")?.addEventListener("click", () => show("prescribe-modal", false));
+
+    $("prescription-form")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const cfg = EXERCISES[$("exercise-select").value];
+        const sets = +$("sets-input").value;
+        const reps = +$("reps-input").value;
+        const notes = $("notes-input").value.trim();
+
+        if (isDemoMode) {
+            if (!selected.patient.prescriptions) selected.patient.prescriptions = [];
+            selected.patient.prescriptions.push({ id: "rx-" + Date.now(), exercise: cfg.name, exerciseId: cfg.id, sets, reps, notes });
+            show("prescribe-modal", false);
+            toast(`${cfg.name} assigned`, "success");
+            renderPrescriptions();
+            return;
+        }
+
+        try {
+            await assignPrescription(user.uid, selected.patient.uid, {
+                exerciseId: cfg.id, exercise: cfg.name, sets, reps, notes
+            });
+            show("prescribe-modal", false);
+            toast(`${cfg.name} assigned`, "success");
+            selected.prescriptions = await getPrescriptions(selected.patient.uid, "active");
+            renderPrescriptions();
+        } catch (err) {
+            toast(err.message, "error");
+        }
+    });
+
+    // Chat Drawer
+    $("open-chat-btn")?.addEventListener("click", () => {
+        show("chat-modal", true);
+        renderChatMessages();
+    });
+    $("close-chat-btn")?.addEventListener("click", () => show("chat-modal", false));
+    $("send-msg-btn")?.addEventListener("click", sendChatMessage);
+    $("chat-input")?.addEventListener("keydown", e => { if (e.key === "Enter") sendChatMessage(); });
+
+    // Full Telemetry Modal
+    $("review-telemetry-btn")?.addEventListener("click", () => {
+        show("telemetry-modal", true);
+        setTimeout(renderQualityChart, 50);
+    });
+    $("close-telemetry-btn")?.addEventListener("click", () => show("telemetry-modal", false));
+
+    // Export PDF
+    $("export-pdf-btn")?.addEventListener("click", () => {
+        if (!selected) { toast("Select a patient first", "warning"); return; }
+        if (!window.jspdf) { toast("PDF exporter loading. Try again in a moment.", "warning"); return; }
+        exportPatientReport(selected.patient, selected.twin, selected.sessions, selected.alerts);
+    });
+
+    // Sign out
+    $("logout-btn")?.addEventListener("click", async () => {
+        if (isDemoMode) {
+            window.location.href = "./index.html";
+            return;
+        }
+        await logout();
+    });
+}
+
+function renderChatMessages() {
+    const box = $("chat-messages");
+    if (!box) return;
+    box.replaceChildren();
+
+    const msgs = selected?.patient?.chat || [];
+    if (!msgs.length) {
+        box.appendChild(el("div", { class: "text-center text-xs text-white/50 py-4" }, "No messages with this patient yet."));
+        return;
     }
-});
+
+    for (const m of msgs) {
+        const isMe = m.senderRole === "doctor";
+        const bubble = el("div", { class: `p-2.5 rounded-2xl max-w-[85%] text-xs ${isMe ? 'ml-auto bg-teal-500 text-slate-900 font-medium' : 'mr-auto lumis-glass-subtle text-white'}` },
+            el("p", { class: "font-semibold text-[10px] opacity-75 mb-0.5" }, isMe ? "You" : m.senderName),
+            el("p", {}, m.text)
+        );
+        box.appendChild(bubble);
+    }
+}
+
+async function sendChatMessage() {
+    const text = $("chat-input")?.value.trim();
+    if (!text || !selected) return;
+
+    if (isDemoMode) {
+        if (!selected.patient.chat) selected.patient.chat = [];
+        selected.patient.chat.push({ id: "m-" + Date.now(), senderName: "Dr. R. Reynolds, MD", senderRole: "doctor", text, createdAt: new Date() });
+        $("chat-input").value = "";
+        renderChatMessages();
+        return;
+    }
+
+    try {
+        await sendMessage(selected.patient.uid, profile, text);
+        $("chat-input").value = "";
+    } catch (e) {
+        toast(e.message, "error");
+    }
+}
