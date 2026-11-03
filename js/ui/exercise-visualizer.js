@@ -20,8 +20,12 @@ const RULE_JOINTS = {
     knee_bent: [26], leg_forward: [24, 26],
 };
 
-export function drawPose(ctx, canvas, state, cfg) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+export function drawPose(ctx, canvas, state, cfg, videoElement = null) {
+    if (videoElement && videoElement.readyState >= 2) {
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
     const lm = state?.landmarks;
     if (!lm) return;
     const W = canvas.width, H = canvas.height;

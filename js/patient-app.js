@@ -281,6 +281,7 @@ async function startSession(rx, cfg) {
 
 let animFrameId = null;
 let isProcessingFrame = false;
+let latestState = null;
 
 async function startCamera() {
     const video = $('webcam'), canvas = $('pose-canvas');
@@ -328,6 +329,7 @@ async function startCamera() {
         }
 
         isProcessingFrame = false;
+        latestState = null;
         animFrameId = requestAnimationFrame(processVideoFrame);
     } catch (err) {
         console.error('Camera start error:', err);
@@ -341,20 +343,35 @@ async function startCamera() {
 async function processVideoFrame() {
     if (!current || current.finishing) return;
     const video = $('webcam');
-    if (video && video.readyState >= 2 && pose && !isProcessingFrame) {
-        const now = performance.now();
-        if (now - sendT >= 33) {
-            sendT = now;
-            isProcessingFrame = true;
-            try {
-                await pose.send({ image: video });
-            } catch (err) {
-                console.warn('Pose processing error:', err);
-            } finally {
-                isProcessingFrame = false;
+    const canvas = $('pose-canvas');
+
+    if (video && video.readyState >= 2 && canvas) {
+        if (video.videoWidth && canvas.width !== video.videoWidth) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            drawPose(ctx, canvas, latestState, current.cfg, video);
+        }
+
+        if (pose && !isProcessingFrame) {
+            const now = performance.now();
+            if (now - sendT >= 33) {
+                sendT = now;
+                isProcessingFrame = true;
+                try {
+                    await pose.send({ image: video });
+                } catch (err) {
+                    console.warn('Pose processing error:', err);
+                } finally {
+                    isProcessingFrame = false;
+                }
             }
         }
     }
+
     if (current && !current.finishing) {
         animFrameId = requestAnimationFrame(processVideoFrame);
     }
@@ -366,6 +383,7 @@ function stopCamera() {
         animFrameId = null;
     }
     isProcessingFrame = false;
+    latestState = null;
     try {
         if (stream) {
             stream.getTracks().forEach(t => t.stop());
@@ -394,13 +412,8 @@ function onPoseResults(results) {
 let frameCount = 0, fpsT0 = performance.now();
 function handleFrame(state) {
     if (!current || current.finishing) return;
-    const canvas = $('pose-canvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            drawPose(ctx, canvas, state, current.cfg);
-        }
-    }
+    latestState = state;
+
     frameCount++;
     const now = performance.now();
     if (now - fpsT0 > 1000) {
@@ -410,7 +423,23 @@ function handleFrame(state) {
     }
     if ($('confidence-bar')) $('confidence-bar').style.width = `${Math.round((state.confidence || 0) * 100)}%`;
     if ($('phase-badge')) $('phase-badge').textContent = state.valid ? (PHASE_LABEL[state.phase] || state.phase) : 'Adjust position';
-    if ($('feedback-box') && state.message) $('feedback-box').textContent = state.message;
+
+    if ($('feedback-box') && state.message) {
+        const msg = state.message;
+        const text = typeof msg === 'object' && msg !== null ? msg.text : msg;
+        const level = typeof msg === 'object' && msg !== null ? msg.level : 'info';
+        const box = $('feedback-box');
+        box.textContent = text;
+        if (level === 'error') {
+            box.className = 'mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-900 flex items-center gap-2';
+        } else if (level === 'warn') {
+            box.className = 'mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900 flex items-center gap-2';
+        } else if (level === 'good') {
+            box.className = 'mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-900 flex items-center gap-2';
+        } else {
+            box.className = 'mt-3 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-900 flex items-center gap-2';
+        }
+    }
 
     const v = state.metrics?.[current.cfg.primaryMetric];
     if (typeof v === 'number' && $('angle-readout')) {

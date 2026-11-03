@@ -95,7 +95,10 @@
 
         /* Mirror webcam and canvas for natural user feedback */
         .mirror {
-            transform: scaleX(-1);
+            transform: scaleX(-1) translateZ(0);
+            -webkit-transform: scaleX(-1) translateZ(0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
 
         .backdrop-enter {
