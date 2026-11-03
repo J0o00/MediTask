@@ -1,100 +1,117 @@
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+    getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "../config.js";
 
-// Initialize core app
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Role checking and redirection
-export async function checkAuthAndRedirect(requiredRole = null) {
-    onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-            // If on a protected page (not login/index/signup), redirect to index
-            if (window.location.pathname.includes('dashboard')) {
-                window.location.replace('./index.html?err=notLoggedIn');
+const DASHBOARD = { doctor: './doctor-dashboard.html', patient: './patient-dashboard.html' };
+
+async function fetchProfile(user, retries = 2) {
+    for (let i = 0; i <= retries; i++) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) return { uid: snap.id, ...snap.data() };
+        // Sign-up writes the profile right after creating the auth user; give it a moment.
+        await new Promise(r => setTimeout(r, 1200));
+    }
+    return null;
+}
+
+/**
+ * Resolve once the signed-in user is confirmed to have `role`.
+ * Redirects away (and never resolves) otherwise.
+ * @returns {Promise<{user: import('firebase/auth').User, profile: object}>}
+ */
+export function requireRole(role) {
+    return new Promise((resolve) => {
+        const stop = onAuthStateChanged(auth, async (user) => {
+            stop();
+            if (!user) { window.location.replace('./index.html?err=notLoggedIn'); return; }
+            try {
+                const profile = await fetchProfile(user);
+                if (!profile) { window.location.replace('./login.html?err=noProfile'); return; }
+                const actual = String(profile.role || '').trim().toLowerCase();
+                if (actual !== role) { window.location.replace(DASHBOARD[actual] || './index.html'); return; }
+                resolve({ user, profile });
+            } catch (e) {
+                console.error('Auth check failed:', e);
+                window.location.replace('./login.html?err=authCheck');
             }
-            return;
-        }
-
-        try {
-            let userDoc = await getDoc(doc(db, "users", user.uid));
-
-            // Retry logic: If doc doesn't exist, wait and try again (handling race condition)
-            if (!userDoc.exists()) {
-                console.log("User profile not found immediately. Retrying in 1.5s...");
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                userDoc = await getDoc(doc(db, "users", user.uid));
-            }
-
-            if (userDoc.exists()) {
-                const { role } = userDoc.data();
-                const normalizedRole = (role || '').toString().trim().toLowerCase();
-
-                // If we are on a dashboard page, verify role
-                if (window.location.pathname.includes('doctor-dashboard') && normalizedRole !== 'doctor') {
-                    window.location.replace('./patient-dashboard.html');
-                } else if (window.location.pathname.includes('patient-dashboard') && normalizedRole !== 'patient') {
-                    window.location.replace('./doctor-dashboard.html');
-                }
-
-                // If on login/index, redirect to dashboard
-                if (window.location.pathname.includes('login') || window.location.pathname.endsWith('/') || window.location.pathname.includes('index')) {
-                    if (normalizedRole === 'doctor') window.location.replace('./doctor-dashboard.html');
-                    else if (normalizedRole === 'patient') window.location.replace('./patient-dashboard.html');
-                }
-            } else {
-                console.warn("User profile still missing after retry. Check Firestore permissions or creation logic.");
-                // Do NOT auto-heal to patient. Let the user stay on the page or show a specific error if appropriate.
-                // For now, we simply don't redirect, allowing the script to fail gracefully or the user to retry.
-            }
-        } catch (error) {
-            console.error("Auth check error:", error);
-        }
+        });
     });
+}
 
-    // Return the listener unsubscribe function if needed, but usually we just let it run
+/** On public pages (index/login/signup): send signed-in users to their dashboard. */
+export function redirectIfSignedIn() {
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) return;
+        try {
+            const profile = await fetchProfile(user, 1);
+            const role = String(profile?.role || '').toLowerCase();
+            if (DASHBOARD[role]) window.location.replace(DASHBOARD[role]);
+        } catch (e) { console.warn('Redirect check failed:', e); }
+    });
+}
+
+/** Back-compat shim for older pages. */
+export function checkAuthAndRedirect(requiredRole = null) {
+    if (requiredRole) return requireRole(requiredRole);
+    return redirectIfSignedIn();
 }
 
 export async function login(email, password) {
-    return signInWithEmailAndPassword(auth, email, password);
+    return signInWithEmailAndPassword(auth, email.trim(), password);
 }
 
 export async function logout() {
-    return signOut(auth).then(() => window.location.replace('./index.html'));
+    await signOut(auth);
+    window.location.replace('./index.html');
 }
 
-export async function createPatientAccount(email, password, doctorId) {
-    // Secondary app workaround for creating a user while logged in
-    const secondaryApp = initializeApp(firebaseConfig, "secondary");
+/** Self sign-up. Profile shape must satisfy the `users` create rule. */
+export async function signUp(email, password, role, displayName = '') {
+    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    const profile = {
+        uid: cred.user.uid,
+        email: cred.user.email.toLowerCase(),
+        role,
+        displayName: displayName || cred.user.email.split('@')[0],
+        createdAt: serverTimestamp(),
+        doctorId: null,
+        consent: null,
+    };
+    if (role === 'patient') profile.points = 0;
+    await setDoc(doc(db, "users", cred.user.uid), profile);
+    return cred.user;
+}
+
+/**
+ * A doctor creates a patient account that is linked to them from the start.
+ * Uses a secondary Firebase app so the doctor stays signed in.
+ */
+export async function createPatientAccount(email, password, doctorId, displayName = '') {
+    const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
     const secondaryAuth = getAuth(secondaryApp);
-
     try {
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-        const newPatient = userCredential.user;
-
-        await setDoc(doc(db, "users", newPatient.uid), {
-            email: email,
+        const cred = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+        // Written with the doctor's credentials (primary app) - allowed by the
+        // "doctor creates a patient they own" branch of the users create rule.
+        await setDoc(doc(db, "users", cred.user.uid), {
+            uid: cred.user.uid,
+            email: cred.user.email.toLowerCase(),
             role: 'patient',
-            doctorId: doctorId,
+            displayName: displayName || cred.user.email.split('@')[0],
+            doctorId,
+            points: 0,
+            consent: null,
             createdAt: serverTimestamp(),
-            points: 0
         });
-
-        await signOut(secondaryAuth);
-        await deleteApp(secondaryApp);
-        return newPatient;
-    } catch (error) {
-        console.error("Error creating patient:", error);
-        // Ensure secondary app is cleaned up on error
-        try {
-            await signOut(secondaryAuth);
-            await deleteApp(secondaryApp);
-        } catch (cleanupError) {
-            console.warn("Cleanup error:", cleanupError);
-        }
-        throw error;
+        return cred.user;
+    } finally {
+        try { await signOut(secondaryAuth); await deleteApp(secondaryApp); } catch (e) { /* ignore */ }
     }
 }

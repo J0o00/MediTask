@@ -4,438 +4,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doctor Dashboard - MediTask</title>
+    <title>Physiotherapist Dashboard - MediTask</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-
-        /* Animated Gradient Background */
-        .gradient-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-            background-size: 200% 200%;
-            animation: gradientShift 15s ease infinite;
-        }
-
-        @keyframes gradientShift {
-
-            0%,
-            100% {
-                background-position: 0% 50%;
-            }
-
-            50% {
-                background-position: 100% 50%;
-            }
-        }
-
-        /* Glassmorphism */
-        .glass {
-            background: rgba(31, 41, 55, 0.7);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .glass-strong {
-            background: rgba(31, 41, 55, 0.9);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-        }
-
-        /* Glow Effects */
-        .glow-teal {
-            box-shadow: 0 0 20px rgba(20, 184, 166, 0.3);
-        }
-
-        /* Loader */
-        .loader {
-            border: 4px solid rgba(20, 184, 166, 0.1);
-            border-top: 4px solid #14b8a6;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Pulse Animation */
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        .pulse-slow {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        /* Custom Scrollbar */
-        #patient-list::-webkit-scrollbar,
-        #patient-report-container::-webkit-scrollbar,
-        #chat-messages::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        #patient-list::-webkit-scrollbar-track,
-        #patient-report-container::-webkit-scrollbar-track,
-        #chat-messages::-webkit-scrollbar-track {
-            background: #1f2937;
-        }
-
-        #patient-list::-webkit-scrollbar-thumb,
-        #patient-report-container::-webkit-scrollbar-thumb,
-        #chat-messages::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 3px;
-        }
-
-        /* Fade In */
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/app.css">
+    <link rel="icon" href="data:,">
 </head>
 
 <body class="gradient-bg text-white min-h-screen p-4 antialiased overflow-x-hidden">
+    <div id="app-container" class="w-full max-w-7xl mx-auto min-h-[95vh] flex flex-col">
 
-    <div id="app-container" class="w-full max-w-7xl mx-auto h-[95vh] flex flex-col">
-
-        <!-- Header -->
-        <header class="glass-strong rounded-2xl shadow-2xl p-4 md:p-6 mb-4 fade-in glow-teal">
+        <header class="glass-strong rounded-2xl shadow-2xl p-4 md:p-5 mb-4 fade-in glow-teal">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="flex items-center gap-3 w-full md:w-auto">
-                    <button id="mobile-menu-btn"
-                        class="md:hidden glass p-2 rounded-lg hover:glass-strong transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
+                    <button id="mobile-menu-btn" class="md:hidden glass p-2 rounded-lg" aria-label="Patients">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                     </button>
-                    <h1
-                        class="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">
-                        ⚕️ Doctor Portal
-                    </h1>
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">⚕️ MediTask Clinical</h1>
+                        <p id="doctor-line" class="text-xs text-gray-400"></p>
+                    </div>
                 </div>
-                <div class="flex flex-wrap justify-center gap-2 md:gap-3 w-full md:w-auto">
-                    <button id="add-patient-btn"
-                        class="bg-blue-500/80 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-xl transition-all transform hover:scale-105 backdrop-blur text-sm md:text-base flex-1 md:flex-none">
-                        + Add Patient
-                    </button>
-                    <button id="link-patient-btn"
-                        class="bg-indigo-500/80 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-xl transition-all transform hover:scale-105 backdrop-blur text-sm md:text-base flex-1 md:flex-none">
-                        Link Patient
-                    </button>
-                    <button id="logout-btn"
-                        class="bg-red-500/80 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-xl transition-all transform hover:scale-105 backdrop-blur text-sm md:text-base flex-1 md:flex-none">
-                        Logout
-                    </button>
+                <div class="flex flex-wrap justify-center gap-2 w-full md:w-auto">
+                    <button id="add-patient-btn" class="bg-blue-500/80 hover:bg-blue-600 font-semibold py-2 px-4 rounded-xl text-sm flex-1 md:flex-none">+ New patient account</button>
+                    <button id="link-patient-btn" class="bg-indigo-500/80 hover:bg-indigo-600 font-semibold py-2 px-4 rounded-xl text-sm flex-1 md:flex-none">Invite existing patient</button>
+                    <button id="logout-btn" class="bg-red-500/80 hover:bg-red-600 font-semibold py-2 px-4 rounded-xl text-sm flex-1 md:flex-none">Logout</button>
                 </div>
             </div>
         </header>
 
-        <!-- Main Content -->
-        <main id="main-content" class="hidden flex-1 overflow-hidden">
-            <div class="grid md:grid-cols-12 gap-4 h-full">
-
-                <!-- Sidebar: Patient List -->
-                <div id="sidebar"
-                    class="md:col-span-3 glass-strong rounded-2xl p-4 hidden md:flex flex-col h-full absolute md:relative z-20 inset-0 md:inset-auto m-4 md:m-0 shadow-2xl md:shadow-none glow-teal">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg text-teal-400">👥 Patients</h3>
-                        <button id="close-sidebar-btn"
-                            class="md:hidden text-gray-400 hover:text-white text-xl transition-colors">✕</button>
+        <main id="main-content" class="hidden flex-1">
+            <div class="grid md:grid-cols-12 gap-4">
+                <!-- Sidebar -->
+                <aside id="sidebar" class="md:col-span-3 glass-strong rounded-2xl p-4 hidden md:flex flex-col fixed md:static z-30 inset-4 md:inset-auto glow-teal">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-lg text-teal-400">👥 My patients</h3>
+                        <button id="close-sidebar-btn" class="md:hidden text-gray-400 hover:text-white text-xl">✕</button>
                     </div>
-                    <div id="patient-list" class="flex-1 overflow-y-auto space-y-2">
-                        <p class="text-gray-400 text-sm pulse-slow">Loading...</p>
+                    <input id="patient-search" type="search" placeholder="Search..." class="mb-3 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
+                    <div id="patient-list" class="flex-1 overflow-y-auto space-y-2 max-h-[55vh]"><p class="text-gray-400 text-sm pulse-slow">Loading...</p></div>
+                    <div class="mt-4 border-t border-gray-700 pt-3">
+                        <h4 class="text-sm font-semibold text-gray-300 mb-2">Pending invitations</h4>
+                        <div id="pending-links" class="space-y-1 text-xs text-gray-400"></div>
                     </div>
-                </div>
+                </aside>
 
-                <!-- Main Content Area -->
-                <div
-                    class="md:col-span-9 glass-strong rounded-2xl p-6 flex flex-col h-full overflow-hidden relative glow-teal">
-                    <div id="report-view" class="flex flex-col h-full">
-                        <div id="patient-report-container" class="flex-1 overflow-y-auto">
-                            <div id="report-placeholder" class="text-center text-gray-400 mt-20">
-                                <div class="glass rounded-2xl p-12 inline-block">
-                                    <div class="text-6xl mb-4">📋</div>
-                                    <p class="text-xl">Select a patient to view details</p>
-                                </div>
-                            </div>
-                            <div id="patient-report" class="hidden">
-                                <!-- Report content generated by JS -->
-                            </div>
+                <!-- Detail -->
+                <section class="md:col-span-9 glass-strong rounded-2xl p-4 md:p-6 glow-teal min-h-[70vh]">
+                    <div id="report-placeholder" class="text-center text-gray-400 mt-20">
+                        <div class="glass rounded-2xl p-12 inline-block">
+                            <div class="text-6xl mb-4">📋</div>
+                            <p class="text-xl">Select a patient to view their rehabilitation profile</p>
                         </div>
                     </div>
 
-                    <!-- Prescription Modal -->
-                    <div id="prescription-view"
-                        class="hidden absolute inset-0 glass-strong z-10 p-6 rounded-2xl flex flex-col">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-2xl font-bold text-teal400">🎯 Assign New Exercise</h3>
-                            <button id="cancel-prescription-btn"
-                                class="text-gray-400 hover:text-white text-2xl transition-colors">✕</button>
+                    <div id="patient-detail" class="hidden">
+                        <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-3 mb-4">
+                            <div class="flex items-center gap-3">
+                                <div id="pt-avatar" class="w-11 h-11 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-lg"></div>
+                                <div>
+                                    <h2 id="pt-name" class="font-bold text-xl"></h2>
+                                    <p id="pt-meta" class="text-xs text-gray-400"></p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 flex-wrap">
+                                <button id="export-pdf-btn" class="bg-purple-600 hover:bg-purple-700 font-semibold py-2 px-4 rounded-lg text-sm">📄 Export report</button>
+                                <button id="open-chat-btn" class="glass font-semibold py-2 px-4 rounded-lg text-sm">💬 Message</button>
+                                <button id="unlink-btn" class="glass text-red-300 font-semibold py-2 px-3 rounded-lg text-sm">Unlink</button>
+                            </div>
                         </div>
 
-                        <form id="prescription-form" class="space-y-6 max-w-lg mx-auto w-full">
-                            <div>
-                                <label for="exercise-select" class="block text-sm font-medium text-gray-300 mb-2">Select
-                                    Exercise</label>
-                                <select id="exercise-select"
-                                    class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all">
-                                    <option value="Right Hand Raise">Right Hand Raise</option>
-                                    <option value="Shoulder Abduction">Shoulder Abduction</option>
-                                    <option value="Squat">Squat</option>
-                                </select>
-                            </div>
+                        <div id="alerts-box" class="space-y-2 mb-4"></div>
 
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label for="sets-input"
-                                        class="block text-sm font-medium text-gray-300 mb-2">Sets</label>
-                                    <input type="number" id="sets-input" value="3" min="1"
-                                        class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all">
-                                </div>
-                                <div>
-                                    <label for="reps-input"
-                                        class="block text-sm fontmedium text-gray-300 mb-2">Reps</label>
-                                    <input type="number" id="reps-input" value="10" min="1"
-                                        class="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all">
-                                </div>
-                            </div>
+                        <nav class="flex gap-1 border-b border-gray-700 mb-4 text-sm">
+                            <button data-tab="overview" class="tab-btn px-4 py-2 -mb-px border-b-2">Digital twin</button>
+                            <button data-tab="sessions" class="tab-btn px-4 py-2 -mb-px border-b-2">Sessions</button>
+                            <button data-tab="prescriptions" class="tab-btn px-4 py-2 -mb-px border-b-2">Prescriptions</button>
+                        </nav>
 
-                            <button type="submit"
-                                class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] glow-teal">
-                                Assign Exercise
-                            </button>
-                        </form>
+                        <!-- Overview / twin -->
+                        <div id="tab-overview" class="tab-panel">
+                            <div class="flex flex-wrap items-center gap-3 mb-4">
+                                <label for="twin-exercise" class="text-sm text-gray-400">Exercise</label>
+                                <select id="twin-exercise" class="bg-gray-800 border border-gray-700 rounded-lg text-sm p-2"></select>
+                                <span id="twin-baseline-note" class="text-xs text-gray-500"></span>
+                            </div>
+                            <div id="twin-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4"></div>
+                            <div class="grid lg:grid-cols-2 gap-4">
+                                <div class="glass rounded-xl p-4"><h4 class="text-sm font-semibold mb-2 text-gray-300">Joint mobility (best ROM per session)</h4><div class="h-60"><canvas id="rom-chart"></canvas></div></div>
+                                <div class="glass rounded-xl p-4"><h4 class="text-sm font-semibold mb-2 text-gray-300">Movement quality, symmetry and pain</h4><div class="h-60"><canvas id="quality-chart"></canvas></div></div>
+                            </div>
+                            <div class="glass rounded-xl p-4 mt-4">
+                                <h4 class="text-sm font-semibold mb-2 text-gray-300">Most frequent movement deviations (last 10 sessions)</h4>
+                                <div id="error-breakdown" class="text-sm text-gray-300 space-y-1"></div>
+                            </div>
+                            <p class="text-[11px] text-gray-500 mt-3">Measurements come from webcam pose estimation and are not clinically validated. Use them to support, not replace, your clinical assessment.</p>
+                        </div>
+
+                        <!-- Sessions -->
+                        <div id="tab-sessions" class="tab-panel hidden">
+                            <div id="session-list" class="space-y-3"></div>
+                        </div>
+
+                        <!-- Prescriptions -->
+                        <div id="tab-prescriptions" class="tab-panel hidden">
+                            <div class="grid lg:grid-cols-2 gap-4">
+                                <div>
+                                    <h4 class="font-semibold mb-2">Active prescriptions</h4>
+                                    <div id="rx-list" class="space-y-2"></div>
+                                </div>
+                                <form id="prescription-form" class="glass rounded-xl p-4 space-y-4">
+                                    <h4 class="font-semibold text-teal-400">🎯 Assign new exercise</h4>
+                                    <div>
+                                        <label for="exercise-select" class="block text-sm text-gray-300 mb-1">Exercise</label>
+                                        <select id="exercise-select" class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3"></select>
+                                        <p id="exercise-desc" class="text-xs text-gray-400 mt-1"></p>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div><label for="sets-input" class="block text-sm text-gray-300 mb-1">Sets</label><input type="number" id="sets-input" value="3" min="1" max="20" required class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3"></div>
+                                        <div><label for="reps-input" class="block text-sm text-gray-300 mb-1">Reps per set</label><input type="number" id="reps-input" value="10" min="1" max="100" required class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3"></div>
+                                    </div>
+                                    <div><label for="notes-input" class="block text-sm text-gray-300 mb-1">Instructions for the patient (optional)</label><textarea id="notes-input" rows="2" maxlength="500" class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3 resize-none"></textarea></div>
+                                    <button type="submit" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Assign exercise</button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </section>
             </div>
         </main>
 
-        <!-- Loading View -->
         <div id="loading-view" class="flex-1 flex items-center justify-center">
-            <div class="glass-strong rounded-3xl p-12 glow-teal">
-                <div class="loader mx-auto mb-4"></div>
-                <p class="text-gray-400 text-lg">Authenticating...</p>
-            </div>
+            <div class="glass-strong rounded-3xl p-12 glow-teal"><div class="loader mx-auto mb-4"></div><p class="text-gray-400 text-lg">Authenticating...</p></div>
         </div>
 
-        <!-- Chat Modal -->
-        <div id="chat-modal"
-            class="hidden fixed bottom-24 right-6 w-80 md:w-96 glass-strong border border-gray-700 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden glow-teal"
-            style="height: 500px;">
+        <!-- Chat -->
+        <div id="chat-modal" class="hidden fixed bottom-6 right-4 left-4 sm:left-auto sm:w-96 glass-strong border border-gray-700 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden glow-teal" style="height: 480px;">
             <div class="glass-strong p-4 flex justify-between items-center border-b border-gray-700">
-                <h3 class="font-bold text-teal-400" id="chat-patient-name">💬 Chat</h3>
-                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-xl transition-colors">✕</button>
+                <h3 class="font-bold text-teal-400 truncate" id="chat-patient-name">💬 Chat</h3>
+                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
-            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3">
-                <!-- Messages -->
-            </div>
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3"></div>
             <div class="p-3 glass-strong border-t border-gray-700 flex gap-2">
-                <input type="text" id="chat-input" placeholder="Type a message..."
-                    class="flex-1 bg-gray-800/50 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 border border-gray-700 transition-all">
-                <button id="send-msg-btn"
-                    class="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black p-2 rounded-xl transition-all transform hover:scale-110">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
+                <input type="text" id="chat-input" maxlength="2000" placeholder="Type a message..." class="flex-1 bg-gray-800/50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 border border-gray-700">
+                <button id="send-msg-btn" class="bg-gradient-to-r from-teal-500 to-cyan-500 text-black p-2 rounded-xl" aria-label="Send">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                 </button>
             </div>
         </div>
 
-        <!-- Add Patient Modal -->
-        <div id="add-patient-modal"
-            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-md glow-teal">
-                <h3 class="text-2xl font-bold text-teal-400 mb-6">➕ Add New Patient</h3>
-
-                <form id="add-patient-form" class="space-y-5">
-                    <div>
-                        <label for="new-patient-email"
-                            class="block text-sm font-medium text-gray-300 mb-2">Email</label>
-                        <input type="email" id="new-patient-email" required
-                            class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white transition-all">
-                    </div>
-                    <div>
-                        <label for="new-patient-password"
-                            class="block text-sm font-medium text-gray-300 mb-2">Password</label>
-                        <input type="password" id="new-patient-password" required minlength="6"
-                            class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white transition-all">
-                    </div>
-                    <div id="add-patient-error"
-                        class="hidden text-red-400 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
+        <!-- Add patient -->
+        <div id="add-patient-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="glass-strong rounded-3xl p-8 w-full max-w-md glow-teal">
+                <h3 class="text-2xl font-bold text-teal-400 mb-2">➕ New patient account</h3>
+                <p class="text-xs text-gray-400 mb-5">Creates a login for the patient that is linked to you. Share the password with them securely and ask them to change it.</p>
+                <form id="add-patient-form" class="space-y-4">
+                    <div><label for="new-patient-name" class="block text-sm text-gray-300 mb-1">Name</label><input id="new-patient-name" maxlength="80" class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
+                    <div><label for="new-patient-email" class="block text-sm text-gray-300 mb-1">Email</label><input type="email" id="new-patient-email" required class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
+                    <div><label for="new-patient-password" class="block text-sm text-gray-300 mb-1">Temporary password</label><input type="password" id="new-patient-password" required minlength="8" class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
+                    <div id="add-patient-error" class="hidden text-red-300 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
                     <div class="flex gap-3 pt-2">
-                        <button type="button" id="cancel-add-patient-btn"
-                            class="flex-1 glass hover:glass-strong text-white font-semibold py-3 rounded-xl transition-all border border-gray-700">
-                            Cancel
-                        </button>
-                        <button type="submit" id="submit-add-patient-btn"
-                            class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl transition-all transform hover:scale-[1.02]">
-                            Create
-                        </button>
+                        <button type="button" id="cancel-add-patient-btn" class="flex-1 glass font-semibold py-3 rounded-xl">Cancel</button>
+                        <button type="submit" id="submit-add-patient-btn" class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Create</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Link Patient Modal -->
-        <div id="link-patient-modal"
-            class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-md glow-teal">
-                <h3 class="text-2xl font-bold text-teal-400 mb-6">🔗 Link Existing Patient</h3>
-
-                <form id="link-patient-form" class="space-y-5">
-                    <div>
-                        <label for="link-patient-email" class="block text-sm font-medium text-gray-300 mb-2">Patient
-                            Email</label>
-                        <input type="email" id="link-patient-email" required
-                            class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 focus:border-transparent text-white transition-all">
-                    </div>
-                    <div id="link-patient-error"
-                        class="hidden text-red-400 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
+        <!-- Invite patient -->
+        <div id="link-patient-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="glass-strong rounded-3xl p-8 w-full max-w-md glow-teal">
+                <h3 class="text-2xl font-bold text-teal-400 mb-2">🔗 Invite an existing patient</h3>
+                <p class="text-xs text-gray-400 mb-5">The patient sees the invitation on their dashboard. You get access to their data only after they accept.</p>
+                <form id="link-patient-form" class="space-y-4">
+                    <div><label for="link-patient-email" class="block text-sm text-gray-300 mb-1">Patient email</label><input type="email" id="link-patient-email" required class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
+                    <div id="link-patient-error" class="hidden text-red-300 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
                     <div class="flex gap-3 pt-2">
-                        <button type="button" id="cancel-link-patient-btn"
-                            class="flex-1 glass hover:glass-strong text-white font-semibold py-3 rounded-xl transition-all border border-gray-700">
-                            Cancel
-                        </button>
-                        <button type="submit" id="submit-link-patient-btn"
-                            class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-black font-bold py-3 rounded-xl transition-all transform hover:scale-[1.02]">
-                            Link
-                        </button>
+                        <button type="button" id="cancel-link-patient-btn" class="flex-1 glass font-semibold py-3 rounded-xl">Cancel</button>
+                        <button type="submit" id="submit-link-patient-btn" class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Send invitation</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script type="module" src="./js/doctor-app.js"></script>
-    <script>
-        // Simple Sidebar Toggle Logic for Mobile
-        const menuBtn = document.getElementById('mobile-menu-btn');
-        const sidebar = document.getElementById('sidebar');
-        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
-
-        if (menuBtn && sidebar) {
-            menuBtn.addEventListener('click', () => {
-                sidebar.classList.remove('hidden');
-                sidebar.classList.add('flex');
-            });
-        }
-
-        if (closeSidebarBtn && sidebar) {
-            closeSidebarBtn.addEventListener('click', () => {
-                sidebar.classList.add('hidden');
-                sidebar.classList.remove('flex');
-            });
-        }
-
-        // PDF Export function (available globally for doctor-app.js to call)
-        window.exportPatientPDF = function (patientEmail, exerciseLogs, feedbackLogs) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-            // Header
-            doc.setFontSize(20);
-            doc.setTextColor(20, 184, 166);
-            doc.text('MediTask - Patient Progress Report', 20, 20);
-
-            // Patient info
-            doc.setFontSize(12);
-            doc.setTextColor(60, 60, 60);
-            doc.text(`Patient: ${patientEmail}`, 20, 35);
-            doc.text(`Report Date: ${new Date().toLocaleDateString()}`, 20, 42);
-
-            // Separator line
-            doc.setDrawColor(20, 184, 166);
-            doc.line(20, 48, 190, 48);
-
-            // Exercise Summary
-            doc.setFontSize(14);
-            doc.setTextColor(40, 40, 40);
-            doc.text('Exercise History', 20, 58);
-
-            let yPos = 68;
-            doc.setFontSize(10);
-
-            if (exerciseLogs && exerciseLogs.length > 0) {
-                exerciseLogs.slice(0, 15).forEach((log, i) => {
-                    const date = log.timestamp?.toDate?.() ? log.timestamp.toDate().toLocaleDateString() : 'N/A';
-                    const status = log.completed ? '✓ Completed' : log.feedback || 'In Progress';
-                    doc.text(`${i + 1}. ${log.exercise || 'Exercise'} - ${date} - ${status}`, 20, yPos);
-                    yPos += 7;
-                    if (yPos > 280) {
-                        doc.addPage();
-                        yPos = 20;
-                    }
-                });
-            } else {
-                doc.text('No exercise history available.', 20, yPos);
-            }
-
-            // Pain/Difficulty Feedback Section
-            if (feedbackLogs && feedbackLogs.length > 0) {
-                yPos += 10;
-                doc.setFontSize(14);
-                doc.text('Patient Feedback', 20, yPos);
-                yPos += 10;
-                doc.setFontSize(10);
-
-                feedbackLogs.slice(0, 10).forEach((fb, i) => {
-                    doc.text(`• Pain Level: ${fb.painLevel}/10, Difficulty: ${fb.difficulty}`, 20, yPos);
-                    yPos += 7;
-                    if (fb.notes) {
-                        doc.text(`  Notes: ${fb.notes.substring(0, 50)}...`, 25, yPos);
-                        yPos += 7;
-                    }
-                });
-            }
-
-            // Footer
-            doc.setFontSize(8);
-            doc.setTextColor(150, 150, 150);
-            doc.text('Generated by MediTask - AI-Powered Rehabilitation Platform', 20, 285);
-
-            // Save
-            doc.save(`MediTask_Report_${patientEmail.split('@')[0]}_${new Date().toISOString().split('T')[0]}.pdf`);
-        };
-    </script>
 </body>
 
 </html>

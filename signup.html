@@ -240,7 +240,7 @@
                     <select id="signup-role"
                         class="input-field w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all appearance-none cursor-pointer">
                         <option value="patient">Patient (Recovering)</option>
-                        <option value="doctor">Doctor (Healthcare Provider)</option>
+                        <option value="doctor">Physiotherapist / Doctor</option>
                     </select>
                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
                         <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -293,7 +293,7 @@
 
     <script type="module">
         import { firebaseConfig } from "./js/config.js";
-        import { auth, db } from "./js/services/auth.js";
+        import { auth, db, signUp } from "./js/services/auth.js";
         import { createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -408,16 +408,9 @@
             const role = document.getElementById('signup-role').value;
 
             try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const normalizedRole = (role || '').toString().trim().toLowerCase();
-
-                await setDoc(doc(db, "users", userCredential.user.uid), {
-                    email: userCredential.user.email,
-                    role: normalizedRole,
-                    uid: userCredential.user.uid,
-                    createdAt: new Date(),
-                    points: 0
-                });
+                // Profile shape is validated by firestore.rules (role, email, points = 0, no doctorId).
+                await signUp(email, password, normalizedRole);
 
                 // Success
                 btnText.textContent = 'Success! Redirecting...';

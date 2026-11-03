@@ -1,0 +1,10 @@
+# MediTask ML pipeline (tested with Python 3.11-3.13, TensorFlow 2.21 / Keras 3)
+numpy>=1.26
+pandas>=2.1
+scikit-learn>=1.4
+matplotlib>=3.8
+openpyxl>=3.1          # KIMORE clinical-score spreadsheets
+tensorflow>=2.16       # or tensorflow-cpu
+# only for scripts/extract_pose.py (video -> landmarks):
+mediapipe>=0.10.14
+opencv-python>=4.9

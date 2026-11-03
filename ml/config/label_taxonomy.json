@@ -1,0 +1,40 @@
+{
+  "_comment": "Common label taxonomy used to harmonise KIMORE, UI-PRMD, REHAB24-6 and MediTask recordings. Source exercise codes marked VERIFY must be checked against the documentation that ships with your downloaded copy of each dataset before training.",
+  "quality_labels": ["correct", "incorrect", "incomplete"],
+  "classes": {
+    "right_hand_raise":     { "primary_metric": "shoulder_r",    "in_app": true },
+    "shoulder_abduction":   { "primary_metric": "shoulder_mean", "in_app": true },
+    "squat":                { "primary_metric": "knee_mean",     "in_app": true },
+    "elbow_flexion":        { "primary_metric": "elbow_r",       "in_app": true },
+    "lateral_leg_raise":    { "primary_metric": "hip_abd_r",     "in_app": true },
+    "arm_raise_bilateral":  { "primary_metric": "shoulder_mean", "in_app": false },
+    "lateral_trunk_tilt":   { "primary_metric": "trunk_incl",    "in_app": false },
+    "trunk_rotation":       { "primary_metric": null,            "in_app": false },
+    "pelvis_rotation":      { "primary_metric": null,            "in_app": false },
+    "hurdle_step":          { "primary_metric": null,            "in_app": false },
+    "inline_lunge":         { "primary_metric": "knee_mean",     "in_app": false },
+    "side_lunge":           { "primary_metric": "knee_mean",     "in_app": false },
+    "sit_to_stand":         { "primary_metric": "knee_mean",     "in_app": false },
+    "standing_leg_raise":   { "primary_metric": null,            "in_app": false },
+    "shoulder_extension":   { "primary_metric": null,            "in_app": false },
+    "shoulder_rotation":    { "primary_metric": null,            "in_app": false },
+    "shoulder_scaption":    { "primary_metric": "shoulder_mean", "in_app": false },
+    "push_up":              { "primary_metric": "elbow_mean",    "in_app": false },
+    "arm_vw":               { "primary_metric": null,            "in_app": false }
+  },
+  "sources": {
+    "kimore": {
+      "exercise_map": { "Es1": "arm_raise_bilateral", "Es2": "lateral_trunk_tilt", "Es3": "trunk_rotation", "Es4": "pelvis_rotation", "Es5": "squat" },
+      "_quality_rule": "KIMORE gives clinical scores, not correct/incorrect labels. A repetition is labelled 'correct' when the exercise's total clinical score >= correct_threshold * score_max. VERIFY score_max against the dataset documentation.",
+      "score_max": 50,
+      "correct_threshold": 0.7
+    },
+    "ui_prmd": {
+      "exercise_map": { "m01": "squat", "m02": "hurdle_step", "m03": "inline_lunge", "m04": "side_lunge", "m05": "sit_to_stand", "m06": "standing_leg_raise", "m07": "shoulder_abduction", "m08": "shoulder_extension", "m09": "shoulder_rotation", "m10": "shoulder_scaption" }
+    },
+    "rehab24_6": {
+      "_comment": "VERIFY: exercise codes/names below are placeholders - map them from the REHAB24-6 annotation files.",
+      "exercise_map": { "Ex1": "shoulder_abduction", "Ex2": "arm_vw", "Ex3": "push_up", "Ex4": "lateral_leg_raise", "Ex5": "inline_lunge", "Ex6": "squat" }
+    }
+  }
+}

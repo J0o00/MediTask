@@ -1,236 +1,200 @@
+// MediTask data-access layer. Every query here is shaped so that the
+// security rules in firestore.rules can prove it is allowed.
 import { db } from "./auth.js";
-import { collection, query, where, getDocs, orderBy, addDoc, serverTimestamp, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+    collection, query, where, getDocs, getDoc, orderBy, limit, addDoc, setDoc, updateDoc,
+    doc, onSnapshot, serverTimestamp, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Firestore collections
 const USERS = "users";
-const PRESCRIPTIONS = "prescriptions";
-const EXERCISE_LOGS = "exercise_logs";
-const MESSAGES = "messages";
+const LINKS = "link_requests";
+const sub = (pid, name) => collection(db, USERS, pid, name);
 
-// --- Doctor Helper Functions ---
+export const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-export async function getPatients() {
-    const q = query(collection(db, USERS), where("role", "==", "patient"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+// ------------------------------------------------------------------ profiles
+export async function getProfile(uid) {
+    const s = await getDoc(doc(db, USERS, uid));
+    return s.exists() ? { uid: s.id, ...s.data() } : null;
 }
 
-export async function linkPatientToDoctor(patientEmail, doctorId) {
-    const q = query(collection(db, USERS), where("email", "==", patientEmail), where("role", "==", "patient"));
-    const snapshot = await getDocs(q);
+export async function updateOwnProfile(uid, fields) {
+    const allowed = ['displayName', 'consent', 'voiceEnabled'];
+    const data = Object.fromEntries(Object.entries(fields).filter(([k]) => allowed.includes(k)));
+    return updateDoc(doc(db, USERS, uid), { ...data, updatedAt: serverTimestamp() });
+}
 
-    if (snapshot.empty) {
-        throw new Error("Patient not found with that email.");
+// ------------------------------------------------------------------ doctor: patients
+/** Only patients assigned to this doctor (rules reject any other query). */
+export async function getMyPatients(doctorId) {
+    const q = query(collection(db, USERS), where("doctorId", "==", doctorId));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(p => p.role === 'patient');
+}
+
+export async function unlinkPatient(patientId) {
+    return updateDoc(doc(db, USERS, patientId), { doctorId: null, updatedAt: serverTimestamp() });
+}
+
+// ------------------------------------------------------------------ link requests
+export async function createLinkRequest(doctor, patientEmail) {
+    const email = patientEmail.trim().toLowerCase();
+    // Avoid duplicate pending invitations from the same doctor.
+    const existing = await getDocs(query(collection(db, LINKS),
+        where("doctorId", "==", doctor.uid), where("status", "==", "pending")));
+    if (existing.docs.some(d => d.data().patientEmail === email)) {
+        throw new Error("An invitation to this email is already pending.");
     }
-
-    const patientDoc = snapshot.docs[0];
-    const patientData = patientDoc.data();
-
-    // Check if already linked to another doctor (optional policy, here we overwrite or check)
-    if (patientData.doctorId && patientData.doctorId !== doctorId) {
-        // Optional: throw new Error("Patient is already linked to another doctor.");
-    }
-
-    await updateDoc(doc(db, USERS, patientDoc.id), {
-        doctorId: doctorId
-    });
-
-    return { uid: patientDoc.id, ...patientData };
-}
-
-export function subscribeToChat(patientId, callback) {
-    const q = query(collection(db, MESSAGES), orderBy("timestamp", "asc"));
-    return onSnapshot(q, (snapshot) => {
-        const messages = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            // Client-side filter for now
-            if (data.patientId === patientId) {
-                messages.push({ id: doc.id, ...data });
-            }
-        });
-        callback(messages);
+    return addDoc(collection(db, LINKS), {
+        doctorId: doctor.uid,
+        doctorEmail: doctor.email,
+        doctorName: doctor.displayName || doctor.email,
+        patientEmail: email,
+        status: 'pending',
+        createdAt: serverTimestamp(),
     });
 }
 
-export async function sendMessage(senderId, senderName, text, type, patientId) {
-    return addDoc(collection(db, MESSAGES), {
-        senderId,
-        senderName,
-        text,
-        timestamp: serverTimestamp(),
-        type,
-        patientId
-    });
+export async function getDoctorPendingLinks(doctorId) {
+    const snap = await getDocs(query(collection(db, LINKS),
+        where("doctorId", "==", doctorId), where("status", "==", "pending")));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-export async function getExerciseHistory(patientId) {
-    try {
-        const q = query(collection(db, EXERCISE_LOGS), where("patientId", "==", patientId), orderBy("timestamp", "desc"));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (e) {
-        console.error("Error fetching history:", e);
-        return [];
-    }
+export async function cancelLinkRequest(reqId) {
+    return updateDoc(doc(db, LINKS, reqId), { status: 'cancelled', respondedAt: serverTimestamp() });
 }
 
-export async function assignPrescription(doctorId, patientId, patientEmail, exercise, sets, reps) {
-    return addDoc(collection(db, PRESCRIPTIONS), {
-        doctorId,
-        patientId,
-        patientEmail,
-        exercise,
-        sets,
-        reps,
-        isCompleted: false,
-        assignedAt: serverTimestamp()
-    });
+export async function getMyPendingLinkRequests(email) {
+    const snap = await getDocs(query(collection(db, LINKS),
+        where("patientEmail", "==", email.toLowerCase()), where("status", "==", "pending")));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-// Get exercise statistics for analytics dashboard
-export async function getExerciseStats(patientId) {
-    try {
-        // Get all completed exercises
-        const logsQuery = query(
-            collection(db, EXERCISE_LOGS),
-            where("patientId", "==", patientId),
-            where("completed", "==", true),
-            orderBy("timestamp", "desc")
-        );
-        const logsSnapshot = await getDocs(logsQuery);
-        const completedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // Get all prescriptions (for adherence calculation)
-        const prescQuery = query(
-            collection(db, PRESCRIPTIONS),
-            where("patientId", "==", patientId)
-        );
-        const prescSnapshot = await getDocs(prescQuery);
-        const totalPrescriptions = prescSnapshot.docs.length;
-        const completedPrescriptions = prescSnapshot.docs.filter(d => d.data().isCompleted).length;
-
-        // Calculate adherence rate
-        const adherenceRate = totalPrescriptions > 0
-            ? Math.round((completedPrescriptions / totalPrescriptions) * 100)
-            : 0;
-
-        // Calculate streak (simplified - based on consecutive days with activity)
-        let streak = 0;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        for (let i = 0; i < 30; i++) {
-            const checkDate = new Date(today);
-            checkDate.setDate(checkDate.getDate() - i);
-            const hasActivity = completedLogs.some(log => {
-                if (log.timestamp && log.timestamp.toDate) {
-                    const logDate = log.timestamp.toDate();
-                    logDate.setHours(0, 0, 0, 0);
-                    return logDate.getTime() === checkDate.getTime();
-                }
-                return false;
-            });
-            if (hasActivity) streak++;
-            else if (i > 0) break; // Break streak if not today
-        }
-
-        // Weekly data for chart
-        const weeklyData = [];
-        for (let i = 6; i >= 0; i--) {
-            const date = new Date();
-            date.setDate(date.getDate() - i);
-            date.setHours(0, 0, 0, 0);
-            const count = completedLogs.filter(log => {
-                if (log.timestamp && log.timestamp.toDate) {
-                    const logDate = log.timestamp.toDate();
-                    logDate.setHours(0, 0, 0, 0);
-                    return logDate.getTime() === date.getTime();
-                }
-                return false;
-            }).length;
-            weeklyData.push({
-                day: date.toLocaleDateString('en', { weekday: 'short' }),
-                count
-            });
-        }
-
-        return {
-            totalExercises: completedLogs.length,
-            streak,
-            adherenceRate,
-            weeklyData
-        };
-    } catch (e) {
-        console.error("Error getting stats:", e);
-        return { totalExercises: 0, streak: 0, adherenceRate: 0, weeklyData: [] };
-    }
-}
-
-// --- Patient Helper Functions ---
-
-export async function getPatientPrescriptions(patientId) {
-    const q = query(collection(db, PRESCRIPTIONS),
-        where("patientId", "==", patientId),
-        where("isCompleted", "==", false)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-
-export async function logExerciseRep(patientId, patientEmail, exercise, currentReps, currentSet, totalReps) {
-    return addDoc(collection(db, EXERCISE_LOGS), {
-        patientId,
-        patientEmail,
-        exercise,
-        feedback: `Rep ${currentReps} - Set ${currentSet}`,
-        isCorrect: true,
-        repCount: currentReps,
-        setCount: currentSet,
-        totalReps: totalReps,
-        timestamp: serverTimestamp()
-    });
-}
-
-export async function completeExercise(patientId, patientEmail, prescriptionId, exercise, totalReps, currentPoints) {
-    // Log completion
-    await addDoc(collection(db, EXERCISE_LOGS), {
-        patientId,
-        patientEmail,
-        exercise,
-        feedback: `Exercise completed! Total reps: ${totalReps}`,
-        isCorrect: true,
-        completed: true,
-        timestamp: serverTimestamp()
-    });
-
-    // Mark prescription done
-    if (prescriptionId && !prescriptionId.startsWith('sample')) {
-        await updateDoc(doc(db, PRESCRIPTIONS, prescriptionId), {
-            isCompleted: true,
-            completedAt: serverTimestamp(),
-            totalRepsCompleted: totalReps
+/** Patient consents to a doctor. Atomic: request -> accepted, profile -> doctorId. */
+export async function respondToLinkRequest(patientId, request, accept) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, LINKS, request.id), { status: accept ? 'accepted' : 'declined', respondedAt: serverTimestamp() });
+    if (accept) {
+        batch.update(doc(db, USERS, patientId), {
+            doctorId: request.doctorId, linkRequestId: request.id, updatedAt: serverTimestamp()
         });
     }
-
-    // Award points
-    const pointsEarned = 10;
-    await updateDoc(doc(db, USERS, patientId), {
-        points: currentPoints + pointsEarned
-    });
-    return pointsEarned;
+    return batch.commit();
 }
 
-// Save patient's post-exercise feedback (pain/difficulty)
-export async function saveExerciseFeedback(patientId, patientEmail, exercise, painLevel, difficulty, notes) {
-    return addDoc(collection(db, EXERCISE_LOGS), {
-        patientId,
-        patientEmail,
-        exercise,
-        type: 'feedback',
-        painLevel: painLevel,
-        difficulty: difficulty,
-        notes: notes || '',
-        timestamp: serverTimestamp()
+// ------------------------------------------------------------------ prescriptions
+export async function assignPrescription(doctorId, patientId, { exerciseId, exercise, sets, reps, notes = '' }) {
+    return addDoc(sub(patientId, 'prescriptions'), {
+        doctorId, patientId, exerciseId, exercise,
+        sets: Math.round(sets), reps: Math.round(reps), notes: String(notes).slice(0, 500),
+        status: 'active', assignedAt: serverTimestamp(),
     });
 }
+
+export async function updatePrescription(patientId, rxId, fields) {
+    return updateDoc(doc(db, USERS, patientId, 'prescriptions', rxId), { ...fields, updatedAt: serverTimestamp() });
+}
+
+export async function getPrescriptions(patientId, status = 'active') {
+    const q = query(sub(patientId, 'prescriptions'), where("status", "==", status), orderBy("assignedAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ------------------------------------------------------------------ sessions
+export async function getSessions(patientId, max = 100) {
+    const q = query(sub(patientId, 'sessions'), orderBy("startedAt", "desc"), limit(max));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Save a finished session. If it completes the prescription, the same atomic
+ * batch marks the prescription completed and awards points - the rules only
+ * accept the reward when all three writes are consistent.
+ * The session id is generated before the session starts, so a retry can
+ * never create a duplicate record.
+ */
+export async function saveSession(patient, session, prescription) {
+    const batch = writeBatch(db);
+    const sessionRef = doc(db, USERS, patient.uid, 'sessions', session.id);
+    const { id, ...data } = session;
+    batch.set(sessionRef, { ...data, patientId: patient.uid, savedAt: serverTimestamp() });
+
+    let pointsEarned = 0;
+    const meetsTarget = prescription && session.status === 'completed'
+        && session.validReps >= prescription.sets * prescription.reps;
+    if (meetsTarget) {
+        batch.update(doc(db, USERS, patient.uid, 'prescriptions', prescription.id), {
+            status: 'completed', completedAt: serverTimestamp(),
+            lastSessionId: session.id, totalRepsCompleted: session.validReps,
+        });
+        if (patient.lastRewardedPrescription !== prescription.id) {
+            pointsEarned = 10;
+            batch.update(doc(db, USERS, patient.uid), {
+                points: (patient.points || 0) + pointsEarned,
+                lastRewardedPrescription: prescription.id,
+                updatedAt: serverTimestamp(),
+            });
+        }
+    }
+    await batch.commit();
+    return { pointsEarned };
+}
+
+export async function addSessionFeedback(patientId, sessionId, feedback, flags = {}) {
+    return updateDoc(doc(db, USERS, patientId, 'sessions', sessionId), {
+        feedback: {
+            pain: Math.max(0, Math.min(10, Math.round(feedback.pain))),
+            difficulty: feedback.difficulty,
+            notes: String(feedback.notes || '').slice(0, 1000),
+        },
+        flags,
+    });
+}
+
+export async function addSessionReview(patientId, sessionId, text) {
+    return updateDoc(doc(db, USERS, patientId, 'sessions', sessionId), {
+        review: { text: String(text).slice(0, 2000), at: new Date().toISOString() },
+    });
+}
+
+// ------------------------------------------------------------------ alerts
+export async function raiseAlert(patientId, type, message, sessionId = null) {
+    return addDoc(sub(patientId, 'alerts'), {
+        type, message: String(message).slice(0, 500), sessionId,
+        acknowledged: false, createdAt: serverTimestamp(),
+    });
+}
+
+export async function getOpenAlerts(patientId) {
+    const q = query(sub(patientId, 'alerts'), where("acknowledged", "==", false), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function acknowledgeAlert(patientId, alertId) {
+    return updateDoc(doc(db, USERS, patientId, 'alerts', alertId), { acknowledged: true, acknowledgedAt: serverTimestamp() });
+}
+
+// ------------------------------------------------------------------ chat
+/** Server-side scoped: only this patient's thread is ever downloaded. */
+export function subscribeToChat(patientId, callback, onError = console.error) {
+    const q = query(sub(patientId, 'messages'), orderBy("createdAt", "asc"), limit(300));
+    return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))), onError);
+}
+
+export async function sendMessage(patientId, sender, text) {
+    const clean = String(text).trim().slice(0, 2000);
+    if (!clean) return null;
+    return addDoc(sub(patientId, 'messages'), {
+        senderId: sender.uid,
+        senderRole: sender.role,
+        senderName: sender.displayName || sender.email,
+        text: clean,
+        createdAt: serverTimestamp(),
+    });
+}
+
+export { setDoc };

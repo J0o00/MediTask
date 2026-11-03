@@ -1,10 +1,227 @@
 rules_version = '2';
+
+// =====================================================================
+// MediTask - Role- and relationship-based Firestore security rules
+// ---------------------------------------------------------------------
+// Data model (see documentation/data-model.md):
+//   users/{uid}                          profile (role, doctorId, points)
+//   users/{pid}/prescriptions/{rxId}     written by the assigned doctor
+//   users/{pid}/sessions/{sessionId}     written once by the patient
+//   users/{pid}/messages/{msgId}         patient <-> assigned doctor chat
+//   users/{pid}/alerts/{alertId}         pain / emergency-stop alerts
+//   link_requests/{reqId}                doctor -> patient link invitation
+//
+// Principles
+//   * A patient can only read/write their own subtree.
+//   * A doctor can only read a patient whose users/{pid}.doctorId == doctor.
+//   * A patient<->doctor relationship can only be created with the
+//     patient's consent (accepting a pending link request), or when the
+//     doctor creates the patient account themselves.
+//   * Points can only be increased by exactly 10, once per prescription,
+//     in the same batch that completes that prescription with a
+//     completed session that meets the prescribed volume.
+//   * Nothing clinical can be deleted from the client.
+// =====================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DEVELOPMENT RULES: Allow any logged-in user to read/write everything.
-    // This allows Doctors to create Patient profiles and Patients to chat.
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function userPath(id) { return /databases/$(database)/documents/users/$(id); }
+    function me() { return get(userPath(uid())).data; }
+    function isDoctor() { return signedIn() && exists(userPath(uid())) && me().role == 'doctor'; }
+    function isSelf(id) { return signedIn() && uid() == id; }
+    function isDoctorOf(pid) {
+      return isDoctor() && get(userPath(pid)).data.get('doctorId', null) == uid();
+    }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function onlyChanged(keys) { return changed().hasOnly(keys); }
+    function isInt(v, lo, hi) { return v is int && v >= lo && v <= hi; }
+
+    // ---------- users ----------
+    match /users/{userId} {
+
+      function validLinkAcceptance(reqId, doctorId) {
+        let req = get(/databases/$(database)/documents/link_requests/$(reqId)).data;
+        let reqAfter = getAfter(/databases/$(database)/documents/link_requests/$(reqId)).data;
+        return reqId is string
+            && req.patientEmail == myEmail()
+            && req.status == 'pending'
+            && req.doctorId == doctorId
+            && reqAfter.status == 'accepted';
+      }
+
+      function validReward(pid, rxId) {
+        let rxPath = /databases/$(database)/documents/users/$(pid)/prescriptions/$(rxId);
+        return rxId is string
+            && rxId != resource.data.get('lastRewardedPrescription', '')
+            && get(rxPath).data.status == 'active'
+            && getAfter(rxPath).data.status == 'completed';
+      }
+
+      // Self, the assigned doctor, or a patient reading their own doctor's profile.
+      allow get: if isSelf(userId)
+                 || (signedIn() && resource.data.get('doctorId', null) == uid())
+                 || (signedIn() && resource.data.role == 'doctor'
+                       && me().get('doctorId', null) == userId);
+
+      // Doctors list only their own patients: query must filter doctorId == uid.
+      allow list: if signedIn() && resource.data.get('doctorId', null) == uid();
+
+      // Self sign-up (patient or doctor) with a clean profile ...
+      allow create: if isSelf(userId)
+                    && request.resource.data.role in ['patient', 'doctor']
+                    && request.resource.data.email == myEmail()
+                    && request.resource.data.get('points', 0) == 0
+                    && request.resource.data.get('doctorId', null) == null
+                 // ... or a doctor creating a patient account they will own.
+                 || (isDoctor()
+                    && request.resource.data.role == 'patient'
+                    && request.resource.data.doctorId == uid()
+                    && request.resource.data.get('points', 0) == 0
+                    && request.resource.data.email is string);
+
+      allow update: if
+        // (a) harmless profile fields
+        (isSelf(userId) && onlyChanged(['displayName', 'consent', 'updatedAt', 'voiceEnabled']))
+        // (b) patient accepts a pending link request (consent-based relationship)
+        || (isSelf(userId) && me().role == 'patient'
+            && onlyChanged(['doctorId', 'linkRequestId', 'updatedAt'])
+            && validLinkAcceptance(request.resource.data.linkRequestId, request.resource.data.doctorId))
+        // (c) patient receives +10 points for completing an active prescription
+        || (isSelf(userId) && me().role == 'patient'
+            && onlyChanged(['points', 'lastRewardedPrescription', 'updatedAt'])
+            && request.resource.data.points == resource.data.get('points', 0) + 10
+            && validReward(userId, request.resource.data.lastRewardedPrescription))
+        // (d) the assigned doctor may release (unlink) a patient
+        || (signedIn() && resource.data.get('doctorId', null) == uid()
+            && onlyChanged(['doctorId', 'updatedAt'])
+            && request.resource.data.doctorId == null);
+
+      allow delete: if false;
+
+      // ---------- prescriptions ----------
+      match /prescriptions/{rxId} {
+        function validCompletion(pid, rx, sessionId) {
+          let s = getAfter(/databases/$(database)/documents/users/$(pid)/sessions/$(sessionId)).data;
+          return sessionId is string
+              && s.status == 'completed'
+              && s.prescriptionId == rx
+              && s.validReps >= resource.data.sets * resource.data.reps;
+        }
+
+        allow read: if isSelf(userId) || isDoctorOf(userId);
+
+        allow create: if isDoctorOf(userId)
+                      && request.resource.data.doctorId == uid()
+                      && request.resource.data.patientId == userId
+                      && request.resource.data.status == 'active'
+                      && request.resource.data.exerciseId is string
+                      && isInt(request.resource.data.sets, 1, 20)
+                      && isInt(request.resource.data.reps, 1, 100);
+
+        allow update: if
+          // doctor edits or cancels an active prescription
+          (isDoctorOf(userId) && resource.data.status == 'active'
+             && onlyChanged(['sets', 'reps', 'notes', 'status', 'updatedAt'])
+             && request.resource.data.status in ['active', 'cancelled']
+             && isInt(request.resource.data.sets, 1, 20)
+             && isInt(request.resource.data.reps, 1, 100))
+          // patient completes it, only with a matching completed session in the same batch
+          || (isSelf(userId) && resource.data.status == 'active'
+             && onlyChanged(['status', 'completedAt', 'lastSessionId', 'totalRepsCompleted'])
+             && request.resource.data.status == 'completed'
+             && validCompletion(userId, rxId, request.resource.data.lastSessionId));
+
+        allow delete: if false;
+
+      }
+
+      // ---------- exercise sessions (standardised session record) ----------
+      match /sessions/{sessionId} {
+        allow read: if isSelf(userId) || isDoctorOf(userId);
+
+        // Written once by the patient. A client-generated id makes retries idempotent:
+        // a second create with the same id is rejected (it becomes an update).
+        allow create: if isSelf(userId)
+                      && request.resource.data.patientId == userId
+                      && request.resource.data.status in ['completed', 'stopped', 'interrupted']
+                      && request.resource.data.exerciseId is string
+                      && isInt(request.resource.data.validReps, 0, 2000)
+                      && isInt(request.resource.data.incompleteReps, 0, 2000)
+                      && request.resource.data.reps is list
+                      && request.resource.data.reps.size() <= 500
+                      && request.resource.data.get('feedback', null) == null;
+
+        allow update: if
+          // patient adds post-session pain/difficulty feedback once
+          (isSelf(userId) && resource.data.get('feedback', null) == null
+             && onlyChanged(['feedback', 'flags'])
+             && isInt(request.resource.data.feedback.pain, 0, 10)
+             && request.resource.data.feedback.difficulty in ['easy', 'medium', 'hard'])
+          // doctor adds a clinical review note
+          || (isDoctorOf(userId) && onlyChanged(['review']));
+
+        allow delete: if false;
+      }
+
+      // ---------- chat (patient <-> assigned doctor only) ----------
+      match /messages/{msgId} {
+        allow read: if isSelf(userId) || isDoctorOf(userId);
+        allow create: if (isSelf(userId) || isDoctorOf(userId))
+                      && request.resource.data.senderId == uid()
+                      && request.resource.data.senderRole in ['patient', 'doctor']
+                      && request.resource.data.senderRole == me().role
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 2000
+                      && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+
+      // ---------- clinical alerts ----------
+      match /alerts/{alertId} {
+        allow read: if isSelf(userId) || isDoctorOf(userId);
+        allow create: if isSelf(userId)
+                      && request.resource.data.type in ['pain', 'pain_increase', 'emergency_stop', 'quality_decline']
+                      && request.resource.data.acknowledged == false;
+        allow update: if isDoctorOf(userId)
+                      && onlyChanged(['acknowledged', 'acknowledgedAt'])
+                      && request.resource.data.acknowledged == true;
+        allow delete: if false;
+      }
+    }
+
+    // ---------- doctor -> patient link invitations ----------
+    match /link_requests/{reqId} {
+      allow read: if signedIn()
+                  && (resource.data.doctorId == uid() || resource.data.patientEmail == myEmail());
+
+      allow create: if isDoctor()
+                    && request.resource.data.doctorId == uid()
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.patientEmail is string
+                    && request.resource.data.patientEmail == request.resource.data.patientEmail.lower();
+
+      allow update: if
+        // the invited patient accepts or declines
+        (signedIn() && resource.data.patientEmail == myEmail() && resource.data.status == 'pending'
+           && onlyChanged(['status', 'respondedAt'])
+           && request.resource.data.status in ['accepted', 'declined'])
+        // the doctor withdraws it
+        || (signedIn() && resource.data.doctorId == uid() && resource.data.status == 'pending'
+           && onlyChanged(['status', 'respondedAt'])
+           && request.resource.data.status == 'cancelled');
+
+      allow delete: if false;
+    }
+
+    // Everything else is closed.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

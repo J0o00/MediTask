@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Recorder - MediTask Research</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/app.css">
+    <link rel="icon" href="data:,">
+</head>
+
+<body class="gradient-bg text-white min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <header class="glass-strong rounded-2xl p-5 mb-4">
+            <h1 class="text-2xl font-bold text-teal-300">🧪 MediTask dataset recorder</h1>
+            <p class="text-sm text-gray-400">Records labelled, automatically segmented repetitions for training the temporal model (the "MediTask custom" source).
+                Video never leaves this device; only skeleton coordinates are exported, to a file you download.</p>
+        </header>
+
+        <div class="glass rounded-2xl p-4 mb-4 text-xs text-amber-200 border border-amber-500/30">
+            Research use only. Obtain institutional approval and informed consent before recording participants. Use anonymous subject IDs (e.g. S07) - never names.
+            Record healthy volunteers first; have a physiotherapist confirm each label. Do not ask people with injuries to perform deliberately incorrect movements.
+        </div>
+
+        <div class="grid lg:grid-cols-5 gap-4">
+            <div class="lg:col-span-3 glass-strong rounded-2xl p-4">
+                <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black border-2 border-gray-700">
+                    <video id="webcam" class="w-full h-full object-cover mirror" autoplay playsinline muted></video>
+                    <canvas id="pose-canvas" class="absolute inset-0 w-full h-full mirror"></canvas>
+                    <div id="rec-badge" class="hidden absolute top-3 left-3 bg-red-600 px-3 py-1 rounded-full text-sm font-bold">● REC</div>
+                </div>
+                <p id="status" class="mt-3 text-sm text-gray-300">Camera off.</p>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+                <div class="glass-strong rounded-2xl p-4 space-y-3 text-sm">
+                    <label class="block">Subject ID <input id="subject" value="S01" pattern="[A-Za-z0-9_-]+" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></label>
+                    <label class="block">Exercise <select id="exercise" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></select></label>
+                    <label class="block">Intended label
+                        <select id="label" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2">
+                            <option value="correct">correct</option>
+                            <option value="incorrect">incorrect</option>
+                            <option value="incomplete">incomplete (partial range)</option>
+                        </select>
+                    </label>
+                    <label class="block">Error variant (for incorrect) <input id="variant" placeholder="e.g. knee_valgus, arm_forward" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></label>
+                    <label class="block">Camera setup <input id="setup" placeholder="e.g. frontal-2m-daylight" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></label>
+                    <div class="flex gap-2 pt-1">
+                        <button id="camera-btn" class="flex-1 bg-teal-500 text-black font-bold py-2 rounded-lg">Start camera</button>
+                        <button id="rec-btn" disabled class="flex-1 bg-red-600 font-bold py-2 rounded-lg disabled:opacity-40">Record</button>
+                    </div>
+                </div>
+
+                <div class="glass-strong rounded-2xl p-4 text-sm">
+                    <div class="flex justify-between mb-2"><b>Captured repetitions</b><span id="count">0</span></div>
+                    <ul id="rep-list" class="max-h-48 overflow-y-auto space-y-1 text-xs text-gray-300"></ul>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <button id="download-btn" class="bg-indigo-500 px-3 py-2 rounded-lg font-semibold">Download dataset JSON</button>
+                        <button id="template-btn" class="glass px-3 py-2 rounded-lg" title="Average progress curve of the captured CORRECT reps for this exercise">Save as DTW reference</button>
+                        <button id="clear-btn" class="glass px-3 py-2 rounded-lg text-red-300">Clear</button>
+                    </div>
+                    <p class="text-[11px] text-gray-500 mt-2">Put downloaded files in <code>ml/data/raw/meditask_custom/</code>. Reference templates go in <code>models/templates/</code>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
+    <script type="module">
+        import { EXERCISES } from './js/rehabilitation/exercise-configs.js';
+        import { RehabSession } from './js/rehabilitation/pose-engine.js';
+        import { progressCurve, resample1d } from './js/intelligence/dtw-analyzer.js';
+        import { drawPose } from './js/ui/exercise-visualizer.js';
+        import { el } from './js/ui/dom.js';
+
+        const $ = id => document.getElementById(id);
+        $('exercise').replaceChildren(...Object.values(EXERCISES).map(e => el('option', { value: e.id }, e.name)));
+
+        let samples = [];
+        try { samples = JSON.parse(localStorage.getItem('meditask_collect') || '[]'); } catch { samples = []; }
+        let engine = null, recording = false, camera = null, pose = null, sendT = 0;
+        const persist = () => { try { localStorage.setItem('meditask_collect', JSON.stringify(samples)); } catch (e) { $('status').textContent = 'Local storage full - download and clear.'; } };
+        const r4 = v => Math.round(v * 1e4) / 1e4;
+
+        function renderList() {
+            $('count').textContent = samples.length;
+            $('rep-list').replaceChildren(...samples.slice(-60).reverse().map(s =>
+                el('li', {}, `${s.subject} · ${s.exercise} · ${s.label}${s.variant ? '/' + s.variant : ''} · ${s.frames.length} frames · engine: ${s.engine_label}`)));
+        }
+        renderList();
+
+        function newEngine() {
+            const cfg = EXERCISES[$('exercise').value];
+            engine = new RehabSession({
+                exercise: cfg, sets: 1, reps: 1e6, recordFeatures: true,
+                onFrame: st => drawPose($('pose-canvas').getContext('2d'), $('pose-canvas'), st, cfg),
+                onRep: rep => {
+                    if (!recording) return;
+                    const full = engine.reps[engine.reps.length - 1];
+                    const subject = $('subject').value.trim().replace(/[^A-Za-z0-9_-]/g, '') || 'S00';
+                    samples.push({
+                        subject, exercise: cfg.id, label: $('label').value, variant: $('variant').value.trim() || null,
+                        setup: $('setup').value.trim() || null, engine_label: rep.label, engine_quality: rep.quality,
+                        recorded_at: new Date().toISOString(), fps_hint: 30,
+                        frames: full._frames.map(f => ({ t: Math.round(f.t), pts: f.raw.map(p => p.map(r4)), vis: f.vis.map(r4) })),
+                        _progress: resample1d(progressCurve(cfg, full._frames), 30),
+                    });
+                    persist(); renderList();
+                },
+            });
+        }
+        $('exercise').addEventListener('change', () => { if (engine) newEngine(); });
+
+        $('camera-btn').addEventListener('click', async () => {
+            const video = $('webcam'), canvas = $('pose-canvas');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+            video.srcObject = stream;
+            await new Promise(r => video.onloadedmetadata = r);
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            pose = new Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}` });
+            pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            pose.onResults(res => { const now = performance.now(); engine?.processResults(res, now, now - sendT); });
+            camera = new Camera(video, { onFrame: async () => { sendT = performance.now(); await pose.send({ image: video }); }, width: 1280, height: 720 });
+            camera.start();
+            newEngine();
+            $('rec-btn').disabled = false; $('camera-btn').disabled = true;
+            $('status').textContent = 'Camera on. Press Record, then perform repetitions - each one is segmented automatically.';
+        });
+
+        $('rec-btn').addEventListener('click', () => {
+            recording = !recording;
+            $('rec-btn').textContent = recording ? 'Stop' : 'Record';
+            $('rec-badge').classList.toggle('hidden', !recording);
+            if (recording) newEngine();
+        });
+
+        $('download-btn').addEventListener('click', () => {
+            const out = { format: 'meditask-sequences-v1', joints: 'common-12 (see js/rehabilitation/skeleton.js)', coordinate_frame: 'mediapipe-world, y up, z flipped', exported_at: new Date().toISOString(),
+                samples: samples.map(({ _progress, ...s }) => s) };
+            const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+            const a = el('a', { href: URL.createObjectURL(blob), download: `meditask_custom_${new Date().toISOString().slice(0, 19).replace(/:/g, '')}.json` });
+            a.click(); URL.revokeObjectURL(a.href);
+        });
+
+        $('template-btn').addEventListener('click', () => {
+            const ex = $('exercise').value;
+            const good = samples.filter(s => s.exercise === ex && s.label === 'correct' && s._progress);
+            if (good.length < 3) { $('status').textContent = 'Record at least 3 correct repetitions of this exercise (ideally by a physiotherapist).'; return; }
+            const progress = good[0]._progress.map((_, i) => Math.round(1e4 * good.reduce((s, g) => s + g._progress[i], 0) / good.length) / 1e4);
+            const blob = new Blob([JSON.stringify({ exerciseId: ex, source: 'therapist', reps: good.length, recordedAt: new Date().toISOString(), progress }, null, 2)], { type: 'application/json' });
+            const a = el('a', { href: URL.createObjectURL(blob), download: `${ex}.json` });
+            a.click(); URL.revokeObjectURL(a.href);
+        });
+
+        $('clear-btn').addEventListener('click', () => { if (confirm('Delete all captured repetitions from this browser?')) { samples = []; persist(); renderList(); } });
+    </script>
+</body>
+
+</html>

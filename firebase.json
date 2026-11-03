@@ -4,11 +4,38 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "ml/**",
+      "tests/**",
+      "tools/**",
+      "documentation/**",
+      "*.md",
+      "package*.json",
+      "firestore.*"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|json|bin)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
     ]
   },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
   }
 }

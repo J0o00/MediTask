@@ -6,3 +6,11 @@ coverage/
 .firebase/
 firebase-debug.log
 .vscode/
+# ML artefacts (large / licensed data - do not commit)
+ml/data/raw/**/*
+!ml/data/raw/**/.gitkeep
+!ml/data/raw/**/manifest.example.csv
+ml/data/processed*/
+ml/models/
+__pycache__/
+*.pyc

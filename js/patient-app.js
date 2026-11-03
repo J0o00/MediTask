@@ -1,768 +1,534 @@
-import { auth, checkAuthAndRedirect, logout, db } from "./services/auth.js";
-import { getPatientPrescriptions, subscribeToChat, sendMessage, logExerciseRep, completeExercise, saveExerciseFeedback, getExerciseStats } from "./services/db.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-// db imported from services/auth.js
+// MediTask - patient dashboard controller.
+import { requireRole, logout } from "./services/auth.js";
+import {
+    getProfile, updateOwnProfile, getPrescriptions, getSessions, saveSession, addSessionFeedback,
+    raiseAlert, subscribeToChat, sendMessage, getMyPendingLinkRequests, respondToLinkRequest, newId,
+} from "./services/db.js";
+import { resolveExercise } from "./rehabilitation/exercise-configs.js";
+import { RehabSession } from "./rehabilitation/pose-engine.js";
+import { PHASES } from "./rehabilitation/repetition-counter.js";
+import { tryLoadClassifier } from "./intelligence/movement-classifier.js";
+import { buildTwin } from "./digital-twin/progress-model.js";
+import { drawPose } from "./ui/exercise-visualizer.js";
+import { barChart, lineChart } from "./ui/charts.js";
+import { $, el, show, toast, fmtDate, toDate, renderChat, PHASE_LABEL, METRIC_LABEL } from "./ui/dom.js";
 
-// Initialize Auth Guard
-checkAuthAndRedirect('patient');
+// ------------------------------------------------------------------ state
+let user, profile;
+let sessions = [];
+let twin = null;
+let classifier;                 // undefined = not tried, null = unavailable
+let current = null;             // { rx, cfg, engine, sessionId, startedAt, finishing }
+let pendingRx = null;
+let camera = null, pose = null, stream = null, sendT = 0;
+let chatUnsub = null;
+let lastSaved = null;           // { record, pointsEarned }
+let selectedDifficulty = null;
 
-// DOM Elements
-const mainContent = document.getElementById('main-content');
-const loadingView = document.getElementById('loading-view');
-const prescriptionListView = document.getElementById('prescription-list-view');
-const exerciseSessionView = document.getElementById('exercise-session-view');
-const prescriptionList = document.getElementById('prescription-list');
-const prescriptionLoadingDiv = document.getElementById('prescription-loading');
-// Exercise UI
-const progressBar = document.getElementById('progress-bar');
-const feedbackBox = document.getElementById('feedback-box');
-// Chat UI
-const chatToggleBtn = document.getElementById('chat-toggle-btn');
-const chatModal = document.getElementById('chat-modal');
-const closeChatBtn = document.getElementById('close-chat-btn');
-const chatInput = document.getElementById('chat-input');
-const sendMsgBtn = document.getElementById('send-msg-btn');
-const chatMessages = document.getElementById('chat-messages');
+const PENDING_KEY = 'meditask_pending_sessions';
 
-// State
-let video, canvasCtx, canvasElement, pose, cameraInstance;
-let isCameraActive = false;
-let currentPrescription = null;
-let currentSet = 1;
-let currentReps = 0;
-let totalReps = 0;
-let lastRepTime = 0;
-let repThreshold = 1000;
-let currentPoints = 0;
-let chatUnsubscribe = null;
+// ------------------------------------------------------------------ boot
+(async function init() {
+    ({ user, profile } = await requireRole('patient'));
+    show('loading-view', false); show('main-content', true);
+    $('welcome-line').textContent = `Signed in as ${profile.displayName || profile.email}`;
+    updatePointsUI(profile.points || 0);
+    show('rewards-card', true);
+    $('voice-toggle').checked = !!profile.voiceEnabled;
 
-// AI Form Accuracy State
-let currentAccuracy = 0;
-let jointStatuses = {};
+    if (!profile.consent?.camera) show('consent-modal', true);
+    await flushPendingSessions();
+    await Promise.all([renderLinkSection(), loadPrescriptions(), loadAnalytics()]);
+})();
 
-// --- Utility: Calculate angle between three points ---
-function calculateAngle(a, b, c) {
-    // a, b, c are {x, y} points. b is the vertex.
-    const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
-    let angle = Math.abs(radians * 180.0 / Math.PI);
-    if (angle > 180) angle = 360 - angle;
-    return angle;
-}
+$('logout-btn').addEventListener('click', async () => { stopCamera(); await logout(); });
 
-// --- Update Accuracy UI ---
-function updateAccuracyUI(accuracy, feedback, joints) {
-    currentAccuracy = accuracy;
-    jointStatuses = joints;
+// ------------------------------------------------------------------ consent
+$('consent-camera').addEventListener('change', e => { $('consent-accept').disabled = !e.target.checked; });
+$('consent-accept').addEventListener('click', async () => {
+    const consent = { camera: true, version: 1, at: new Date().toISOString() };
+    try { await updateOwnProfile(user.uid, { consent }); profile.consent = consent; } catch (e) { console.error(e); }
+    show('consent-modal', false);
+});
 
-    const ring = document.getElementById('accuracy-ring');
-    const percent = document.getElementById('accuracy-percent');
-    const feedbackEl = document.getElementById('form-feedback');
-    const jointIndicators = document.getElementById('joint-indicators');
+// ------------------------------------------------------------------ doctor link
+async function renderLinkSection() {
+    const box = $('link-section');
+    box.replaceChildren();
+    let requests = [];
+    try { requests = await getMyPendingLinkRequests(profile.email); } catch (e) { console.warn('link requests', e); }
 
-    if (!ring || !percent) return;
+    for (const r of requests) {
+        const reassign = profile.doctorId && profile.doctorId !== r.doctorId;
+        box.appendChild(el('div', { class: 'glass-strong rounded-2xl p-4 border border-indigo-500/40 flex flex-col sm:flex-row gap-3 sm:items-center justify-between' },
+            el('div', {},
+                el('p', { class: 'font-semibold' }, `🔗 ${r.doctorName || r.doctorEmail} wants to supervise your rehabilitation.`),
+                el('p', { class: 'text-xs text-gray-400' }, reassign
+                    ? 'Accepting will replace your current physiotherapist. They will be able to see your exercise sessions and messages.'
+                    : 'Accepting lets them prescribe exercises and see your session results and messages.')),
+            el('div', { class: 'flex gap-2' },
+                el('button', { class: 'bg-teal-500 text-black font-bold px-4 py-2 rounded-lg', onclick: () => respond(r, true) }, 'Accept'),
+                el('button', { class: 'glass px-4 py-2 rounded-lg', onclick: () => respond(r, false) }, 'Decline'))));
+    }
 
-    // Update circular gauge (circumference = 2 * PI * 45 = ~283)
-    const offset = 283 - (283 * accuracy / 100);
-    ring.style.strokeDashoffset = offset;
-
-    // Update color based on accuracy
-    if (accuracy >= 80) {
-        ring.style.stroke = '#22c55e'; // green
-        percent.className = 'text-2xl font-bold text-green-400';
-    } else if (accuracy >= 50) {
-        ring.style.stroke = '#eab308'; // yellow
-        percent.className = 'text-2xl font-bold text-yellow-400';
+    if (!profile.doctorId) {
+        box.appendChild(el('div', { class: 'glass rounded-2xl p-4 border border-amber-500/30 text-sm text-amber-200' },
+            'You are not linked to a physiotherapist yet. Ask them to send an invitation to ', el('b', {}, profile.email), '.'));
     } else {
-        ring.style.stroke = '#ef4444'; // red
-        percent.className = 'text-2xl font-bold text-red-400';
-    }
-
-    percent.textContent = `${Math.round(accuracy)}%`;
-    feedbackEl.textContent = feedback;
-
-    // Update joint indicators
-    if (jointIndicators) {
-        jointIndicators.innerHTML = '';
-        for (const [joint, isCorrect] of Object.entries(joints)) {
-            const indicator = document.createElement('span');
-            indicator.className = `px-2 py-1 rounded text-xs font-medium ${isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`;
-            indicator.textContent = `${isCorrect ? '✓' : '✗'} ${joint}`;
-            jointIndicators.appendChild(indicator);
-        }
+        try {
+            const dr = await getProfile(profile.doctorId);
+            if (dr) box.appendChild(el('p', { class: 'text-sm text-gray-400' }, `Supervising physiotherapist: ${dr.displayName || dr.email}`));
+        } catch (e) { /* profile read is best-effort */ }
     }
 }
 
-
-// --- Initialization ---
-
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        try {
-            loadingView.classList.add('hidden');
-            mainContent.classList.remove('hidden');
-
-            // Load points
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-            if (userDoc.exists()) {
-                updatePointsUI(userDoc.data().points || 0);
-            }
-            document.getElementById('rewards-card').classList.remove('hidden');
-
-            await loadPrescriptions();
-            loadAnalytics(); // Load analytics dashboard
-        } catch (error) {
-            console.error("Init error:", error);
-            loadingView.innerHTML = `<p class="text-red-500">Error loading dashboard: ${error.message}</p>`;
-            loadingView.classList.remove('hidden');
-        }
-    }
-});
-
-document.getElementById('logout-btn').addEventListener('click', () => {
-    cleanupPatientView();
-    logout();
-});
-
-document.getElementById('back-to-prescriptions').addEventListener('click', showPrescriptionList);
-
-async function loadPrescriptions() {
-    prescriptionList.innerHTML = '';
-    prescriptionLoadingDiv.textContent = 'Loading...';
-
-    const userId = auth.currentUser.uid;
-    let items = [];
+async function respond(request, accept) {
     try {
-        items = await getPatientPrescriptions(userId);
-    } catch (err) {
-        console.error("Prescription load error:", err);
-        prescriptionLoadingDiv.innerHTML = `<span class="text-red-400">Failed to load: ${err.message}</span>`;
-        if (err.message.includes('index')) {
-            prescriptionLoadingDiv.innerHTML += `<br><span class="text-xs text-gray-400">Database index required. Check console for link.</span>`;
-        }
+        await respondToLinkRequest(user.uid, request, accept);
+        if (accept) profile.doctorId = request.doctorId;
+        toast(accept ? 'Linked to your physiotherapist' : 'Invitation declined', 'success');
+        await Promise.all([renderLinkSection(), loadPrescriptions()]);
+    } catch (e) { console.error(e); toast(`Could not update invitation: ${e.message}`, 'error'); }
+}
+
+// ------------------------------------------------------------------ prescriptions
+async function loadPrescriptions() {
+    const list = $('prescription-list');
+    list.replaceChildren();
+    $('prescription-loading').textContent = 'Loading...';
+    let items = [];
+    try { items = await getPrescriptions(user.uid, 'active'); }
+    catch (err) {
+        console.error('Prescription load error:', err);
+        $('prescription-loading').textContent = `Failed to load: ${err.message}`;
         return;
     }
-
-    if (items.length > 0) {
-        items.forEach(createPrescriptionCard);
-        prescriptionLoadingDiv.textContent = `${items.length} prescription(s) found`;
-    } else {
-        // Sample fallback
-        const samples = [
-            { id: 'sample1', exercise: 'Right Hand Raise', sets: 3, reps: 10, assignedAt: new Date() },
-            { id: 'sample2', exercise: 'Shoulder Abduction', sets: 2, reps: 15, assignedAt: new Date() },
-            { id: 'sample3', exercise: 'Squat', sets: 3, reps: 12, assignedAt: new Date() }
-        ];
-        samples.forEach(createPrescriptionCard);
-        prescriptionLoadingDiv.textContent = 'Showing sample prescriptions';
+    // No demo/sample fallback: only real prescriptions are ever shown to patients.
+    if (!items.length) {
+        $('prescription-loading').textContent = '';
+        list.appendChild(el('div', { class: 'glass rounded-xl p-6 text-center text-gray-400' },
+            profile.doctorId ? 'No active prescriptions. Your physiotherapist will assign exercises here.'
+                : 'Once you are linked to a physiotherapist, your prescribed exercises will appear here.'));
+        return;
+    }
+    $('prescription-loading').textContent = `${items.length} active`;
+    for (const rx of items) {
+        const cfg = resolveExercise(rx.exerciseId || rx.exercise);
+        list.appendChild(el('div', { class: 'bg-gray-700/70 p-4 rounded-xl border border-gray-600 hover:border-teal-500 transition-colors flex justify-between items-start gap-3' },
+            el('div', {},
+                el('h4', { class: 'font-semibold text-lg' }, `${cfg?.emoji || '🏃'} ${cfg?.name || rx.exercise}`),
+                el('p', { class: 'text-gray-400' }, `${rx.sets} sets × ${rx.reps} reps`),
+                rx.notes ? el('p', { class: 'text-sm text-amber-200 mt-1' }, `Note: ${rx.notes}`) : null,
+                el('p', { class: 'text-xs text-gray-500 mt-1' }, `Assigned ${fmtDate(rx.assignedAt)}`)),
+            cfg ? el('button', { class: 'bg-teal-500 hover:bg-teal-600 text-black font-bold py-2 px-4 rounded-lg', onclick: () => showDemo(rx, cfg) }, 'Start')
+                : el('span', { class: 'text-xs text-red-300' }, 'Exercise not supported in this version')));
     }
 }
 
-function createPrescriptionCard(prescription) {
-    const card = document.createElement('div');
-    card.className = 'bg-gray-700 p-4 rounded-xl border border-gray-600 hover:border-teal-500 transition-colors';
+function showDemo(rx, cfg) {
+    if (!profile.consent?.camera) { show('consent-modal', true); return; }
+    pendingRx = { rx, cfg };
+    $('demo-title').textContent = cfg.name;
+    $('demo-animation').textContent = cfg.emoji;
+    $('demo-instructions').replaceChildren(...cfg.steps.map(s => el('li', {}, s)));
+    $('demo-notes').textContent = rx.notes ? `Physiotherapist's note: ${rx.notes}` : '';
+    show('demo-modal', true);
+}
+$('cancel-demo-btn').addEventListener('click', () => { show('demo-modal', false); pendingRx = null; });
+$('start-exercise-btn').addEventListener('click', () => { show('demo-modal', false); if (pendingRx) startSession(pendingRx.rx, pendingRx.cfg); });
 
-    // Convert timestamp
-    let dateStr = 'Recently';
-    if (prescription.assignedAt && prescription.assignedAt.toDate) {
-        dateStr = prescription.assignedAt.toDate().toLocaleDateString();
-    } else if (prescription.assignedAt instanceof Date) {
-        dateStr = prescription.assignedAt.toLocaleDateString();
-    }
-
-    card.innerHTML = `
-        <div class="flex justify-between items-start">
-            <div>
-                <h4 class="font-semibold text-lg">${prescription.exercise}</h4>
-                <p class="text-gray-400">${prescription.sets} sets × ${prescription.reps} reps</p>
-                <p class="text-sm text-gray-500">Assigned: ${dateStr}</p>
-            </div>
-            <button class="start-btn bg-teal-500 hover:bg-teal-600 text-black font-bold py-2 px-4 rounded-lg">
-                Start
-            </button>
-        </div>
-    `;
-
-    card.querySelector('.start-btn').onclick = () => showExerciseDemo(prescription);
-    prescriptionList.appendChild(card);
+// ------------------------------------------------------------------ session
+async function loadTemplate(exerciseId) {
+    try {
+        const r = await fetch(`./models/templates/${exerciseId}.json`, { cache: 'no-cache' });
+        if (!r.ok) return null;
+        const t = await r.json();
+        return Array.isArray(t.progress) && t.progress.length >= 10 ? t : null;
+    } catch { return null; }
 }
 
-// Exercise demo content
-const exerciseDemos = {
-    'Right Hand Raise': {
-        emoji: '🙋‍♂️',
-        title: 'Right Hand Raise',
-        steps: [
-            '1. Stand straight with arms at your sides',
-            '2. Keep your right arm straight',
-            '3. Raise your right arm above your head',
-            '4. Hold briefly, then lower slowly'
-        ]
-    },
-    'Shoulder Abduction': {
-        emoji: '🧍‍♂️',
-        title: 'Shoulder Abduction (T-Pose)',
-        steps: [
-            '1. Stand with arms relaxed at sides',
-            '2. Raise both arms out to the sides',
-            '3. Stop when arms are at shoulder height',
-            '4. Hold the T-pose, then lower'
-        ]
-    },
-    'Squat': {
-        emoji: '🏋️',
-        title: 'Squat Exercise',
-        steps: [
-            '1. Stand with feet shoulder-width apart',
-            '2. Bend your knees and push hips back',
-            '3. Lower until thighs are parallel to floor',
-            '4. Push through heels to stand up'
-        ]
-    }
-};
+async function startSession(rx, cfg) {
+    if (classifier === undefined) classifier = await tryLoadClassifier('./models/web/meditask_model');
+    const template = await loadTemplate(cfg.id);
+    $('ml-badge').textContent = classifier ? `AI model: ${classifier.info.model_name}` : 'Rule-based analysis';
 
-let pendingPrescription = null;
+    const engine = new RehabSession({
+        exercise: cfg, sets: rx.sets, reps: rx.reps,
+        template: template?.progress, templateSource: template?.source,
+        classifier, voice: $('voice-toggle').checked,
+        onFrame: onEngineFrame, onRep: onEngineRep, onEvent: onEngineEvent,
+    });
+    current = { rx, cfg, engine, sessionId: newId(), startedAt: new Date(), finishing: false };
 
-function showExerciseDemo(prescription) {
-    pendingPrescription = prescription;
-
-    const demo = exerciseDemos[prescription.exercise] || {
-        emoji: '🏃',
-        title: prescription.exercise,
-        steps: ['Follow the on-screen instructions']
-    };
-
-    document.getElementById('demo-title').textContent = demo.title;
-    document.getElementById('demo-animation').textContent = demo.emoji;
-    document.getElementById('demo-instructions').innerHTML =
-        `<ul class="text-left space-y-2">${demo.steps.map(s => `<li class="flex gap-2"><span class="text-teal-400">•</span> ${s}</li>`).join('')}</ul>`;
-
-    document.getElementById('demo-modal').classList.remove('hidden');
-}
-
-document.getElementById('start-exercise-btn')?.addEventListener('click', () => {
-    document.getElementById('demo-modal').classList.add('hidden');
-    if (pendingPrescription) {
-        startExercise(pendingPrescription);
-    }
-});
-
-document.getElementById('cancel-demo-btn')?.addEventListener('click', () => {
-    document.getElementById('demo-modal').classList.add('hidden');
-    pendingPrescription = null;
-});
-
-function startExercise(prescription) {
-    if (!prescription) return;
-
-    currentPrescription = prescription;
-    currentSet = 1;
-    currentReps = 0;
-    totalReps = 0;
-
-    // Update UI
-    document.getElementById('exercise-name').textContent = prescription.exercise;
-    document.getElementById('exercise-sets').textContent = prescription.sets;
-    document.getElementById('exercise-reps').textContent = prescription.reps;
-    document.getElementById('total-sets').textContent = prescription.sets;
-    document.getElementById('target-reps').textContent = prescription.reps;
-    document.getElementById('current-set').textContent = currentSet;
-    document.getElementById('current-reps').textContent = currentReps;
-    document.getElementById('current-exercise-title').textContent = `${prescription.exercise} - Set ${currentSet}`;
-
+    $('current-exercise-title').textContent = cfg.name;
+    $('total-sets').textContent = rx.sets; $('target-reps').textContent = rx.reps;
+    $('current-set').textContent = 1; $('current-reps').textContent = 0;
+    $('rep-log').replaceChildren(); $('incomplete-note').textContent = '';
+    $('phase-steps').replaceChildren(...PHASES.map(p => el('span', { class: 'phase-step', dataset: { phase: p } }, PHASE_LABEL[p])));
     updateProgressUI();
-
-    prescriptionListView.classList.add('hidden');
-    exerciseSessionView.classList.remove('hidden');
-
-    initCamera();
+    show('prescription-list-view', false); show('exercise-session-view', true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await startCamera();
 }
 
-function showPrescriptionList() {
-    exerciseSessionView.classList.add('hidden');
-    prescriptionListView.classList.remove('hidden');
-    cleanupPatientView();
+async function startCamera() {
+    const video = $('webcam'), canvas = $('pose-canvas');
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' }, audio: false });
+    } catch (err) {
+        setFeedback(err.name === 'NotAllowedError'
+            ? 'Camera permission denied. Allow camera access in your browser settings to use guided exercises.'
+            : `Camera unavailable: ${err.message}`, 'error');
+        return;
+    }
+    video.srcObject = stream;
+    await new Promise(r => { video.onloadedmetadata = r; });
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    pose = new Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}` });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    pose.onResults(results => {
+        if (!current || current.finishing) return;
+        const now = performance.now();
+        current.engine.processResults(results, now, now - sendT);
+    });
+    camera = new Camera(video, {
+        onFrame: async () => { if (pose && video.readyState >= 2) { sendT = performance.now(); await pose.send({ image: video }); } },
+        width: 1280, height: 720,
+    });
+    camera.start();
+    setFeedback('Get into the starting position', 'info');
+}
+
+function stopCamera() {
+    try { camera?.stop(); } catch { /* ignore */ }
+    stream?.getTracks().forEach(t => t.stop());
+    const v = $('webcam'); if (v) v.srcObject = null;
+    try { pose?.close(); } catch { /* ignore */ }
+    camera = null; pose = null; stream = null;
+    current?.engine?.feedback?.cancel();
+}
+
+let frameCount = 0, fpsT0 = performance.now();
+function onEngineFrame(state) {
+    const canvas = $('pose-canvas');
+    drawPose(canvas.getContext('2d'), canvas, state, current.cfg);
+
+    frameCount++;
+    const now = performance.now();
+    if (now - fpsT0 > 1000) { $('fps-label').textContent = `${Math.round(frameCount * 1000 / (now - fpsT0))} fps`; frameCount = 0; fpsT0 = now; }
+
+    $('confidence-bar').style.width = `${Math.round((state.confidence || 0) * 100)}%`;
+    $('confidence-bar').className = `h-2 transition-all ${state.valid ? 'bg-teal-500' : 'bg-red-500'}`;
+    setFeedback(state.message.text, state.message.level);
+    updateGauge(state.valid ? state.formScore : 0);
+
+    $('phase-badge').textContent = state.valid ? PHASE_LABEL[state.phase] : 'Paused - repositioning';
+    document.querySelectorAll('#phase-steps .phase-step').forEach(n => n.classList.toggle('active', n.dataset.phase === state.phase));
+
+    const cfg = current.cfg;
+    if (state.valid && state.metrics) {
+        const v = state.metrics[cfg.primaryMetric];
+        $('angle-readout').textContent = `${METRIC_LABEL[cfg.primaryMetric] || cfg.primaryMetric}: ${Math.round(v)}° (target ${cfg.targetValue}°)`;
+        $('rom-bar').style.width = `${Math.max(0, Math.min(100, state.progress * 100))}%`;
+    }
+}
+
+function onEngineRep(rep) {
+    const e = current.engine;
+    $('current-set').textContent = e.currentSet;
+    $('current-reps').textContent = e.repsInSet;
+    updateProgressUI();
+    const incompletes = e.reps.filter(r => r.label === 'incomplete').length;
+    $('incomplete-note').textContent = incompletes ? `${incompletes} incomplete repetition(s) not counted - reach the full range to count a rep.` : '';
+
+    const color = rep.label === 'correct' ? 'text-green-400' : rep.label === 'incorrect' ? 'text-yellow-300' : 'text-gray-400';
+    const icon = rep.label === 'correct' ? '✅' : rep.label === 'incorrect' ? '⚠️' : '↩️';
+    const tip = rep.messages[0] ? ` - ${rep.messages[0]}` : '';
+    const ml = rep.ml?.confident ? ` · AI: ${rep.ml.quality}` : '';
+    $('rep-log').prepend(el('li', { class: `glass rounded-lg px-3 py-1.5 ${color}` },
+        `${icon} Rep ${rep.index} · quality ${Math.round(rep.quality)}${ml}${tip}`));
+    if (rep.ml?.exerciseMismatch) toast(`This movement doesn't look like ${current.cfg.name}. Check the instructions.`, 'info');
+
+    if (rep.label !== 'incomplete') {
+        const f = $('rep-flash'); f.textContent = e.repsInSet; show(f, true);
+        setTimeout(() => show(f, false), 500);
+    }
+}
+
+function onEngineEvent(ev) {
+    if (ev.type === 'set_complete') toast(`Set ${ev.set} complete - rest for a moment, then continue`, 'success');
+    if (ev.type === 'rep_aborted') setFeedback('Tracking lost - that repetition was not counted', 'warn');
+    if (ev.type === 'session_complete') finishSession('completed');
+}
+
+$('voice-toggle').addEventListener('change', e => {
+    current?.engine?.setVoice(e.target.checked);
+    updateOwnProfile(user.uid, { voiceEnabled: e.target.checked }).catch(() => {});
+});
+
+$('back-to-prescriptions').addEventListener('click', () => {
+    if (!current) return backToList();
+    if (current.engine.reps.length === 0) { stopCamera(); current = null; return backToList(); }
+    if (confirm('End this session now? Your completed repetitions will be saved, but the prescription will stay open.')) finishSession('stopped');
+});
+
+$('emergency-stop-btn').addEventListener('click', () => {
+    if (!current) return;
+    finishSession('stopped', { emergency: true });
+});
+
+async function finishSession(status, { emergency = false } = {}) {
+    if (!current || current.finishing) return;          // duplicate-completion guard
+    current.finishing = true;
+    stopCamera();
+    const { engine, rx, sessionId, startedAt } = current;
+    const record = engine.buildRecord({ id: sessionId, status, prescription: rx, startedAt, endedAt: new Date() });
+    if (emergency) record.emergencyStop = true;
+
+    let pointsEarned = 0;
+    try {
+        ({ pointsEarned } = await saveWithRetry(record, rx));
+        if (pointsEarned) { profile.points = (profile.points || 0) + pointsEarned; profile.lastRewardedPrescription = rx.id; updatePointsUI(profile.points); }
+    } catch (e) {
+        console.error('Session save failed, queued for retry:', e);
+        queuePending(record, rx);
+        toast('Saved on this device - it will upload when you are back online.', 'info', 5000);
+    }
+    if (emergency) {
+        raiseAlert(user.uid, 'emergency_stop', `Patient pressed STOP during ${engine.cfg.name}`, sessionId).catch(console.error);
+    }
+    lastSaved = { record, pointsEarned, emergency };
+    showReport(record, pointsEarned, emergency);
+}
+
+async function saveWithRetry(record, rx, attempts = 3) {
+    let err;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            // The points rule needs the exact stored value, so refresh first.
+            const fresh = await getProfile(user.uid);
+            if (fresh) Object.assign(profile, fresh);
+            return await saveSession(profile, record, rx);
+        } catch (e) {
+            err = e;
+            if (e.code === 'permission-denied') {
+                // e.g. prescription was cancelled/edited meanwhile: save the session on its own.
+                try { return await saveSession(profile, record, null); }
+                catch (e2) {
+                    // Same client-generated id: a rejection here means the record already exists.
+                    if (e2.code === 'permission-denied') return { pointsEarned: 0, alreadySaved: true };
+                    err = e2;
+                }
+            }
+            await new Promise(r => setTimeout(r, 800 * (i + 1)));
+        }
+    }
+    throw err;
+}
+
+function queuePending(record, rx) {
+    try {
+        const q = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+        q.push({ record: { ...record, startedAt: record.startedAt.toISOString(), endedAt: record.endedAt.toISOString() }, rx });
+        localStorage.setItem(PENDING_KEY, JSON.stringify(q.slice(-10)));
+    } catch { /* storage unavailable */ }
+}
+
+async function flushPendingSessions() {
+    let q = [];
+    try { q = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return; }
+    if (!q.length) return;
+    const left = [];
+    for (const item of q) {
+        const rec = { ...item.record, startedAt: new Date(item.record.startedAt), endedAt: new Date(item.record.endedAt) };
+        try { await saveSession(profile, rec, item.rx); }
+        catch (e) { if (e.code !== 'permission-denied') left.push(item); }
+    }
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(left)); } catch { /* ignore */ }
+    if (q.length !== left.length) toast(`Uploaded ${q.length - left.length} saved session(s)`, 'success');
+}
+
+// ------------------------------------------------------------------ report + feedback
+function showReport(rec, points, emergency) {
+    const s = rec.summary;
+    $('report-title').textContent = emergency ? 'Session stopped' : rec.status === 'completed' ? '🎉 Exercise complete!' : 'Session saved';
+    $('report-sub').textContent = `${rec.exercise} · ${rec.validReps}/${rec.targetSets * rec.targetReps} repetitions`;
+    const body = $('report-body');
+    body.replaceChildren();
+    if (emergency) body.appendChild(el('div', { class: 'bg-red-900/50 border border-red-500 rounded-xl p-3 text-sm' },
+        'Your physiotherapist has been notified. Rest, and do not continue this exercise until you have spoken to them. If you have severe pain, chest pain or difficulty breathing, call 112.'));
+
+    const tiles = [
+        ['Movement quality', s.avgQuality ? `${Math.round(s.avgQuality)}/100` : '--'],
+        ['Correct reps', `${s.correctReps}/${s.totalReps}`],
+        ['Consistency', `${Math.round(s.consistency)}%`],
+        ['Points earned', points ? `+${points}` : '0'],
+    ];
+    body.appendChild(el('div', { class: 'grid grid-cols-2 gap-3' }, ...tiles.map(([k, v]) =>
+        el('div', { class: 'glass rounded-xl p-3 text-center' }, el('p', { class: 'text-xs text-gray-400' }, k), el('p', { class: 'text-xl font-bold text-teal-300' }, v)))));
+
+    const rom = Object.entries(s.rom || {});
+    if (rom.length) body.appendChild(el('div', { class: 'glass rounded-xl p-3' },
+        el('p', { class: 'text-sm font-semibold mb-2' }, 'Range of motion achieved'),
+        ...rom.map(([k, v]) => el('p', { class: 'text-sm text-gray-300' }, `${METRIC_LABEL[k] || k}: best ${v.bestRange}° (avg ${v.meanRange}°)`))));
+
+    const errs = Object.entries(s.errorCounts || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (errs.length) {
+        body.appendChild(el('div', { class: 'glass rounded-xl p-3' },
+            el('p', { class: 'text-sm font-semibold mb-2' }, 'Focus for next time'),
+            ...errs.map(([id, n]) => el('p', { class: 'text-sm text-amber-200' }, `• ${messageFor(id)} (${n} rep${n > 1 ? 's' : ''})`))));
+    }
+    if (s.performanceDecline) body.appendChild(el('p', { class: 'text-xs text-gray-400' },
+        'Your movement quality dropped towards the end of the session. Take adequate rest between sets.'));
+    show('report-modal', true);
+}
+
+function messageFor(id) {
+    const r = current?.cfg?.rules.find(x => x.id === id);
+    return r?.message || { too_fast: 'Move more slowly', too_slow: 'Keep a steady pace', short_hold: 'Hold the end position longer', incomplete_rom: 'Reach the full range' }[id] || id;
+}
+
+$('report-continue').addEventListener('click', () => {
+    show('report-modal', false);
+    $('pain-slider').value = 0; $('pain-value').textContent = '0'; $('feedback-notes').value = '';
+    show('pain-warning', false);
+    selectedDifficulty = null;
+    document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('border-teal-500', 'bg-teal-500/20'));
+    show('feedback-modal', true);
+});
+
+$('pain-slider').addEventListener('input', e => { $('pain-value').textContent = e.target.value; show('pain-warning', +e.target.value >= 7); });
+document.querySelectorAll('.difficulty-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('border-teal-500', 'bg-teal-500/20'));
+    btn.classList.add('border-teal-500', 'bg-teal-500/20');
+    selectedDifficulty = btn.dataset.difficulty;
+}));
+
+$('submit-feedback-btn').addEventListener('click', async () => {
+    if (!selectedDifficulty) { toast('Please choose a difficulty level', 'error'); return; }
+    const pain = parseInt($('pain-slider').value, 10);
+    const { record } = lastSaved || {};
+    if (record) {
+        // Pain escalation relative to the patient's own baseline for this exercise.
+        const base = twin?.exercises?.[record.exerciseId]?.baseline?.pain;
+        const flags = { highPain: pain >= 7, painIncrease: Number.isFinite(base) && pain - base >= 3 };
+        try {
+            await addSessionFeedback(user.uid, record.id, { pain, difficulty: selectedDifficulty, notes: $('feedback-notes').value.trim() }, flags);
+            if (flags.highPain) await raiseAlert(user.uid, 'pain', `Pain ${pain}/10 reported after ${record.exercise}`, record.id);
+            else if (flags.painIncrease) await raiseAlert(user.uid, 'pain_increase', `Pain ${pain}/10 after ${record.exercise} (baseline ${base})`, record.id);
+        } catch (e) { console.error('Feedback save failed:', e); toast('Could not save feedback', 'error'); }
+    }
+    closeSessionFlow();
+});
+$('skip-feedback-btn').addEventListener('click', closeSessionFlow);
+
+function closeSessionFlow() {
+    show('feedback-modal', false);
+    current = null; lastSaved = null;
+    backToList();
+}
+
+async function backToList() {
+    show('exercise-session-view', false); show('prescription-list-view', true);
+    await Promise.all([loadPrescriptions(), loadAnalytics()]);
+}
+
+// ------------------------------------------------------------------ live UI helpers
+function setFeedback(text, level = 'info') {
+    const cls = { error: 'bg-red-900/70 text-red-100', warn: 'bg-yellow-900/70 text-yellow-100', good: 'bg-green-900/70 text-green-100', info: 'bg-slate-800/80 text-slate-100' }[level] || '';
+    const box = $('feedback-box');
+    box.className = `text-center text-lg font-bold p-4 rounded-xl transition-all border border-gray-700 ${cls}`;
+    box.textContent = text;
+}
+
+function updateGauge(score) {
+    const ring = $('accuracy-ring');
+    ring.style.strokeDashoffset = 283 - 283 * score / 100;
+    ring.style.stroke = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
+    $('accuracy-percent').textContent = Math.round(score);
 }
 
 function updateProgressUI() {
-    if (!currentPrescription) return;
-    const totalTargetReps = currentPrescription.sets * currentPrescription.reps;
-    const completedReps = (currentSet - 1) * currentPrescription.reps + currentReps;
-    const progress = Math.min((completedReps / totalTargetReps) * 100, 100);
-    progressBar.style.width = `${progress}%`;
-}
-
-async function initCamera() {
-    if (isCameraActive) return;
-    isCameraActive = true;
-    video = document.getElementById('webcam');
-    canvasElement = document.getElementById('pose-canvas');
-    canvasCtx = canvasElement.getContext('2d');
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'user' } });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-            canvasElement.width = video.videoWidth;
-            canvasElement.height = video.videoHeight;
-            pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
-            pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-            pose.onResults(onPoseResults);
-            cameraInstance = new Camera(video, {
-                onFrame: async () => { if (video.readyState >= 3) await pose.send({ image: video }); },
-                width: 1280, height: 720
-            });
-            cameraInstance.start();
-        };
-    } catch (err) {
-        feedbackBox.textContent = `Error: ${err.message}`;
-    }
-}
-
-function cleanupPatientView() {
-    if (video && video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
-    }
-    if (cameraInstance) { cameraInstance.stop(); cameraInstance = null; }
-    if (pose) { pose.close(); pose = null; }
-    isCameraActive = false;
-}
-
-// --- Pose Analysis ---
-async function onPoseResults(results) {
-    if (!isCameraActive || !currentPrescription || !canvasCtx || !canvasElement) return;
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-    if (results.poseLandmarks && results.poseLandmarks.length > 0) {
-        const landmarks = results.poseLandmarks;
-        let analysisResult = { isCorrect: false, accuracy: 0, feedback: '', joints: {} };
-
-        switch (currentPrescription.exercise) {
-            case 'Right Hand Raise': analysisResult = analyzeHandRaiseWithAccuracy(landmarks); break;
-            case 'Shoulder Abduction': analysisResult = analyzeShoulderAbductionWithAccuracy(landmarks); break;
-            case 'Squat': analysisResult = analyzeSquatWithAccuracy(landmarks); break;
-        }
-
-        // Update the AI Accuracy UI
-        updateAccuracyUI(analysisResult.accuracy, analysisResult.feedback, analysisResult.joints);
-
-        if (analysisResult.isCorrect) {
-            const now = Date.now();
-            if (now - lastRepTime > repThreshold) {
-                currentReps++;
-                totalReps++;
-                lastRepTime = now;
-
-                if (currentReps >= currentPrescription.reps) {
-                    currentSet++;
-                    currentReps = 0;
-                    if (currentSet > currentPrescription.sets) {
-                        feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-green-800 text-green-200";
-                        feedbackBox.textContent = "🎉 Exercise completed!";
-                        finishExercise();
-                    } else {
-                        feedbackBox.textContent = `✅ Set ${currentSet - 1} completed! Start set ${currentSet}`;
-                        document.getElementById('current-set').textContent = currentSet;
-                        document.getElementById('current-exercise-title').textContent = `${currentPrescription.exercise} - Set ${currentSet}`;
-                    }
-                } else {
-                    feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-green-800 text-green-200";
-                    feedbackBox.textContent = `✅ Rep ${currentReps}/${currentPrescription.reps}`;
-                }
-
-                document.getElementById('current-reps').textContent = currentReps;
-                updateProgressUI();
-                logExerciseRep(auth.currentUser.uid, auth.currentUser.email, currentPrescription.exercise, currentReps, currentSet, totalReps);
-            }
-        } else {
-            feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-yellow-800 text-yellow-200";
-            feedbackBox.textContent = analysisResult.feedback || getInstruction();
-        }
-
-        // Draw skeleton with color-coded joints
-        drawConnectors(canvasCtx, landmarks, POSE_CONNECTIONS, { color: '#4ade80', lineWidth: 4 });
-
-        // Custom landmark drawing with color based on correctness
-        landmarks.forEach((landmark, idx) => {
-            if (landmark.visibility > 0.5) {
-                const x = landmark.x * canvasElement.width;
-                const y = landmark.y * canvasElement.height;
-                canvasCtx.beginPath();
-                canvasCtx.arc(x, y, 6, 0, 2 * Math.PI);
-
-                // Color key joints based on their status
-                let color = '#f87171'; // default red
-                if (analysisResult.accuracy >= 80) color = '#22c55e'; // green
-                else if (analysisResult.accuracy >= 50) color = '#eab308'; // yellow
-
-                canvasCtx.fillStyle = color;
-                canvasCtx.fill();
-            }
-        });
-    } else {
-        feedbackBox.textContent = "No person detected.";
-        feedbackBox.className = "mt-4 text-center text-xl font-bold p-4 rounded-lg bg-red-800 text-red-200";
-        updateAccuracyUI(0, "Position yourself in front of the camera", {});
-    }
-    canvasCtx.restore();
-}
-
-// --- Enhanced Exercise Analysis with Accuracy ---
-
-function analyzeHandRaiseWithAccuracy(landmarks) {
-    const rightShoulder = landmarks[12];
-    const rightElbow = landmarks[14];
-    const rightWrist = landmarks[16];
-    const rightHip = landmarks[24];
-
-    const visible = rightShoulder.visibility > 0.5 && rightElbow.visibility > 0.5 && rightWrist.visibility > 0.5;
-    if (!visible) return { isCorrect: false, accuracy: 0, feedback: "Can't see your right arm clearly", joints: {} };
-
-    // Calculate arm angle (shoulder-elbow-wrist)
-    const armAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
-    const armStraight = armAngle > 150; // Arm should be relatively straight
-
-    // Check if hand is above shoulder
-    const handAboveShoulder = rightWrist.y < rightShoulder.y;
-    const heightDiff = (rightShoulder.y - rightWrist.y) * 100; // normalized
-
-    // Calculate accuracy
-    let accuracy = 0;
-    if (handAboveShoulder) {
-        accuracy += 50; // Base points for raising hand
-        accuracy += Math.min(heightDiff * 2, 30); // Bonus for height
-        if (armStraight) accuracy += 20; // Bonus for straight arm
-    } else {
-        accuracy = Math.max(0, 30 - (rightWrist.y - rightShoulder.y) * 100);
-    }
-    accuracy = Math.min(100, Math.max(0, accuracy));
-
-    const isCorrect = accuracy >= 80;
-
-    let feedback = '';
-    if (accuracy >= 80) feedback = "Excellent form! Hold the position.";
-    else if (accuracy >= 50) feedback = "Almost there! Raise your hand higher.";
-    else if (!handAboveShoulder) feedback = "⬆️ Raise your right hand above shoulder";
-    else if (!armStraight) feedback = "Straighten your arm";
-    else feedback = "Keep raising your hand higher";
-
-    return {
-        isCorrect,
-        accuracy,
-        feedback,
-        joints: {
-            'Shoulder': true,
-            'Elbow': armStraight,
-            'Wrist': handAboveShoulder
-        }
-    };
-}
-
-function analyzeShoulderAbductionWithAccuracy(landmarks) {
-    const leftShoulder = landmarks[11];
-    const leftElbow = landmarks[13];
-    const leftWrist = landmarks[15];
-    const rightShoulder = landmarks[12];
-    const rightElbow = landmarks[14];
-    const rightWrist = landmarks[16];
-    const leftHip = landmarks[23];
-    const rightHip = landmarks[24];
-
-    const visible = leftShoulder.visibility > 0.5 && rightShoulder.visibility > 0.5;
-    if (!visible) return { isCorrect: false, accuracy: 0, feedback: "Position both shoulders visible", joints: {} };
-
-    // Calculate angles for both arms relative to torso
-    const leftArmAngle = calculateAngle(leftHip, leftShoulder, leftElbow);
-    const rightArmAngle = calculateAngle(rightHip, rightShoulder, rightElbow);
-
-    // Target: arms at ~90 degrees from body (horizontal)
-    const leftScore = Math.max(0, 100 - Math.abs(90 - leftArmAngle));
-    const rightScore = Math.max(0, 100 - Math.abs(90 - rightArmAngle));
-
-    const accuracy = (leftScore + rightScore) / 2;
-    const isCorrect = accuracy >= 70;
-
-    let feedback = '';
-    if (accuracy >= 80) feedback = "Perfect T-pose! Hold it steady.";
-    else if (accuracy >= 50) feedback = "Raise both arms to shoulder height";
-    else feedback = "Spread arms out to the sides horizontally";
-
-    return {
-        isCorrect,
-        accuracy,
-        feedback,
-        joints: {
-            'Left Arm': leftScore >= 60,
-            'Right Arm': rightScore >= 60
-        }
-    };
-}
-
-function analyzeSquatWithAccuracy(landmarks) {
-    const leftHip = landmarks[23];
-    const leftKnee = landmarks[25];
-    const leftAnkle = landmarks[27];
-    const rightHip = landmarks[24];
-    const rightKnee = landmarks[26];
-    const rightAnkle = landmarks[28];
-
-    const visible = leftKnee.visibility > 0.5 && rightKnee.visibility > 0.5;
-    if (!visible) return { isCorrect: false, accuracy: 0, feedback: "Can't see your legs clearly", joints: {} };
-
-    // Calculate knee angles
-    const leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
-    const rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
-    const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
-
-    // Target: ~90 degrees for a proper squat
-    // Score based on how close to 90 degrees
-    let accuracy = 0;
-    if (avgKneeAngle <= 110) {
-        accuracy = Math.max(0, 100 - Math.abs(90 - avgKneeAngle) * 2);
-    } else {
-        // Standing - encourage going lower
-        accuracy = Math.max(0, 50 - (avgKneeAngle - 110));
-    }
-    accuracy = Math.min(100, Math.max(0, accuracy));
-
-    const isCorrect = accuracy >= 70;
-
-    let feedback = '';
-    if (accuracy >= 80) feedback = "Great squat depth! Hold and rise.";
-    else if (accuracy >= 50) feedback = "Good start, go a bit lower";
-    else if (avgKneeAngle > 150) feedback = "Bend your knees to start the squat";
-    else feedback = "Lower your hips more";
-
-    return {
-        isCorrect,
-        accuracy,
-        feedback,
-        joints: {
-            'Left Knee': leftKneeAngle <= 110,
-            'Right Knee': rightKneeAngle <= 110,
-            'Depth': avgKneeAngle <= 100
-        }
-    };
-}
-
-function getInstruction() {
-    if (currentPrescription.exercise === 'Right Hand Raise') return '⬆️ Raise right hand above shoulder';
-    if (currentPrescription.exercise === 'Shoulder Abduction') return '↔️ Spread arms out horizontally';
-    if (currentPrescription.exercise === 'Squat') return '⬇️ Bend knees and lower your hips';
-    return 'Perform the exercise correctly';
-}
-
-async function finishExercise() {
-    const points = await completeExercise(auth.currentUser.uid, auth.currentUser.email, currentPrescription.id, currentPrescription.exercise, totalReps, currentPoints);
-    updatePointsUI(currentPoints + points);
-
-    // Show the feedback modal instead of immediately redirecting
-    showFeedbackModal(points);
+    if (!current) return;
+    const total = current.rx.sets * current.rx.reps;
+    $('progress-bar').style.width = `${Math.min(100, 100 * current.engine.validReps / total)}%`;
 }
 
 function updatePointsUI(points) {
-    currentPoints = points;
-    document.getElementById('user-points').textContent = points;
-    document.getElementById('user-currency').textContent = `₹${(points / 100).toFixed(2)}`;
+    $('user-points').textContent = points;
+    $('user-currency').textContent = `₹${(points / 100).toFixed(2)}`;
 }
 
-function showRewardNotification(points) {
-    const notif = document.createElement('div');
-    notif.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-yellow-500 text-black font-bold p-6 rounded-2xl shadow-2xl z-50 animate-bounce text-center';
-    notif.innerHTML = `<div class="text-4xl mb-2">🎉</div><div class="text-2xl">Exercise Complete!</div><div class="text-xl">+${points} Points</div>`;
-    document.body.appendChild(notif);
-    setTimeout(() => notif.remove(), 3000);
+// ------------------------------------------------------------------ analytics / twin
+async function loadAnalytics() {
+    try { sessions = await getSessions(user.uid, 100); } catch (e) { console.error('sessions', e); sessions = []; }
+    twin = buildTwin(sessions);
+    const completed = sessions.filter(s => s.status === 'completed');
+    $('stat-total-exercises').textContent = completed.length;
+    $('stat-adherence').textContent = `${twin.activeDaysLast14}/14`;
+    const recentQ = sessions.slice(0, 10).map(s => s.summary?.avgQuality).filter(v => v > 0);
+    $('stat-avg-accuracy').textContent = recentQ.length ? Math.round(recentQ.reduce((a, b) => a + b, 0) / recentQ.length) : '--';
+
+    // streak of consecutive days (ending today or yesterday) with a session
+    const days = new Set(sessions.map(s => toDate(s.startedAt)?.toDateString()).filter(Boolean));
+    let streak = 0; const d = new Date();
+    if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1);
+    while (days.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1); }
+    $('stat-streak').textContent = streak;
+
+    const labels = [], counts = [];
+    for (let i = 6; i >= 0; i--) {
+        const day = new Date(); day.setDate(day.getDate() - i);
+        labels.push(day.toLocaleDateString('en', { weekday: 'short' }));
+        counts.push(sessions.filter(s => toDate(s.startedAt)?.toDateString() === day.toDateString()).length);
+    }
+    barChart($('weekly-chart'), labels, counts, 'Sessions');
+
+    const sel = $('trend-exercise');
+    const exIds = Object.keys(twin.exercises);
+    const prev = sel.value;
+    sel.replaceChildren(...(exIds.length ? exIds.map(id => el('option', { value: id }, twin.exercises[id].name)) : [el('option', { value: '' }, 'No sessions yet')]));
+    if (exIds.includes(prev)) sel.value = prev;
+    renderTrend();
 }
 
-// --- Chat ---
-chatToggleBtn.addEventListener('click', () => {
-    chatModal.classList.toggle('hidden');
-    if (!chatModal.classList.contains('hidden')) {
-        loadChatMessages();
+$('trend-exercise').addEventListener('change', renderTrend);
+
+function renderTrend() {
+    const ex = twin?.exercises?.[$('trend-exercise').value];
+    if (!ex) { lineChart($('trend-chart'), [], []); $('trend-summary').textContent = 'Complete a session to start tracking your recovery.'; return; }
+    const labels = ex.timeline.map(t => new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    lineChart($('trend-chart'), labels, [
+        { label: `ROM (${METRIC_LABEL[ex.primaryJoint] || 'primary'}) °`, data: ex.timeline.map(t => t.rom), color: '#22d3ee' },
+        { label: 'Quality', data: ex.timeline.map(t => t.quality), color: '#a78bfa' },
+        { label: 'Pain (0-10)', data: ex.timeline.map(t => t.pain), color: '#f87171', axis: 'y2', dashed: true },
+    ], { yTitle: 'degrees / score', y2Title: 'pain', y2Max: 10 });
+    const c = ex.change;
+    $('trend-summary').textContent = ex.baselineReady
+        ? `Since your first ${3} sessions: range of motion ${fmtChange(c.rom, '°')}, movement quality ${fmtChange(c.quality, '')}.`
+        : `Baseline forming - ${ex.sessions}/3 sessions recorded.`;
+}
+const fmtChange = (v, unit) => v === null ? 'n/a' : `${v >= 0 ? '+' : ''}${v}${unit}`;
+
+// ------------------------------------------------------------------ chat
+$('chat-toggle-btn').addEventListener('click', () => {
+    const modal = $('chat-modal');
+    modal.classList.toggle('hidden');
+    if (!modal.classList.contains('hidden') && !chatUnsub) {
+        chatUnsub = subscribeToChat(user.uid, msgs => renderChat($('chat-messages'), msgs, user.uid),
+            e => { console.error(e); $('chat-messages').textContent = 'Chat unavailable.'; });
     }
 });
-closeChatBtn.addEventListener('click', () => chatModal.classList.add('hidden'));
-sendMsgBtn.addEventListener('click', sendChat);
-chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+$('close-chat-btn').addEventListener('click', () => show('chat-modal', false));
+$('send-msg-btn').addEventListener('click', sendChat);
+$('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
 
 async function sendChat() {
-    const text = chatInput.value.trim();
+    const text = $('chat-input').value.trim();
     if (!text) return;
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            alert("You must be logged in to send messages.");
-            return;
-        }
-        console.log("Sending chat:", text, user.uid);
-        await sendMessage(user.uid, user.email.split('@')[0], text, 'patient_msg', user.uid);
-        chatInput.value = '';
-    } catch (e) {
-        console.error("Chat Error:", e);
-        alert("Failed to send message: " + e.message);
-    }
+    if (!profile.doctorId) { toast('Link to a physiotherapist to use chat', 'error'); return; }
+    try { await sendMessage(user.uid, profile, text); $('chat-input').value = ''; }
+    catch (e) { console.error('Chat error:', e); toast(`Message not sent: ${e.message}`, 'error'); }
 }
 
-function loadChatMessages() {
-    if (chatUnsubscribe) return;
-    chatUnsubscribe = subscribeToChat(auth.currentUser.uid, (messages) => {
-        chatMessages.innerHTML = '';
-        messages.forEach(msg => {
-            const isMe = msg.senderId === auth.currentUser.uid;
-            const div = document.createElement('div');
-            div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-            div.innerHTML = `
-                <div class="max-w-[80%] rounded-lg px-3 py-2 ${isMe ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-200'}">
-                    <p class="text-sm">${msg.text}</p>
-                </div>`;
-            chatMessages.appendChild(div);
-        });
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-}
-
-// --- Post-Exercise Feedback Modal ---
-let selectedDifficulty = null;
-let pendingPoints = 0;
-
-function showFeedbackModal(points) {
-    pendingPoints = points;
-    selectedDifficulty = null;
-
-    // Reset modal state
-    document.getElementById('pain-slider').value = 1;
-    document.getElementById('pain-value').textContent = '1';
-    document.getElementById('feedback-notes').value = '';
-    document.querySelectorAll('.difficulty-btn').forEach(btn => {
-        btn.classList.remove('border-teal-500', 'bg-teal-500/20');
-        btn.classList.add('border-gray-700');
-    });
-
-    // Show modal
-    document.getElementById('feedback-modal').classList.remove('hidden');
-}
-
-function closeFeedbackModal() {
-    document.getElementById('feedback-modal').classList.add('hidden');
-    showRewardNotification(pendingPoints);
-
-    setTimeout(() => {
-        showPrescriptionList();
-        loadPrescriptions();
-    }, 2000);
-}
-
-// Pain slider update
-document.getElementById('pain-slider')?.addEventListener('input', (e) => {
-    document.getElementById('pain-value').textContent = e.target.value;
-});
-
-// Difficulty button selection
-document.querySelectorAll('.difficulty-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        // Remove selection from all
-        document.querySelectorAll('.difficulty-btn').forEach(b => {
-            b.classList.remove('border-teal-500', 'bg-teal-500/20');
-            b.classList.add('border-gray-700');
-        });
-        // Add selection to clicked
-        btn.classList.add('border-teal-500', 'bg-teal-500/20');
-        btn.classList.remove('border-gray-700');
-        selectedDifficulty = btn.dataset.difficulty;
-    });
-});
-
-// Submit feedback
-document.getElementById('submit-feedback-btn')?.addEventListener('click', async () => {
-    const painLevel = parseInt(document.getElementById('pain-slider').value);
-    const notes = document.getElementById('feedback-notes').value.trim();
-
-    if (!selectedDifficulty) {
-        alert('Please select a difficulty level');
-        return;
-    }
-
-    try {
-        await saveExerciseFeedback(
-            auth.currentUser.uid,
-            auth.currentUser.email,
-            currentPrescription.exercise,
-            painLevel,
-            selectedDifficulty,
-            notes
-        );
-        console.log('Feedback saved successfully');
-    } catch (e) {
-        console.error('Error saving feedback:', e);
-    }
-
-    closeFeedbackModal();
-});
-
-// Skip feedback
-document.getElementById('skip-feedback-btn')?.addEventListener('click', () => {
-    closeFeedbackModal();
-});
-
-// --- Analytics Dashboard ---
-let weeklyChart = null;
-
-async function loadAnalytics() {
-    try {
-        const stats = await getExerciseStats(auth.currentUser.uid);
-
-        // Update stat cards
-        document.getElementById('stat-total-exercises').textContent = stats.totalExercises || 0;
-        document.getElementById('stat-streak').textContent = stats.streak || 0;
-        document.getElementById('stat-adherence').textContent = `${stats.adherenceRate || 0}%`;
-
-        // Render weekly chart if Chart.js is available
-        const canvas = document.getElementById('weekly-chart');
-        if (canvas && typeof Chart !== 'undefined' && stats.weeklyData && stats.weeklyData.length > 0) {
-            const ctx = canvas.getContext('2d');
-
-            // Destroy existing chart if any
-            if (weeklyChart) weeklyChart.destroy();
-
-            weeklyChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: stats.weeklyData.map(d => d.day),
-                    datasets: [{
-                        label: 'Exercises Completed',
-                        data: stats.weeklyData.map(d => d.count),
-                        backgroundColor: 'rgba(20, 184, 166, 0.7)',
-                        borderColor: 'rgba(20, 184, 166, 1)',
-                        borderWidth: 1,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                color: '#9ca3af',
-                                stepSize: 1
-                            },
-                            grid: { color: 'rgba(75, 85, 99, 0.3)' }
-                        },
-                        x: {
-                            ticks: { color: '#9ca3af' },
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-        }
-    } catch (e) {
-        console.error("Error loading analytics:", e);
-    }
-}
+window.addEventListener('beforeunload', stopCamera);

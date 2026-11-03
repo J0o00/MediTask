@@ -1,23 +1,37 @@
 {
-    "indexes": [
-        {
-            "collectionGroup": "prescriptions",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "isCompleted",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "patientId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "assignedAt",
-                    "order": "DESCENDING"
-                }
-            ]
-        }
-    ],
-    "fieldOverrides": []
+  "indexes": [
+    {
+      "collectionGroup": "prescriptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "assignedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "acknowledged", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "link_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientEmail", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "link_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doctorId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
 }
