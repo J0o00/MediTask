@@ -181,7 +181,7 @@ function renderPatientList() {
     if ($("patient-count")) $("patient-count").textContent = `${shown.length} under monitoring`;
 
     if (!shown.length) {
-        list.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-4 text-center text-xs text-white/60" }, "No patients found matching your search."));
+        list.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-4 text-center text-xs text-slate-light border border-stone-200" }, "No patients found matching your search."));
         return;
     }
 
@@ -193,22 +193,22 @@ function renderPatientList() {
         const statusText = p.statusText || (statusKind === "amber" ? "Needs Review" : "On Track");
 
         const card = el("div", {
-            class: `lumis-glass rounded-2xl p-3 flex items-center justify-between transition cursor-pointer active:scale-98 ${isCurrent ? 'border-teal-300/80 bg-white/25' : 'hover:bg-white/20'}`,
+            class: `lumis-glass rounded-2xl p-3 flex items-center justify-between transition cursor-pointer active:scale-98 border ${isCurrent ? 'ring-2 ring-charcoal bg-white' : 'border-stone-200/80 hover:bg-white'}`,
             onclick: () => selectPatient(p)
         },
             el("div", { class: "flex items-center space-x-3" },
-                el("div", { class: "w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-xs font-semibold text-white border border-white/30" }, initials(name)),
+                el("div", { class: "w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center text-xs font-semibold text-charcoal border border-stone-200" }, initials(name)),
                 el("div", {},
                     el("div", { class: "flex items-center space-x-1.5" },
-                        el("span", { class: "text-xs font-medium text-white" }, name),
-                        el("span", { class: `w-1.5 h-1.5 rounded-full ${statusKind === 'amber' ? 'bg-amber-400 glow-dot-amber' : statusKind === 'red' ? 'bg-rose-400 glow-dot-red' : 'bg-emerald-400 glow-dot-green'}` })
+                        el("span", { class: "text-xs font-semibold text-charcoal" }, name),
+                        el("span", { class: `w-1.5 h-1.5 rounded-full ${statusKind === 'amber' ? 'bg-amber-500 glow-dot-amber' : statusKind === 'red' ? 'bg-rose-500' : 'bg-emerald-500 glow-dot-green'}` })
                     ),
-                    el("p", { class: "text-[11px] text-white/65" }, injury || p.email)
+                    el("p", { class: "text-[11px] text-slate-light" }, injury || p.email)
                 )
             ),
             el("div", { class: "flex items-center space-x-2" },
-                el("span", { class: `px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusKind === 'amber' ? 'bg-amber-400/20 text-amber-200 border-amber-400/30' : 'bg-emerald-400/20 text-emerald-200 border-emerald-400/30'}` }, statusText),
-                el("span", { class: "text-white/40 text-xs" }, "›")
+                el("span", { class: `px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusKind === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}` }, statusText),
+                el("span", { class: "text-stone-400 text-xs" }, "›")
             )
         );
         list.appendChild(card);
@@ -224,21 +224,21 @@ function renderPendingLinks() {
 
     const links = isDemoMode ? DEMO_PENDING_LINKS : [];
     if (!links.length) {
-        box.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-4 text-center text-xs text-white/60" }, "No pending invitations."));
+        box.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-4 text-center text-xs text-slate-light border border-stone-200" }, "No pending invitations."));
         return;
     }
 
     for (const r of links) {
-        box.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-3 flex items-center justify-between border-dashed border-white/30" },
-            el("div", { class: "flex items-center space-x-3 opacity-80" },
-                el("div", { class: "w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xs font-semibold text-white/70 border border-white/20" }, "✉"),
+        box.appendChild(el("div", { class: "lumis-glass-subtle rounded-2xl p-3 flex items-center justify-between border border-dashed border-stone-300" },
+            el("div", { class: "flex items-center space-x-3 opacity-90" },
+                el("div", { class: "w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center text-xs font-semibold text-stone-500 border border-stone-200" }, "✉"),
                 el("div", {},
-                    el("p", { class: "text-xs font-medium text-white/90" }, r.patientEmail),
-                    el("p", { class: "text-[11px] text-white/50" }, "Invitation sent")
+                    el("p", { class: "text-xs font-semibold text-charcoal" }, r.patientEmail),
+                    el("p", { class: "text-[11px] text-slate-light" }, "Invitation sent")
                 )
             ),
             el("button", {
-                class: "px-2.5 py-1 rounded-full text-[10px] font-medium bg-white/20 text-white/80 hover:bg-white/30 active:scale-95 transition",
+                class: "px-2.5 py-1 rounded-full text-[10px] font-medium bg-stone-200/80 text-stone-700 hover:bg-stone-300 active:scale-95 transition",
                 type: "button",
                 onclick: () => toast("Invitation link resent to " + r.patientEmail, "success")
             }, "Resend")
@@ -299,7 +299,7 @@ function updatePatientHeader(p) {
     const rom = p.romDegrees || 124;
     const romTarget = p.romTarget || 130;
     if ($("rom-title")) $("rom-title").textContent = `Range of Motion (${p.romJoint || "Extension"})`;
-    if ($("rom-degrees")) $("rom-degrees").innerHTML = `${rom}° <span class="text-[9px] font-normal text-white/60">/ ${romTarget}°</span>`;
+    if ($("rom-degrees")) $("rom-degrees").innerHTML = `${rom}° <span class="text-[9px] font-normal text-stone-400">/ ${romTarget}°</span>`;
 }
 
 // ------------------------------------------------------------------ ROM Waveform Chart
@@ -312,8 +312,8 @@ function renderRomChart() {
 
     const ctx = canvas.getContext("2d");
     const gradient = ctx.createLinearGradient(0, 0, 0, 100);
-    gradient.addColorStop(0, "rgba(45, 212, 191, 0.4)");
-    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    gradient.addColorStop(0, "rgba(29, 28, 22, 0.15)");
+    gradient.addColorStop(1, "rgba(250, 248, 244, 0)");
 
     new Chart(canvas, {
         type: "line",
@@ -321,13 +321,13 @@ function renderRomChart() {
             labels: ["Warmup", "Set 1", "Set 2", "Peak", "Cooldown"],
             datasets: [{
                 data: [45, 82, 105, selected?.patient?.romDegrees || 124, 75],
-                borderColor: "rgba(255, 255, 255, 0.95)",
-                borderWidth: 2.2,
+                borderColor: "#1D1C16",
+                borderWidth: 2,
                 backgroundColor: gradient,
                 fill: true,
                 tension: 0.42,
-                pointBackgroundColor: "#2dd4bf",
-                pointBorderColor: "#ffffff",
+                pointBackgroundColor: "#1D1C16",
+                pointBorderColor: "#FFFFFF",
                 pointBorderWidth: 2,
                 pointRadius: [0, 0, 0, 4.5, 0]
             }]
@@ -356,17 +356,17 @@ function renderQualityChart() {
         data: {
             labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Today"],
             datasets: [
-                { label: "Quality Score", data: [82, 85, 84, 88, 90, 89, 92], borderColor: "#2dd4bf", tension: 0.35 },
-                { label: "Consistency %", data: [75, 78, 80, 82, 85, 86, 88], borderColor: "#60a5fa", tension: 0.35 }
+                { label: "Quality Score", data: [82, 85, 84, 88, 90, 89, 92], borderColor: "#1D1C16", tension: 0.35 },
+                { label: "Consistency %", data: [75, 78, 80, 82, 85, 86, 88], borderColor: "#665D51", tension: 0.35 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: "rgba(255,255,255,0.8)", font: { size: 10 } } } },
+            plugins: { legend: { labels: { color: "#1D1C16", font: { size: 10 } } } },
             scales: {
-                x: { ticks: { color: "rgba(255,255,255,0.6)", font: { size: 9 } } },
-                y: { ticks: { color: "rgba(255,255,255,0.6)", font: { size: 9 } }, min: 50, max: 100 }
+                x: { ticks: { color: "#665D51", font: { size: 9 } } },
+                y: { ticks: { color: "#665D51", font: { size: 9 } }, min: 50, max: 100 }
             }
         }
     });
@@ -380,7 +380,7 @@ function renderSessions() {
 
     const sessions = selected?.sessions || [];
     if (!sessions.length) {
-        list.appendChild(el("div", { class: "lumis-glass rounded-2xl p-4 text-center text-xs text-white/60" }, "No completed exercise sessions recorded yet."));
+        list.appendChild(el("div", { class: "lumis-glass rounded-2xl p-4 text-center text-xs text-slate-light border border-stone-200" }, "No completed exercise sessions recorded yet."));
         return;
     }
 
@@ -389,26 +389,26 @@ function renderSessions() {
         const reps = s.validReps || 10;
         const dateStr = s.startedAt ? fmtDateTime(s.startedAt) : "Recent";
 
-        const card = el("div", { class: "lumis-glass rounded-2xl p-3.5 space-y-2" },
+        const card = el("div", { class: "lumis-glass rounded-2xl p-3.5 space-y-2 border border-stone-200/80" },
             el("div", { class: "flex items-center justify-between" },
                 el("div", {},
-                    el("p", { class: "text-xs font-semibold text-white" }, s.exercise || "Rehabilitation Exercise"),
-                    el("p", { class: "text-[10px] text-white/60" }, dateStr)
+                    el("p", { class: "text-xs font-semibold text-charcoal" }, s.exercise || "Rehabilitation Exercise"),
+                    el("p", { class: "text-[10px] text-slate-light" }, dateStr)
                 ),
-                el("span", { class: "px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-teal-400/20 text-teal-200 border border-teal-300/30" }, `${reps} Reps`)
+                el("span", { class: "px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-charcoal border border-stone-300" }, `${reps} Reps`)
             ),
             el("div", { class: "grid grid-cols-3 gap-2 pt-1 text-center text-[10px]" },
-                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5" },
-                    el("span", { class: "text-white/60 block" }, "Form Quality"),
-                    el("span", { class: "font-semibold text-teal-300" }, `${quality}/100`)
+                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5 border border-stone-200" },
+                    el("span", { class: "text-slate-light block" }, "Form Quality"),
+                    el("span", { class: "font-bold text-charcoal" }, `${quality}/100`)
                 ),
-                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5" },
-                    el("span", { class: "text-white/60 block" }, "Consistency"),
-                    el("span", { class: "font-semibold text-white" }, `${s.summary?.consistency ?? 85}%`)
+                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5 border border-stone-200" },
+                    el("span", { class: "text-slate-light block" }, "Consistency"),
+                    el("span", { class: "font-bold text-charcoal" }, `${s.summary?.consistency ?? 85}%`)
                 ),
-                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5" },
-                    el("span", { class: "text-white/60 block" }, "Track Confidence"),
-                    el("span", { class: "font-semibold text-emerald-300" }, `${100 - (s.summary?.lowConfidencePct ?? 0)}%`)
+                el("div", { class: "lumis-glass-subtle rounded-xl p-1.5 border border-stone-200" },
+                    el("span", { class: "text-slate-light block" }, "Track Confidence"),
+                    el("span", { class: "font-bold text-emerald-700" }, `${100 - (s.summary?.lowConfidencePct ?? 0)}%`)
                 )
             )
         );
@@ -424,18 +424,18 @@ function renderPrescriptions() {
 
     const rxs = selected?.prescriptions || [];
     if (!rxs.length) {
-        list.appendChild(el("div", { class: "lumis-glass rounded-2xl p-4 text-center text-xs text-white/60" }, "No active exercise prescriptions. Click '+ New Prescription' to assign one."));
+        list.appendChild(el("div", { class: "lumis-glass rounded-2xl p-4 text-center text-xs text-slate-light border border-stone-200" }, "No active exercise prescriptions. Click '+ New Routine' to assign one."));
         return;
     }
 
     for (const rx of rxs) {
-        const item = el("div", { class: "lumis-glass rounded-2xl p-3.5 flex items-center justify-between" },
+        const item = el("div", { class: "lumis-glass rounded-2xl p-3.5 flex items-center justify-between border border-stone-200" },
             el("div", { class: "space-y-1" },
-                el("h4", { class: "text-xs font-semibold text-white" }, rx.exercise),
-                el("p", { class: "text-[11px] text-white/70" }, `${rx.sets} sets × ${rx.reps} reps`),
-                rx.notes ? el("p", { class: "text-[10px] text-teal-200/80 italic" }, `“${rx.notes}”`) : null
+                el("h4", { class: "text-xs font-semibold text-charcoal" }, rx.exercise),
+                el("p", { class: "text-[11px] text-slate-light" }, `${rx.sets} sets × ${rx.reps} reps`),
+                rx.notes ? el("p", { class: "text-[10px] text-stone-600 italic" }, `“${rx.notes}”`) : null
             ),
-            el("span", { class: "px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-200 border border-emerald-400/30" }, "Active")
+            el("span", { class: "px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200" }, "Active")
         );
         list.appendChild(item);
     }
@@ -454,10 +454,10 @@ function setupNavigation() {
         tabs.forEach(t => {
             const isMatch = t.view === targetView;
             if (t.pill && $(t.pill)) {
-                $(t.pill).className = `tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${isMatch ? 'lumis-pill-active' : 'lumis-pill-inactive'}`;
+                $(t.pill).className = `tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${isMatch ? 'lumis-pill-active' : 'lumis-pill-inactive hover:bg-white'}`;
             }
             if (t.dock && $(t.dock)) {
-                $(t.dock).className = `flex flex-col items-center transition-colors ${isMatch ? 'text-teal-300' : 'text-white/60 hover:text-white'}`;
+                $(t.dock).className = `flex flex-col items-center transition-colors ${isMatch ? 'text-charcoal font-bold' : 'text-stone-400 hover:text-charcoal'}`;
             }
             show(t.view, isMatch);
         });
@@ -620,13 +620,13 @@ function renderChatMessages() {
 
     const msgs = selected?.patient?.chat || [];
     if (!msgs.length) {
-        box.appendChild(el("div", { class: "text-center text-xs text-white/50 py-4" }, "No messages with this patient yet."));
+        box.appendChild(el("div", { class: "text-center text-xs text-slate-light py-4" }, "No messages with this patient yet."));
         return;
     }
 
     for (const m of msgs) {
         const isMe = m.senderRole === "doctor";
-        const bubble = el("div", { class: `p-2.5 rounded-2xl max-w-[85%] text-xs ${isMe ? 'ml-auto bg-teal-500 text-slate-900 font-medium' : 'mr-auto lumis-glass-subtle text-white'}` },
+        const bubble = el("div", { class: `p-2.5 rounded-2xl max-w-[85%] text-xs ${isMe ? 'ml-auto bg-charcoal text-white font-medium shadow-sm' : 'mr-auto lumis-glass-subtle text-charcoal border border-stone-200'}` },
             el("p", { class: "font-semibold text-[10px] opacity-75 mb-0.5" }, isMe ? "You" : m.senderName),
             el("p", {}, m.text)
         );

@@ -254,9 +254,14 @@ async function startSession(rx, cfg) {
 
     current = {
         rx, cfg, sessionId: newId(), startedAt: new Date(), finishing: false,
-        engine: new RehabSession(cfg, {
-            targetSets: rx.sets, targetReps: rx.reps,
-            classifier, voice: $('voice-toggle')?.checked ?? false,
+        engine: new RehabSession({
+            exercise: cfg,
+            sets: rx.sets,
+            reps: rx.reps,
+            classifier,
+            voice: $('voice-toggle')?.checked ?? false,
+            onFrame: handleFrame,
+            onRep: handleRep,
             onEvent: handleEngineEvent,
         }),
     };
@@ -285,24 +290,32 @@ async function startCamera() {
 
     pose = new window.Pose({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}` });
     pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    pose.onResults(onPoseResults);
+    pose.onResults(results => {
+        if (!current || current.finishing) return;
+        const now = performance.now();
+        current.engine.processResults(results, now, now - sendT);
+    });
 
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+            audio: false
+        });
         video.srcObject = stream;
         await new Promise(r => video.onloadedmetadata = r);
         video.play();
         camera = new window.Camera(video, {
             onFrame: async () => {
                 if (!current || current.finishing) return;
-                const now = performance.now();
-                if (now - sendT < 30) return;
-                sendT = now;
-                await pose.send({ image: video });
+                if (pose && video.readyState >= 2) {
+                    sendT = performance.now();
+                    await pose.send({ image: video });
+                }
             },
             width: 640, height: 480,
         });
         camera.start();
+        if ($('feedback-box')) $('feedback-box').textContent = 'Get into starting position in front of camera';
     } catch (err) {
         console.error('Camera start error:', err);
         toast(`Camera access error: ${err.message}`, 'error');
@@ -314,25 +327,30 @@ function stopCamera() {
     try { camera?.stop?.(); } catch {}
     try { stream?.getTracks()?.forEach(t => t.stop()); } catch {}
     const v = $('webcam'); if (v) v.srcObject = null;
+    try { pose?.close?.(); } catch {}
     camera = null; stream = null; pose = null;
+    current?.engine?.feedback?.cancel?.();
 }
 
 let frameCount = 0, fpsT0 = performance.now();
-function onPoseResults(results) {
+function handleFrame(state) {
     if (!current || current.finishing) return;
     const canvas = $('pose-canvas');
-    if (canvas) {
-        canvas.width = results.image.width; canvas.height = results.image.height;
-        drawPose(canvas, results.poseLandmarks, current.cfg);
+    if (canvas && state.landmarks) {
+        canvas.width = canvas.clientWidth || 640;
+        canvas.height = canvas.clientHeight || 480;
+        drawPose(canvas, state.landmarks, current.cfg);
     }
-    const state = current.engine.processFrame(results.poseLandmarks, performance.now());
-    frameCount++; const now = performance.now();
+    frameCount++;
+    const now = performance.now();
     if (now - fpsT0 > 1000) {
         if ($('fps-label')) $('fps-label').textContent = `${Math.round(frameCount * 1000 / (now - fpsT0))} fps`;
-        frameCount = 0; fpsT0 = now;
+        frameCount = 0;
+        fpsT0 = now;
     }
     if ($('confidence-bar')) $('confidence-bar').style.width = `${Math.round((state.confidence || 0) * 100)}%`;
     if ($('phase-badge')) $('phase-badge').textContent = state.valid ? (PHASE_LABEL[state.phase] || state.phase) : 'Adjust position';
+    if ($('feedback-box') && state.message) $('feedback-box').textContent = state.message;
 
     const v = state.metrics?.[current.cfg.primaryMetric];
     if (typeof v === 'number' && $('angle-readout')) {
@@ -342,31 +360,44 @@ function onPoseResults(results) {
     if ($('rom-fill')) $('rom-fill').style.height = `${fill * 100}%`;
 }
 
+function handleRep(rep) {
+    if (!current || current.finishing) return;
+    if ($('current-set')) $('current-set').textContent = current.engine.currentSet;
+    if ($('current-reps')) $('current-reps').textContent = current.engine.repsInSet;
+    updateScoreUI(rep.quality);
+    updateProgressUI();
+
+    const log = $('rep-log');
+    if (log) {
+        const isFirst = log.children.length === 1 && log.children[0].tagName === 'P';
+        if (isFirst) log.replaceChildren();
+        log.prepend(el('div', { class: 'p-2 rounded-xl glass-chip flex items-center justify-between text-xs mb-1.5' },
+            el('span', { class: 'font-semibold text-slate-800' }, `Rep ${current.engine.validReps}`),
+            el('span', { class: `font-bold ${rep.quality >= 80 ? 'text-teal-600' : rep.quality >= 60 ? 'text-amber-600' : 'text-rose-600'}` }, `Quality ${Math.round(rep.quality)}/100`),
+            el('span', { class: 'text-[10px] text-slate-500' }, `${(rep.durationMs / 1000).toFixed(1)}s`)
+        ));
+    }
+    const flash = $('rep-flash');
+    if (flash) {
+        flash.textContent = current.engine.repsInSet;
+        show(flash, true);
+        setTimeout(() => show(flash, false), 700);
+    }
+}
+
 function handleEngineEvent(e) {
-    if (e.type === 'feedback') {
-        const box = $('feedback-box');
-        if (box) box.textContent = e.message;
-    } else if (e.type === 'rep_complete') {
-        if ($('current-set')) $('current-set').textContent = e.currentSet;
-        if ($('current-reps')) $('current-reps').textContent = e.repsInSet;
-        updateScoreUI(e.quality);
-        updateProgressUI();
-        const log = $('rep-log');
-        if (log) {
-            log.prepend(el('div', { class: 'p-2 rounded-xl glass-chip flex items-center justify-between text-xs' },
-                el('span', { class: 'font-semibold text-slate-800' }, `Rep ${e.totalReps}`),
-                el('span', { class: 'font-bold text-teal-600' }, `Quality ${Math.round(e.quality)}/100`),
-                el('span', { class: 'text-[10px] text-slate-500' }, `${(e.rep.durationMs / 1000).toFixed(1)}s`)
-            ));
-        }
-        const flash = $('rep-flash');
-        if (flash) {
-            flash.textContent = e.repsInSet;
-            show(flash, true);
-            setTimeout(() => show(flash, false), 700);
-        }
+    if (e.type === 'set_complete') {
+        toast(`Set ${e.set} completed! Take a short rest.`, 'success');
+        if ($('current-set')) $('current-set').textContent = current.engine.currentSet;
+        if ($('current-reps')) $('current-reps').textContent = 0;
     } else if (e.type === 'session_complete') {
+        toast('Prescribed sets completed!', 'success');
         finishSession('completed');
+    } else if (e.type === 'rep_aborted') {
+        if ($('incomplete-note')) {
+            $('incomplete-note').textContent = 'Repetition reset — return to start';
+            setTimeout(() => { if ($('incomplete-note')) $('incomplete-note').textContent = ''; }, 2500);
+        }
     }
 }
 

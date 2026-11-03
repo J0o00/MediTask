@@ -5,22 +5,29 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
     <title>MediTask Clinical Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&amp;display=swap" rel="stylesheet" />
     <!-- Tailwind CSS v3 with Plugins -->
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Tailwind Custom Configuration -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            teal: '#0d9488',
-                            tealLight: '#2dd4bf',
-                            periwinkle: '#6b8afd',
-                            coral: '#f472b6',
-                        }
+                        surface: '#FAF8F4',
+                        'surface-dim': '#F3ECE2',
+                        charcoal: '#1D1C16',
+                        slate: '#444845',
+                        'slate-light': '#665D51',
+                        'border-warm': '#E5DFD5',
+                        'border-subtle': '#EDE7DD',
                     },
                     fontFamily: {
-                        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        sans: ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        serif: ['Newsreader', 'Georgia', 'serif'],
                     }
                 }
             }
@@ -30,45 +37,48 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+    <!-- BEGIN: Custom CSS Styles -->
     <style data-purpose="ambient-canvas-and-glass">
-        /* Lumis aesthetic background gradient mesh */
+        /* Warm cream, white and grey ambient canvas */
         body {
-            background: radial-gradient(circle at 15% 15%, #5d75bc 0%, #465f9e 35%, #505c87 70%, #2f3755 100%),
-                linear-gradient(135deg, #7c94d6 0%, #b2a8d3 40%, #e2b4cb 75%, #a6badf 100%);
-            background-blend-mode: overlay, normal;
+            background: radial-gradient(circle at 15% 10%, #FFFFFF 0%, #FAF8F4 45%, #F4ECE2 85%, #EFE7DC 100%),
+                linear-gradient(145deg, #FAF8F4 0%, #F5EFE6 45%, #EDE5D8 100%);
+            background-blend-mode: normal, normal;
             background-attachment: fixed;
             min-height: 100vh;
+            color: #1D1C16;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Glassmorphism translucent panels replicating Lumis UI */
+        /* Clean white frosted cards with warm grey borders */
         .lumis-glass {
-            background: rgba(255, 255, 255, 0.18);
-            backdrop-filter: blur(28px) saturate(160%);
-            -webkit-backdrop-filter: blur(28px) saturate(160%);
-            border: 1px solid rgba(255, 255, 255, 0.32);
-            box-shadow: 0 16px 40px -10px rgba(18, 25, 48, 0.18),
-                inset 0 1px 1px 0 rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            border: 1px solid rgba(229, 223, 213, 0.85);
+            box-shadow: 0 10px 30px -8px rgba(77, 70, 58, 0.06),
+                0 2px 6px -1px rgba(77, 70, 58, 0.04),
+                inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
         }
 
         .lumis-glass-subtle {
-            background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border: 1px solid rgba(255, 255, 255, 0.22);
-            box-shadow: inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.62);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(235, 229, 220, 0.85);
+            box-shadow: inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.8);
         }
 
         .lumis-pill-active {
-            background: rgba(255, 255, 255, 0.92);
-            color: #1e293b;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+            background: #1D1C16;
+            color: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(29, 28, 22, 0.16);
         }
 
         .lumis-pill-inactive {
-            background: rgba(255, 255, 255, 0.16);
-            color: rgba(255, 255, 255, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.7);
+            color: #55524B;
+            border: 1px solid rgba(229, 223, 213, 0.8);
         }
 
         /* iOS safe areas */
@@ -91,189 +101,196 @@
         }
 
         .glow-dot-green {
-            box-shadow: 0 0 10px #4ade80, 0 0 2px #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), 0 0 2px #22c55e;
         }
 
         .glow-dot-amber {
-            box-shadow: 0 0 10px #fbbf24, 0 0 2px #f59e0b;
-        }
-
-        .glow-dot-red {
-            box-shadow: 0 0 10px #f87171, 0 0 2px #ef4444;
-        }
-
-        /* Modal backdrop transitions */
-        .backdrop-enter {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(8px);
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.4), 0 0 2px #f59e0b;
         }
     </style>
+    <!-- END: Custom CSS Styles -->
 </head>
 
-<body class="text-white font-sans selection:bg-teal-400 selection:text-white">
-    <!-- Ambient Background Glow Lights -->
+<body class="text-charcoal font-sans selection:bg-neutral-800 selection:text-white">
+    <!-- BEGIN: Ambient Background Glow Lights (Soft warm cream & light grey tones) -->
     <div aria-hidden="true" class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div class="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-indigo-300/30 blur-3xl"></div>
-        <div class="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-rose-200/25 blur-3xl"></div>
-        <div class="absolute -bottom-20 left-10 w-96 h-96 rounded-full bg-blue-300/20 blur-3xl"></div>
+        <!-- Top-left bright pearl light orb -->
+        <div class="absolute -top-20 -left-16 w-80 h-80 rounded-full bg-white/90 blur-3xl"></div>
+        <!-- Top-right champagne-cream ambient glow -->
+        <div class="absolute -top-12 -right-16 w-72 h-72 rounded-full bg-amber-100/40 blur-3xl"></div>
+        <!-- Center-right warm cream light leak -->
+        <div class="absolute top-1/3 -right-20 w-96 h-96 rounded-full bg-amber-100/35 blur-3xl"></div>
+        <!-- Center-left subtle pearl highlight for graph refraction -->
+        <div class="absolute top-1/2 -left-20 w-80 h-80 rounded-full bg-white/75 blur-3xl"></div>
+        <!-- Bottom warm grey and sand ambient tone -->
+        <div class="absolute -bottom-16 left-6 w-96 h-96 rounded-full bg-stone-200/40 blur-3xl"></div>
     </div>
+    <!-- END: Ambient Background Glow Lights -->
 
-    <!-- Main Responsive Container -->
-    <main class="relative z-10 max-w-lg md:max-w-4xl lg:max-w-5xl mx-auto min-h-screen flex flex-col px-4 safe-top safe-bottom">
+    <!-- BEGIN: Main Mobile Container -->
+    <main class="relative z-10 max-w-md md:max-w-xl mx-auto min-h-screen flex flex-col px-4 safe-top safe-bottom">
 
-        <!-- Demo Mode Indicator Bar (if in demo mode) -->
-        <div id="demo-banner" class="hidden mb-2 py-1.5 px-3 rounded-full lumis-glass-subtle flex items-center justify-between text-xs text-teal-200">
+        <!-- Demo Mode Indicator Bar -->
+        <div id="demo-banner" class="hidden mb-2.5 py-1.5 px-3.5 rounded-2xl lumis-glass flex items-center justify-between text-xs text-charcoal font-medium border border-stone-200">
             <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-teal-300 animate-pulse"></span>
-                <span>Clinician Demo Mode</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Doctor Demo Preview</span>
             </span>
-            <a href="./login.html" class="underline text-white font-medium hover:text-teal-200">Sign in to Firebase</a>
+            <a href="./login.html" class="underline text-charcoal font-semibold hover:text-stone-600">Sign in with Account</a>
         </div>
 
-        <!-- TopBar / Header -->
+        <!-- BEGIN: TopBar / Header -->
         <header class="pt-3 pb-3 flex items-center justify-between" data-purpose="top-navigation-bar">
             <!-- Brand & Status -->
-            <div class="flex items-center space-x-2.5">
-                <a href="./index.html" class="w-9 h-9 rounded-2xl lumis-glass flex items-center justify-center text-teal-300 shadow-inner hover:scale-105 transition" title="Back to Home">
+            <a href="./index.html" class="flex items-center space-x-2.5 hover:opacity-90 transition">
+                <div class="w-9 h-9 rounded-2xl lumis-glass flex items-center justify-center text-charcoal shadow-sm border border-stone-200">
+                    <!-- Heart + Cross Medical Icon -->
                     <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
                         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
                     </svg>
-                </a>
+                </div>
                 <div>
                     <div class="flex items-center space-x-1.5">
-                        <h1 class="text-base font-semibold tracking-tight text-white">MediTask</h1>
-                        <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full bg-teal-400/25 text-teal-200 border border-teal-300/30">Clinical</span>
+                        <h1 class="text-base font-semibold tracking-tight text-charcoal">MediTask</h1>
+                        <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full bg-stone-200/70 text-stone-700 border border-stone-300">Clinical</span>
                     </div>
-                    <p id="doctor-line" class="text-[11px] text-white/70 font-light">Dr. R. Reynolds, MD</p>
+                    <p id="doctor-line" class="text-[11px] text-slate-light font-normal">Dr. R. Reynolds, MD</p>
                 </div>
-            </div>
-            <!-- Actions & Clinician Avatar -->
+            </a>
+
+            <!-- Action Buttons & Clinician Avatar -->
             <div class="flex items-center space-x-2">
-                <button id="export-pdf-btn" aria-label="Export report" class="lumis-glass-subtle w-9 h-9 rounded-2xl flex items-center justify-center text-white/90 active:scale-95 transition-transform" title="Export PDF Report">
-                    <svg class="w-4 h-4 text-white/80" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+                <button aria-label="Notifications" class="lumis-glass-subtle w-9 h-9 rounded-2xl flex items-center justify-center text-charcoal hover:bg-white active:scale-95 transition-transform" title="Notifications">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
-                <div id="doctor-avatar" class="w-9 h-9 rounded-2xl border border-white/40 overflow-hidden shadow-sm bg-indigo-200/40 flex items-center justify-center text-xs font-semibold text-white">
-                    RR
-                </div>
-                <button id="logout-btn" class="lumis-glass-subtle w-9 h-9 rounded-2xl flex items-center justify-center text-rose-300 hover:text-rose-200 active:scale-95 transition" title="Sign out">
+                <button id="logout-btn" aria-label="Sign out" class="lumis-glass-subtle w-9 h-9 rounded-2xl flex items-center justify-center text-rose-600 hover:bg-white active:scale-95 transition-transform" title="Sign out">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
+                <div id="doctor-avatar" class="w-9 h-9 rounded-2xl border border-stone-300 overflow-hidden shadow-sm bg-stone-200 flex items-center justify-center text-xs font-semibold text-charcoal">
+                    RR
+                </div>
             </div>
         </header>
+        <!-- END: TopBar / Header -->
 
-        <!-- Quick Header Actions -->
+        <!-- BEGIN: Quick Header Actions -->
         <section class="mt-1 mb-3 flex items-center justify-between gap-2" data-purpose="quick-action-bar">
-            <button id="add-patient-btn" class="flex-1 py-2 px-3 rounded-2xl lumis-glass text-xs font-medium flex items-center justify-center gap-1.5 active:scale-98 transition text-white/95 hover:bg-white/25">
-                <svg class="w-3.5 h-3.5 text-teal-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <button id="add-patient-btn" class="flex-1 py-2 px-3 rounded-2xl lumis-glass text-xs font-medium flex items-center justify-center gap-1.5 active:scale-98 transition text-charcoal hover:bg-white border border-stone-200">
+                <svg class="w-3.5 h-3.5 text-stone-800" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                     <path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <span>New Patient</span>
             </button>
-            <button id="link-patient-btn" class="flex-1 py-2 px-3 rounded-2xl lumis-glass-subtle text-xs font-medium flex items-center justify-center gap-1.5 active:scale-98 transition text-white/80 hover:text-white">
-                <svg class="w-3.5 h-3.5 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <button id="link-patient-btn" class="flex-1 py-2 px-3 rounded-2xl lumis-glass-subtle text-xs font-medium flex items-center justify-center gap-1.5 active:scale-98 transition text-slate-light hover:text-charcoal hover:bg-white/80 border border-stone-200">
+                <svg class="w-3.5 h-3.5 text-stone-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <span>Invite Patient</span>
             </button>
         </section>
+        <!-- END: Quick Header Actions -->
 
-        <!-- Filter Pills -->
+        <!-- BEGIN: Filter Pills -->
         <nav aria-label="Patient Categories" class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-1 mb-4">
             <button id="pill-overview" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-active shrink-0">Overview</button>
-            <button id="pill-sessions" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0">Sessions History</button>
-            <button id="pill-protocols" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0">Prescriptions</button>
-            <button id="pill-invites" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0">Pending Invites</button>
+            <button id="pill-sessions" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0 hover:bg-white">Live Telemetry</button>
+            <button id="pill-protocols" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0 hover:bg-white">Prescriptions</button>
+            <button id="pill-invites" class="tab-pill px-3.5 py-1.5 rounded-full text-xs font-medium lumis-pill-inactive shrink-0 hover:bg-white">Pending Invites</button>
         </nav>
+        <!-- END: Filter Pills -->
 
-        <!-- Hero Clinician Banner -->
-        <section class="mb-4" data-purpose="hero-title-section">
-            <p class="text-xs uppercase tracking-widest text-teal-200/90 font-semibold mb-1">Rehabilitation Telemetry</p>
-            <h2 class="text-2xl font-light tracking-tight text-white leading-tight">
-                Patient Recovery Looks <br />
-                <span class="font-serif italic font-normal text-white drop-shadow-sm">Promising</span>
-            </h2>
-        </section>
-
-        <!-- VIEW: Overview Tab -->
+        <!-- TAB VIEW 1: Overview -->
         <div id="view-overview" class="space-y-4">
+            <!-- BEGIN: Hero Clinician Banner -->
+            <section class="mb-1" data-purpose="hero-title-section">
+                <p class="text-xs uppercase tracking-widest text-slate-light font-semibold mb-1">Rehabilitation Telemetry</p>
+                <h2 class="text-2xl font-normal tracking-tight text-charcoal leading-tight">
+                    Patient Recovery Looks <br />
+                    <span class="font-serif italic font-normal text-charcoal">Promising</span>
+                </h2>
+            </section>
+            <!-- END: Hero Clinician Banner -->
 
-            <!-- Featured Active Patient Telemetry Card -->
+            <!-- BEGIN: Featured Active Patient Telemetry Card -->
             <section class="lumis-glass rounded-3xl p-4 relative overflow-hidden" data-purpose="primary-patient-card">
-                <div class="absolute -right-8 -top-8 w-36 h-36 bg-pink-300/20 rounded-full blur-2xl pointer-events-none"></div>
+                <!-- Glow subtle ambient warm light inside card -->
+                <div class="absolute -right-8 -top-8 w-36 h-36 bg-amber-100/40 rounded-full blur-2xl pointer-events-none"></div>
 
-                <!-- Patient Header -->
+                <!-- Card Top: Patient Info & Status Badge -->
                 <div class="flex items-start justify-between relative z-10 mb-3">
                     <div class="flex items-center space-x-3">
-                        <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-white/30 to-white/10 border border-white/40 flex items-center justify-center font-medium text-white shadow-inner">
+                        <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center font-medium text-charcoal shadow-inner">
                             AQ
                         </div>
                         <div>
                             <div class="flex items-center space-x-1.5">
-                                <h3 id="pt-name" class="text-base font-semibold text-white tracking-tight">Aarav Q.</h3>
-                                <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 glow-dot-green"></span>
+                                <h3 id="pt-name" class="text-base font-semibold text-charcoal tracking-tight">Aarav Q.</h3>
+                                <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 glow-dot-green"></span>
                             </div>
-                            <p id="pt-meta" class="text-xs text-white/70">aq@gmail.com • ACL Rehab Wk 4</p>
+                            <p id="pt-meta" class="text-xs text-slate-light">aq@gmail.com • ACL Rehab Wk 4</p>
                         </div>
                     </div>
-                    <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 flex items-center space-x-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         <span id="pt-status-text">On Track</span>
                     </span>
                 </div>
 
-                <!-- Metrics Grid -->
+                <!-- Quick Metrics Grid (Score & Bio telemetry) -->
                 <div class="grid grid-cols-2 gap-2.5 mb-3.5 relative z-10">
-                    <!-- AI Pose Accuracy -->
-                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between">
+                    <!-- AI Pose Accuracy Metric Card -->
+                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
                         <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-normal text-white/70">Pose Accuracy</span>
-                            <span id="pt-accuracy-delta" class="text-[10px] text-teal-300 font-medium">+4.2%</span>
+                            <span class="text-[11px] font-normal text-slate-light">Pose Accuracy</span>
+                            <span id="pt-accuracy-delta" class="text-[10px] text-emerald-700 font-semibold">+4.2%</span>
                         </div>
                         <div class="mt-2 flex items-baseline space-x-1">
-                            <span id="pt-accuracy-val" class="text-2xl font-light text-white tracking-tight">92</span>
-                            <span class="text-xs text-white/60">/100</span>
+                            <span id="pt-accuracy-val" class="text-2xl font-light text-charcoal tracking-tight">92</span>
+                            <span class="text-xs text-stone-400">/100</span>
                         </div>
-                        <div class="w-full bg-white/15 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div id="pt-accuracy-bar" class="bg-gradient-to-r from-teal-300 to-emerald-400 h-full rounded-full" style="width: 92%"></div>
+                        <!-- Mini progress bar -->
+                        <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div id="pt-accuracy-bar" class="bg-gradient-to-r from-stone-700 to-stone-900 h-full rounded-full" style="width: 92%"></div>
                         </div>
                     </div>
 
-                    <!-- Exercises Completed -->
-                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between">
+                    <!-- Exercise Routine Adherence Card -->
+                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
                         <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-normal text-white/70">Exercises Today</span>
-                            <span id="pt-adherence-pct" class="text-[10px] text-pink-200 font-medium">83%</span>
+                            <span class="text-[11px] font-normal text-slate-light">Exercises Today</span>
+                            <span id="pt-adherence-pct" class="text-[10px] text-stone-600 font-semibold">83%</span>
                         </div>
                         <div class="mt-2 flex items-baseline space-x-1">
-                            <span id="pt-completed-val" class="text-2xl font-light text-white tracking-tight">5</span>
-                            <span id="pt-target-val" class="text-xs text-white/60">/6 completed</span>
+                            <span id="pt-completed-val" class="text-2xl font-light text-charcoal tracking-tight">5</span>
+                            <span id="pt-target-val" class="text-xs text-stone-400">/6 completed</span>
                         </div>
-                        <div class="w-full bg-white/15 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div id="pt-adherence-bar" class="bg-gradient-to-r from-pink-300 to-rose-400 h-full rounded-full" style="width: 83.3%"></div>
+                        <!-- Mini progress bar -->
+                        <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div id="pt-adherence-bar" class="bg-gradient-to-r from-stone-500 to-stone-700 h-full rounded-full" style="width: 83.3%"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Range of Motion Waveform / Chart -->
-                <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10" data-purpose="telemetry-chart">
+                <!-- Waveform Card: Joint Range of Motion -->
+                <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10 border border-stone-200/80" data-purpose="telemetry-chart">
                     <div class="flex items-center justify-between mb-1">
                         <div>
-                            <p id="rom-title" class="text-xs font-medium text-white">Range of Motion (Knee Extension)</p>
-                            <p id="twin-baseline-note" class="text-[10px] text-white/60">Live Sensor Stream • Smart Knee Sleeve</p>
+                            <p id="rom-title" class="text-xs font-semibold text-charcoal">Range of Motion (Knee Extension)</p>
+                            <p id="twin-baseline-note" class="text-[10px] text-slate-light">Live Sensor Stream • Smart Knee Sleeve</p>
                         </div>
-                        <span id="rom-degrees" class="text-xs font-semibold text-teal-300">124° <span class="text-[9px] font-normal text-white/60">/ 130°</span></span>
+                        <span id="rom-degrees" class="text-xs font-semibold text-charcoal">124° <span class="text-[9px] font-normal text-stone-400">/ 130°</span></span>
                     </div>
 
-                    <!-- Chart Canvas / SVG Container -->
+                    <!-- Canvas with styled height -->
                     <div class="h-28 w-full flex items-center justify-center">
                         <canvas id="rom-chart" class="w-full h-full"></canvas>
                     </div>
 
-                    <div class="flex justify-between text-[9px] text-white/50 tracking-wider uppercase pt-1">
+                    <div class="flex justify-between text-[9px] text-stone-500 tracking-wider uppercase pt-1">
                         <span>Warmup</span>
                         <span>Set 1</span>
                         <span>Set 2</span>
@@ -282,89 +299,100 @@
                     </div>
                 </div>
 
-                <!-- Action Buttons: Chat & Telemetry Review -->
+                <!-- Action Buttons inside Patient Card -->
                 <div class="grid grid-cols-2 gap-2">
-                    <button id="open-chat-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-white flex items-center justify-center gap-1.5 hover:bg-white/25 active:scale-98 transition">
-                        <svg class="w-4 h-4 text-pink-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <button id="open-chat-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">
+                        <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                         <span>Message</span>
                     </button>
-                    <button id="review-telemetry-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-white flex items-center justify-center gap-1.5 hover:bg-white/25 active:scale-98 transition">
-                        <svg class="w-4 h-4 text-teal-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <button id="review-telemetry-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">
+                        <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round"></path>
                             <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
-                        <span>Full Telemetry</span>
+                        <span>Review AI Pose</span>
                     </button>
                 </div>
             </section>
+            <!-- END: Featured Active Patient Telemetry Card -->
 
-            <!-- Active Clinical Roster -->
-            <section data-purpose="patient-queue-section">
+            <!-- BEGIN: Patient Queue / Fast Clinical Triage -->
+            <section class="mb-4" data-purpose="patient-queue-section">
                 <div class="flex items-center justify-between mb-2 px-1">
-                    <h3 class="text-sm font-semibold text-white tracking-tight">Active Clinical Roster</h3>
-                    <span id="patient-count" class="text-xs text-teal-200/80 font-light">4 under monitoring</span>
+                    <h3 class="text-sm font-semibold text-charcoal tracking-tight">Active Clinical Roster</h3>
+                    <span id="patient-count" class="text-xs text-slate-light font-normal">4 under monitoring</span>
                 </div>
 
                 <div class="mb-2">
-                    <input id="patient-search" type="search" class="w-full py-2 px-3.5 rounded-xl lumis-glass-subtle text-xs text-white placeholder-white/50 border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="Search patients by name or condition...">
+                    <input id="patient-search" type="search" class="w-full py-2 px-3.5 rounded-xl lumis-glass text-xs text-charcoal placeholder-stone-400 border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="Search patients by name or condition...">
                 </div>
 
+                <!-- Compact Frosted Patient Cards List -->
                 <div id="patient-list" class="space-y-2">
-                    <!-- Populated dynamically -->
+                    <!-- Populated dynamically by doctor-app.js -->
                 </div>
             </section>
+            <!-- END: Patient Queue / Fast Clinical Triage -->
 
-            <!-- Quick Prescription & AI Protocol Bar -->
-            <section class="lumis-glass rounded-3xl p-3.5 flex items-center justify-between" data-purpose="quick-prescription-module">
+            <!-- BEGIN: Quick Prescription & AI Protocol Bar -->
+            <section class="lumis-glass rounded-3xl p-3.5 mb-2 flex items-center justify-between border border-stone-200" data-purpose="quick-prescription-module">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-2xl bg-teal-400/20 border border-teal-300/40 flex items-center justify-center text-teal-200">
+                    <div class="w-10 h-10 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                     </div>
                     <div>
-                        <p class="text-xs font-medium text-white">Prescribe Routine</p>
-                        <p class="text-[10px] text-white/65">Update biomechanical exercise plan</p>
+                        <p class="text-xs font-semibold text-charcoal">Prescribe Routine</p>
+                        <p class="text-[10px] text-slate-light">Update biomechanical resistance plan</p>
                     </div>
                 </div>
-                <button id="open-prescribe-modal-btn" class="px-3 py-1.5 rounded-full lumis-glass text-xs font-medium text-white hover:bg-white/30 active:scale-95 transition flex items-center space-x-1">
+                <button id="open-prescribe-modal-btn" class="px-3 py-1.5 rounded-full lumis-glass text-xs font-medium text-charcoal hover:bg-white active:scale-95 transition flex items-center space-x-1 border border-stone-200">
                     <span>Assign</span>
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <svg class="w-3.5 h-3.5 text-stone-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
             </section>
-
+            <!-- END: Quick Prescription & AI Protocol Bar -->
         </div>
 
-        <!-- VIEW: Sessions History Tab -->
+        <!-- TAB VIEW 2: Sessions History -->
         <div id="view-sessions" class="hidden space-y-3">
-            <div class="flex items-center justify-between px-1">
-                <h3 class="text-sm font-semibold text-white">Rehabilitation Sessions History</h3>
-                <span class="text-xs text-white/60">Live AI telemetry</span>
+            <div class="flex items-center justify-between px-1 mb-2">
+                <div>
+                    <h3 class="text-sm font-semibold text-charcoal">Rehabilitation Sessions History</h3>
+                    <p class="text-xs text-slate-light">Live AI movement quality & sensor stream</p>
+                </div>
             </div>
             <div id="session-list" class="space-y-2.5">
                 <!-- Session cards rendered here -->
             </div>
         </div>
 
-        <!-- VIEW: Prescriptions Tab -->
+        <!-- TAB VIEW 3: Prescriptions -->
         <div id="view-protocols" class="hidden space-y-3">
-            <div class="flex items-center justify-between px-1">
-                <h3 class="text-sm font-semibold text-white">Active Prescriptions</h3>
-                <button id="prescribe-tab-add-btn" class="text-xs text-teal-300 font-medium hover:underline">+ New Prescription</button>
+            <div class="flex items-center justify-between px-1 mb-2">
+                <div>
+                    <h3 class="text-sm font-semibold text-charcoal">Active Exercise Prescriptions</h3>
+                    <p class="text-xs text-slate-light">Kinematic rehabilitation protocols</p>
+                </div>
+                <button id="prescribe-tab-add-btn" class="text-xs text-charcoal font-semibold underline hover:text-stone-600">+ New Routine</button>
             </div>
             <div id="rx-list" class="space-y-2.5">
                 <!-- Prescriptions list rendered here -->
             </div>
         </div>
 
-        <!-- VIEW: Pending Invites Tab -->
+        <!-- TAB VIEW 4: Pending Invites -->
         <div id="view-invites" class="hidden space-y-3">
-            <div class="flex items-center justify-between px-1">
-                <h3 class="text-sm font-semibold text-white">Pending Patient Invitations</h3>
+            <div class="flex items-center justify-between px-1 mb-2">
+                <div>
+                    <h3 class="text-sm font-semibold text-charcoal">Pending Patient Invitations</h3>
+                    <p class="text-xs text-slate-light">Patients invited to your clinical practice</p>
+                </div>
             </div>
             <div id="pending-links" class="space-y-2">
                 <!-- Pending links rendered here -->
@@ -372,177 +400,188 @@
         </div>
 
     </main>
+    <!-- END: Main Mobile Container -->
 
-    <!-- Bottom Floating Dock Navigation -->
+    <!-- BEGIN: Bottom Floating Dock Navigation -->
     <aside aria-label="Bottom Navigation" class="fixed bottom-3 left-0 right-0 max-w-xs mx-auto px-2 z-40">
-        <nav class="lumis-glass rounded-full px-4 py-2.5 flex items-center justify-around shadow-2xl border border-white/40">
-            <button id="dock-patients" class="flex flex-col items-center text-teal-300 transition-colors" title="Patients">
+        <nav class="lumis-glass rounded-full px-4 py-2.5 flex items-center justify-around shadow-xl border border-stone-200/90">
+            <!-- Tab 1: Patients (Active) -->
+            <button id="dock-patients" aria-current="page" class="flex flex-col items-center text-charcoal transition-colors" title="Patients">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path>
                 </svg>
-                <span class="text-[9px] font-semibold mt-0.5">Patients</span>
+                <span class="text-[9px] font-bold mt-0.5">Patients</span>
             </button>
-            <button id="dock-sessions" class="flex flex-col items-center text-white/60 hover:text-white transition-colors" title="Telemetry">
+            <!-- Tab 2: Live Telemetry -->
+            <button id="dock-sessions" class="flex flex-col items-center text-stone-400 hover:text-charcoal transition-colors" title="Telemetry">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
-                <span class="text-[9px] font-medium mt-0.5">Sessions</span>
+                <span class="text-[9px] font-medium mt-0.5">Live</span>
             </button>
-            <button id="dock-protocols" class="flex flex-col items-center text-white/60 hover:text-white transition-colors" title="Prescriptions">
+            <!-- Tab 3: Prescriptions -->
+            <button id="dock-protocols" class="flex flex-col items-center text-stone-400 hover:text-charcoal transition-colors" title="Prescriptions">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <span class="text-[9px] font-medium mt-0.5">Protocols</span>
             </button>
-            <button id="dock-chat" class="flex flex-col items-center text-white/60 hover:text-white transition-colors relative" title="Messages">
+            <!-- Tab 4: Messages -->
+            <button id="dock-chat" class="flex flex-col items-center text-stone-400 hover:text-charcoal transition-colors relative" title="Messages">
                 <div class="relative">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
-                    <span id="chat-unread-dot" class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-pink-400"></span>
+                    <span id="chat-unread-dot" class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-stone-700"></span>
                 </div>
                 <span class="text-[9px] font-medium mt-0.5">Chats</span>
             </button>
         </nav>
     </aside>
+    <!-- END: Bottom Floating Dock Navigation -->
 
     <!-- MODAL: Telemetry & AI Pose Details -->
-    <div id="telemetry-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
-        <div class="lumis-glass rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto no-scrollbar p-5 space-y-4">
-            <div class="flex items-center justify-between border-b border-white/20 pb-3">
+    <div id="telemetry-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm hidden">
+        <div class="lumis-glass rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto no-scrollbar p-5 space-y-4 border border-stone-200">
+            <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
                 <div>
-                    <h3 class="text-base font-semibold text-white">Clinical Telemetry & AI Form</h3>
-                    <p id="telemetry-patient-name" class="text-xs text-white/70">Aarav Q. • Movement Analysis</p>
+                    <h3 class="text-base font-semibold text-charcoal">Clinical Telemetry & AI Pose</h3>
+                    <p id="telemetry-patient-name" class="text-xs text-slate-light">Aarav Q. • Movement Analysis</p>
                 </div>
-                <button id="close-telemetry-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+                <button id="close-telemetry-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
             </div>
 
             <!-- Quality & Deviation Chart -->
-            <div class="lumis-glass-subtle rounded-2xl p-3 space-y-2">
+            <div class="lumis-glass-subtle rounded-2xl p-3 space-y-2 border border-stone-200">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-medium text-white">Movement Quality & Symmetry</span>
-                    <span class="text-[10px] text-teal-300">Biomechanical Score</span>
+                    <span class="text-xs font-semibold text-charcoal">Movement Quality & Symmetry</span>
+                    <span class="text-[10px] text-stone-600 font-semibold">Biomechanical Score</span>
                 </div>
-                <div class="h-32 w-full">
+                <div class="h-36 w-full">
                     <canvas id="quality-chart"></canvas>
                 </div>
             </div>
 
             <!-- Most frequent deviations -->
-            <div class="lumis-glass-subtle rounded-2xl p-3">
-                <p class="text-xs font-semibold text-white mb-2">Frequent Movement Deviations (Last 10 sessions)</p>
-                <div id="error-breakdown" class="text-xs text-white/80 space-y-1">
-                    <p class="text-white/60 text-xs">No significant deviations detected.</p>
+            <div class="lumis-glass-subtle rounded-2xl p-3 border border-stone-200">
+                <p class="text-xs font-semibold text-charcoal mb-2">Frequent Movement Deviations (Last 10 sessions)</p>
+                <div id="error-breakdown" class="text-xs text-slate-light space-y-1">
+                    <p class="text-stone-500 text-xs">No significant deviations detected.</p>
                 </div>
             </div>
 
-            <button id="unlink-btn" class="w-full py-2.5 rounded-xl lumis-glass text-xs font-medium text-rose-300 hover:text-rose-200 hover:bg-rose-500/20 transition">
-                Discharge Patient from Clinic
-            </button>
+            <div class="flex gap-2 pt-1">
+                <button id="export-pdf-btn" class="flex-1 py-2.5 rounded-xl lumis-glass text-xs font-semibold text-charcoal hover:bg-white border border-stone-200 transition">
+                    Export Clinical PDF
+                </button>
+                <button id="unlink-btn" class="flex-1 py-2.5 rounded-xl lumis-glass-subtle text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
+                    Discharge Patient
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- MODAL: New Patient -->
-    <div id="add-patient-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
-        <form id="add-patient-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4">
-            <div class="flex items-center justify-between border-b border-white/20 pb-3">
-                <h3 class="text-base font-semibold text-white">Create Patient Account</h3>
-                <button type="button" id="cancel-add-patient-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+    <!-- MODAL: New Patient Account -->
+    <div id="add-patient-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm hidden">
+        <form id="add-patient-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4 border border-stone-200">
+            <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
+                <h3 class="text-base font-semibold text-charcoal">Create Patient Account</h3>
+                <button type="button" id="cancel-add-patient-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
             </div>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs font-medium text-white/80 mb-1">Full Name</label>
-                    <input id="new-patient-name" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="e.g. Elena Rostova" required>
+                    <label class="block text-xs font-medium text-slate-light mb-1">Full Name</label>
+                    <input id="new-patient-name" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="e.g. Elena Rostova" required>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-white/80 mb-1">Email Address</label>
-                    <input type="email" id="new-patient-email" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="patient@example.com" required>
+                    <label class="block text-xs font-medium text-slate-light mb-1">Email Address</label>
+                    <input type="email" id="new-patient-email" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="patient@example.com" required>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-white/80 mb-1">Temporary Password</label>
-                    <input type="password" id="new-patient-password" minlength="8" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="At least 8 characters" required>
+                    <label class="block text-xs font-medium text-slate-light mb-1">Temporary Password</label>
+                    <input type="password" id="new-patient-password" minlength="8" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="At least 8 characters" required>
                 </div>
-                <div id="add-patient-error" class="hidden text-xs text-rose-300 bg-rose-500/20 p-2 rounded-lg"></div>
+                <div id="add-patient-error" class="hidden text-xs text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200"></div>
             </div>
             <div class="flex gap-2 pt-2">
-                <button type="button" id="cancel-add-patient-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-white/80 hover:text-white">Cancel</button>
-                <button type="submit" id="submit-add-patient-btn" class="flex-1 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-xs font-semibold text-slate-900 transition">Create Account</button>
+                <button type="button" id="cancel-add-patient-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-slate-light hover:bg-white border border-stone-200">Cancel</button>
+                <button type="submit" id="submit-add-patient-btn" class="flex-1 py-2 rounded-xl bg-charcoal hover:bg-stone-800 text-xs font-semibold text-white transition">Create Account</button>
             </div>
         </form>
     </div>
 
     <!-- MODAL: Invite Existing Patient -->
-    <div id="link-patient-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
-        <form id="link-patient-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4">
-            <div class="flex items-center justify-between border-b border-white/20 pb-3">
-                <h3 class="text-base font-semibold text-white">Invite Patient</h3>
-                <button type="button" id="cancel-link-patient-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+    <div id="link-patient-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm hidden">
+        <form id="link-patient-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4 border border-stone-200">
+            <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
+                <h3 class="text-base font-semibold text-charcoal">Invite Patient</h3>
+                <button type="button" id="cancel-link-patient-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
             </div>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs font-medium text-white/80 mb-1">Patient's Registered Email</label>
-                    <input type="email" id="link-patient-email" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 focus:ring-1 focus:ring-teal-300 outline-none" placeholder="patient@example.com" required>
+                    <label class="block text-xs font-medium text-slate-light mb-1">Patient's Registered Email</label>
+                    <input type="email" id="link-patient-email" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="patient@example.com" required>
                 </div>
-                <div id="link-patient-error" class="hidden text-xs text-rose-300 bg-rose-500/20 p-2 rounded-lg"></div>
+                <div id="link-patient-error" class="hidden text-xs text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200"></div>
             </div>
             <div class="flex gap-2 pt-2">
-                <button type="button" id="cancel-link-patient-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-white/80 hover:text-white">Cancel</button>
-                <button type="submit" id="submit-link-patient-btn" class="flex-1 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-xs font-semibold text-slate-900 transition">Send Invitation</button>
+                <button type="button" id="cancel-link-patient-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-slate-light hover:bg-white border border-stone-200">Cancel</button>
+                <button type="submit" id="submit-link-patient-btn" class="flex-1 py-2 rounded-xl bg-charcoal hover:bg-stone-800 text-xs font-semibold text-white transition">Send Invitation</button>
             </div>
         </form>
     </div>
 
     <!-- MODAL: Prescribe Routine Form -->
-    <div id="prescribe-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
-        <form id="prescription-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4">
-            <div class="flex items-center justify-between border-b border-white/20 pb-3">
-                <h3 class="text-base font-semibold text-white">Prescribe Routine</h3>
-                <button type="button" id="close-prescribe-modal-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+    <div id="prescribe-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-sm hidden">
+        <form id="prescription-form" class="lumis-glass rounded-3xl max-w-md w-full p-5 space-y-4 border border-stone-200">
+            <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
+                <h3 class="text-base font-semibold text-charcoal">Prescribe Routine</h3>
+                <button type="button" id="close-prescribe-modal-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
             </div>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs font-medium text-white/80 mb-1">Exercise</label>
-                    <select id="exercise-select" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-slate-900 bg-white/90 border-0 outline-none">
+                    <label class="block text-xs font-medium text-slate-light mb-1">Exercise Module</label>
+                    <select id="exercise-select" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal bg-white border border-stone-200 outline-none">
                     </select>
-                    <p id="exercise-desc" class="text-[10px] text-white/60 mt-1"></p>
+                    <p id="exercise-desc" class="text-[10px] text-slate-light mt-1"></p>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block text-xs font-medium text-white/80 mb-1">Sets</label>
-                        <input type="number" id="sets-input" value="3" min="1" max="20" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 outline-none" required>
+                        <label class="block text-xs font-medium text-slate-light mb-1">Sets</label>
+                        <input type="number" id="sets-input" value="3" min="1" max="20" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 outline-none" required>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-white/80 mb-1">Reps per set</label>
-                        <input type="number" id="reps-input" value="10" min="1" max="100" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 outline-none" required>
+                        <label class="block text-xs font-medium text-slate-light mb-1">Reps per set</label>
+                        <input type="number" id="reps-input" value="10" min="1" max="100" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 outline-none" required>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-white/80 mb-1">Instructions for Patient</label>
-                    <textarea id="notes-input" rows="2" maxlength="500" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white border-0 outline-none placeholder-white/50" placeholder="e.g. Move slowly through pain-free range"></textarea>
+                    <label class="block text-xs font-medium text-slate-light mb-1">Instructions for Patient</label>
+                    <textarea id="notes-input" rows="2" maxlength="500" class="w-full py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal border border-stone-200 outline-none placeholder-stone-400" placeholder="e.g. Move slowly through pain-free range of motion"></textarea>
                 </div>
             </div>
             <div class="flex gap-2 pt-2">
-                <button type="button" id="close-prescribe-modal-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-white/80 hover:text-white">Cancel</button>
-                <button type="submit" class="flex-1 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-xs font-semibold text-slate-900 transition">Assign Prescription</button>
+                <button type="button" id="close-prescribe-modal-btn-2" class="flex-1 py-2 rounded-xl lumis-glass-subtle text-xs text-slate-light hover:bg-white border border-stone-200">Cancel</button>
+                <button type="submit" class="flex-1 py-2 rounded-xl bg-charcoal hover:bg-stone-800 text-xs font-semibold text-white transition">Assign Prescription</button>
             </div>
         </form>
     </div>
 
     <!-- MODAL / DRAWER: Patient Chat -->
-    <aside id="chat-modal" class="fixed inset-y-0 right-0 max-w-sm w-full z-50 lumis-glass shadow-2xl flex flex-col p-4 border-l border-white/30 hidden">
-        <div class="flex items-center justify-between border-b border-white/20 pb-3">
+    <aside id="chat-modal" class="fixed inset-y-0 right-0 max-w-sm w-full z-50 lumis-glass shadow-2xl flex flex-col p-4 border-l border-stone-200 hidden">
+        <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
             <div>
-                <h3 class="text-sm font-semibold text-white">Patient Messages</h3>
-                <p id="chat-patient-name" class="text-xs text-teal-300">Aarav Q.</p>
+                <h3 class="text-sm font-semibold text-charcoal">Patient Messages</h3>
+                <p id="chat-patient-name" class="text-xs text-slate-light">Aarav Q.</p>
             </div>
-            <button id="close-chat-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white">✕</button>
+            <button id="close-chat-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
         </div>
-        <div id="chat-messages" class="flex-1 overflow-y-auto no-scrollbar py-3 space-y-2">
+        <div id="chat-messages" class="flex-1 overflow-y-auto no-scrollbar py-3 space-y-2 text-xs">
             <!-- Messages rendered here -->
         </div>
         <div class="pt-2 flex gap-2">
-            <input type="text" id="chat-input" maxlength="2000" class="flex-1 py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-white placeholder-white/50 border-0 outline-none" placeholder="Write clinical message...">
-            <button id="send-msg-btn" class="p-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-900 flex items-center justify-center">
+            <input type="text" id="chat-input" maxlength="2000" class="flex-1 py-2 px-3 rounded-xl lumis-glass-subtle text-xs text-charcoal placeholder-stone-400 border border-stone-200 outline-none" placeholder="Write clinical message...">
+            <button id="send-msg-btn" class="p-2 rounded-xl bg-charcoal hover:bg-stone-800 text-white flex items-center justify-center">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
