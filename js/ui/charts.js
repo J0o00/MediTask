@@ -1,7 +1,10 @@
 // Thin wrappers over Chart.js (loaded globally from the CDN).
 const registry = new Map();
 
-const AXIS = { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(75, 85, 99, 0.3)' } };
+// Light clinical theme
+const AXIS = { ticks: { color: '#5A6A65', font: { family: 'IBM Plex Sans', size: 12 } }, grid: { color: '#E6ECEA' }, border: { color: '#D9E1DE' } };
+export const SERIES = { primary: '#0E5A52', blue: '#2F5F9E', amber: '#B7791F', red: '#B42318', grey: '#8A9A95', teal2: '#5FA89D' };
+if (typeof Chart !== 'undefined' && Chart.defaults) { Chart.defaults.font.family = 'IBM Plex Sans'; Chart.defaults.color = '#5A6A65'; }
 
 export function renderChart(canvas, config) {
     if (!canvas || typeof Chart === 'undefined') return null;
@@ -14,7 +17,7 @@ export function renderChart(canvas, config) {
 export function barChart(canvas, labels, data, label = '') {
     return renderChart(canvas, {
         type: 'bar',
-        data: { labels, datasets: [{ label, data, backgroundColor: 'rgba(20, 184, 166, 0.7)', borderRadius: 6 }] },
+        data: { labels, datasets: [{ label, data, backgroundColor: SERIES.primary, borderRadius: 4, maxBarThickness: 36 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
             scales: { y: { ...AXIS, beginAtZero: true, ticks: { ...AXIS.ticks, precision: 0 } }, x: { ...AXIS, grid: { display: false } } } },
     });
@@ -29,16 +32,16 @@ export function lineChart(canvas, labels, series, { yTitle = '', y2Title = '', y
             labels,
             datasets: series.map(s => ({
                 label: s.label, data: s.data, borderColor: s.color, backgroundColor: s.color,
-                tension: 0.3, spanGaps: true, pointRadius: 3, yAxisID: s.axis || 'y', borderDash: s.dashed ? [6, 4] : undefined,
+                tension: 0.25, spanGaps: true, pointRadius: 3, borderWidth: 2, yAxisID: s.axis || 'y', borderDash: s.dashed ? [6, 4] : undefined,
             })),
         },
         options: {
             responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-            plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 12 } } },
+            plugins: { legend: { position: 'bottom', labels: { color: '#3A4A45', boxWidth: 10, boxHeight: 10, usePointStyle: true } } },
             scales: {
                 x: { ...AXIS, grid: { display: false } },
-                y: { ...AXIS, beginAtZero: true, max: yMax ?? undefined, title: { display: !!yTitle, text: yTitle, color: '#9ca3af' } },
-                ...(hasY2 ? { y2: { ...AXIS, position: 'right', beginAtZero: true, max: y2Max ?? undefined, grid: { display: false }, title: { display: !!y2Title, text: y2Title, color: '#9ca3af' } } } : {}),
+                y: { ...AXIS, beginAtZero: true, max: yMax ?? undefined, title: { display: !!yTitle, text: yTitle, color: '#5A6A65' } },
+                ...(hasY2 ? { y2: { ...AXIS, position: 'right', beginAtZero: true, max: y2Max ?? undefined, grid: { display: false }, title: { display: !!y2Title, text: y2Title, color: '#5A6A65' } } } : {}),
             },
         },
     });

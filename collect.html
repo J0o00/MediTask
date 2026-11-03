@@ -4,68 +4,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dataset Recorder - MediTask Research</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Dataset recorder - MediTask Research</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/app.css">
     <link rel="icon" href="data:,">
 </head>
 
-<body class="gradient-bg text-white min-h-screen p-4">
-    <div class="max-w-6xl mx-auto">
-        <header class="glass-strong rounded-2xl p-5 mb-4">
-            <h1 class="text-2xl font-bold text-teal-300">🧪 MediTask dataset recorder</h1>
-            <p class="text-sm text-gray-400">Records labelled, automatically segmented repetitions for training the temporal model (the "MediTask custom" source).
-                Video never leaves this device; only skeleton coordinates are exported, to a file you download.</p>
-        </header>
-
-        <div class="glass rounded-2xl p-4 mb-4 text-xs text-amber-200 border border-amber-500/30">
-            Research use only. Obtain institutional approval and informed consent before recording participants. Use anonymous subject IDs (e.g. S07) - never names.
-            Record healthy volunteers first; have a physiotherapist confirm each label. Do not ask people with injuries to perform deliberately incorrect movements.
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <span class="brand"><span class="brand-mark"><span data-icon="logo"></span></span><span class="brand-name">MediTask</span><span class="brand-tag">Research</span></span>
+        </div>
+    </header>
+    <main class="page stack-lg">
+        <div class="page-head">
+            <div>
+                <h1>Dataset recorder</h1>
+                <p>Records labelled, automatically segmented repetitions for training the temporal model. Video never leaves this device; only skeleton coordinates are exported, to a file you download.</p>
+            </div>
         </div>
 
-        <div class="grid lg:grid-cols-5 gap-4">
-            <div class="lg:col-span-3 glass-strong rounded-2xl p-4">
-                <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black border-2 border-gray-700">
-                    <video id="webcam" class="w-full h-full object-cover mirror" autoplay playsinline muted></video>
-                    <canvas id="pose-canvas" class="absolute inset-0 w-full h-full mirror"></canvas>
-                    <div id="rec-badge" class="hidden absolute top-3 left-3 bg-red-600 px-3 py-1 rounded-full text-sm font-bold">● REC</div>
+        <div class="banner warning"><span data-icon="alert"></span>
+            <p>Research use only. Obtain institutional approval and informed consent before recording. Use anonymous subject IDs such as S07, never names. Record healthy volunteers first, have a physiotherapist confirm each label, and do not ask people with injuries to perform deliberately incorrect movements.</p>
+        </div>
+
+        <div class="session-grid">
+            <div>
+                <div class="stage">
+                    <div class="video-frame">
+                        <video id="webcam" class="mirror" autoplay playsinline muted></video>
+                        <canvas id="pose-canvas" class="mirror"></canvas>
+                        <span id="rec-badge" class="video-tag left hidden">Recording</span>
+                    </div>
                 </div>
-                <p id="status" class="mt-3 text-sm text-gray-300">Camera off.</p>
+                <p id="status" class="feedback-bar info">Camera off.</p>
             </div>
 
-            <div class="lg:col-span-2 space-y-4">
-                <div class="glass-strong rounded-2xl p-4 space-y-3 text-sm">
-                    <label class="block">Subject ID <input id="subject" value="S01" pattern="[A-Za-z0-9_-]+" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></label>
-                    <label class="block">Exercise <select id="exercise" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></select></label>
-                    <label class="block">Intended label
-                        <select id="label" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2">
-                            <option value="correct">correct</option>
-                            <option value="incorrect">incorrect</option>
-                            <option value="incomplete">incomplete (partial range)</option>
-                        </select>
-                    </label>
-                    <label class="block">Error variant (for incorrect) <input id="variant" placeholder="e.g. knee_valgus, arm_forward" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></label>
-                    <label class="block">Camera setup <input id="setup" placeholder="e.g. frontal-2m-daylight" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2"></label>
-                    <div class="flex gap-2 pt-1">
-                        <button id="camera-btn" class="flex-1 bg-teal-500 text-black font-bold py-2 rounded-lg">Start camera</button>
-                        <button id="rec-btn" disabled class="flex-1 bg-red-600 font-bold py-2 rounded-lg disabled:opacity-40">Record</button>
+            <div class="stack">
+                <div class="panel">
+                    <div class="panel-head"><h2>Recording</h2></div>
+                    <div class="panel-body stack">
+                        <div class="field"><label for="subject">Subject ID</label><input id="subject" class="input" value="S01" pattern="[A-Za-z0-9_-]+"></div>
+                        <div class="field"><label for="exercise">Exercise</label><select id="exercise" class="select"></select></div>
+                        <div class="field"><label for="label">Intended label</label>
+                            <select id="label" class="select">
+                                <option value="correct">Correct</option>
+                                <option value="incorrect">Incorrect</option>
+                                <option value="incomplete">Incomplete (partial range)</option>
+                            </select>
+                        </div>
+                        <div class="field"><label for="variant">Error variant</label><input id="variant" class="input" placeholder="For incorrect, e.g. knee_valgus"></div>
+                        <div class="field"><label for="setup">Camera setup</label><input id="setup" class="input" placeholder="e.g. frontal-2m-daylight"></div>
+                        <div class="row">
+                            <button id="camera-btn" class="btn btn-secondary grow" type="button">Start camera</button>
+                            <button id="rec-btn" class="btn btn-danger grow" type="button" disabled>Record</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="glass-strong rounded-2xl p-4 text-sm">
-                    <div class="flex justify-between mb-2"><b>Captured repetitions</b><span id="count">0</span></div>
-                    <ul id="rep-list" class="max-h-48 overflow-y-auto space-y-1 text-xs text-gray-300"></ul>
-                    <div class="flex flex-wrap gap-2 mt-3">
-                        <button id="download-btn" class="bg-indigo-500 px-3 py-2 rounded-lg font-semibold">Download dataset JSON</button>
-                        <button id="template-btn" class="glass px-3 py-2 rounded-lg" title="Average progress curve of the captured CORRECT reps for this exercise">Save as DTW reference</button>
-                        <button id="clear-btn" class="glass px-3 py-2 rounded-lg text-red-300">Clear</button>
+                <div class="panel">
+                    <div class="panel-head"><h2>Captured repetitions</h2><span id="count" class="badge primary num">0</span></div>
+                    <ul id="rep-list" class="panel-body tiny muted stack" style="max-height:200px;overflow-y:auto;margin:0;list-style:none"></ul>
+                    <div class="modal-foot" style="justify-content:flex-start;flex-wrap:wrap">
+                        <button id="download-btn" class="btn btn-primary btn-sm" type="button">Download dataset</button>
+                        <button id="template-btn" class="btn btn-secondary btn-sm" type="button" title="Average progress curve of the captured correct repetitions">Save as DTW reference</button>
+                        <button id="clear-btn" class="btn btn-ghost btn-sm" type="button">Clear</button>
                     </div>
-                    <p class="text-[11px] text-gray-500 mt-2">Put downloaded files in <code>ml/data/raw/meditask_custom/</code>. Reference templates go in <code>models/templates/</code>.</p>
+                    <p class="tiny muted" style="padding:0 20px 16px">Put downloaded files in ml/data/raw/meditask_custom/. Reference templates go in models/templates/.</p>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
@@ -75,6 +85,8 @@
         import { progressCurve, resample1d } from './js/intelligence/dtw-analyzer.js';
         import { drawPose } from './js/ui/exercise-visualizer.js';
         import { el } from './js/ui/dom.js';
+        import { hydrateIcons } from './js/ui/icons.js';
+        hydrateIcons();
 
         const $ = id => document.getElementById(id);
         $('exercise').replaceChildren(...Object.values(EXERCISES).map(e => el('option', { value: e.id }, e.name)));
@@ -88,7 +100,7 @@
         function renderList() {
             $('count').textContent = samples.length;
             $('rep-list').replaceChildren(...samples.slice(-60).reverse().map(s =>
-                el('li', {}, `${s.subject} · ${s.exercise} · ${s.label}${s.variant ? '/' + s.variant : ''} · ${s.frames.length} frames · engine: ${s.engine_label}`)));
+                el('li', {}, `${s.subject}, ${s.exercise}, ${s.label}${s.variant ? ' (' + s.variant + ')' : ''}, ${s.frames.length} frames, engine label ${s.engine_label}`)));
         }
         renderList();
 
@@ -132,7 +144,7 @@
 
         $('rec-btn').addEventListener('click', () => {
             recording = !recording;
-            $('rec-btn').textContent = recording ? 'Stop' : 'Record';
+            $('rec-btn').textContent = recording ? 'Stop recording' : 'Record';
             $('rec-badge').classList.toggle('hidden', !recording);
             if (recording) newEngine();
         });

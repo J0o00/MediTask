@@ -1,32 +1,32 @@
 {
-    "name": "MediTask - Rehabilitation Companion",
-    "short_name": "MediTask",
-    "description": "AI-powered rehabilitation and wellness tracking application",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#0f172a",
-    "theme_color": "#14b8a6",
-    "orientation": "portrait-primary",
-    "icons": [
-        {
-            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏋️</text></svg>",
-            "sizes": "96x96",
-            "type": "image/svg+xml"
-        },
-        {
-            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏋️</text></svg>",
-            "sizes": "192x192",
-            "type": "image/svg+xml"
-        },
-        {
-            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏋️</text></svg>",
-            "sizes": "512x512",
-            "type": "image/svg+xml"
-        }
-    ],
-    "categories": [
-        "health",
-        "fitness",
-        "medical"
-    ]
+  "name": "MediTask - Rehabilitation Companion",
+  "short_name": "MediTask",
+  "description": "Guided home rehabilitation with real-time movement feedback, supervised by your physiotherapist",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F7F6",
+  "theme_color": "#0E5A52",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A52'/><path d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/></svg>",
+      "sizes": "96x96",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A52'/><path d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230E5A52'/><path d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": [
+    "health",
+    "fitness",
+    "medical"
+  ]
 }

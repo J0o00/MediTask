@@ -30,31 +30,37 @@ export function toDate(ts) { return ts?.toDate ? ts.toDate() : (ts instanceof Da
 export function fmtDate(ts, opts = { dateStyle: 'medium' }) { const d = toDate(ts); return d ? d.toLocaleDateString(undefined, opts) : '—'; }
 export function fmtDateTime(ts) { const d = toDate(ts); return d ? d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
 
+let toastTimer = null;
 export function toast(message, kind = 'info', ms = 3500) {
-    const colors = { info: 'bg-slate-800 border-teal-500/50', error: 'bg-red-900/90 border-red-500', success: 'bg-emerald-900/90 border-emerald-500' };
-    const t = el('div', { class: `fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl border text-white shadow-2xl ${colors[kind] || colors.info}`, role: 'status' }, message);
+    document.querySelector('.toast')?.remove();
+    const t = el('div', { class: `toast ${kind === 'info' ? '' : kind}`, role: 'status' }, message);
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), ms);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.remove(), ms);
+}
+
+export function initials(name) {
+    const parts = String(name || '?').replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean);
+    return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || '')).toUpperCase();
 }
 
 export function renderChat(container, messages, myUid) {
     container.replaceChildren();
     if (!messages.length) {
-        container.appendChild(el('div', { class: 'text-center text-gray-500 text-sm mt-4' }, 'No messages yet. Start the conversation.'));
+        container.appendChild(el('div', { class: 'empty small' }, el('h3', {}, 'No messages yet'), 'Ask a question or tell your care team how your exercises are going.'));
         return;
     }
     for (const m of messages) {
         const mine = m.senderId === myUid;
-        container.appendChild(el('div', { class: `flex ${mine ? 'justify-end' : 'justify-start'}` },
-            el('div', { class: `max-w-[80%] rounded-lg px-3 py-2 ${mine ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-200'}` },
-                el('p', { class: 'text-[11px] font-semibold opacity-70 mb-0.5' }, mine ? 'You' : (m.senderName || (m.senderRole === 'doctor' ? 'Physiotherapist' : 'Patient'))),
-                el('p', { class: 'text-sm whitespace-pre-wrap break-words' }, m.text),
-                el('p', { class: 'text-[10px] opacity-50 mt-1 text-right' }, m.createdAt ? fmtDateTime(m.createdAt) : 'sending…'))));
+        container.appendChild(el('div', { class: `msg ${mine ? 'mine' : ''}` },
+            el('p', { class: 'msg-who' }, mine ? 'You' : (m.senderName || (m.senderRole === 'doctor' ? 'Physiotherapist' : 'Patient'))),
+            el('p', { class: 'msg-text' }, m.text),
+            el('p', { class: 'msg-time' }, m.createdAt ? fmtDateTime(m.createdAt) : 'Sending…')));
     }
     container.scrollTop = container.scrollHeight;
 }
 
-export const PHASE_LABEL = { rest: 'Rest', outward: 'Moving', hold: 'Hold', return: 'Returning' };
+export const PHASE_LABEL = { rest: 'Rest', outward: 'Moving', hold: 'Hold', return: 'Return' };
 export const METRIC_LABEL = {
     shoulder_l: 'Left shoulder', shoulder_r: 'Right shoulder', shoulder_mean: 'Shoulders', elbow_l: 'Left elbow', elbow_r: 'Right elbow',
     knee_l: 'Left knee', knee_r: 'Right knee', knee_mean: 'Knees', hip_l: 'Left hip', hip_r: 'Right hip', hip_abd_r: 'Right hip abduction', hip_abd_l: 'Left hip abduction',

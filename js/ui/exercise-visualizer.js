@@ -52,11 +52,11 @@ export function drawPose(ctx, canvas, state, cfg) {
         if (p && Number.isFinite(val)) {
             const x = p.x * W, y = p.y * H;
             ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1);
-            ctx.font = 'bold 26px Inter, sans-serif';
+            ctx.font = '600 26px "IBM Plex Sans", sans-serif';
             const txt = `${Math.round(val)}°`;
             const w = ctx.measureText(txt).width;
             ctx.fillStyle = 'rgba(15,23,42,0.8)'; ctx.fillRect(-w / 2 - 8, -52, w + 16, 34);
-            ctx.fillStyle = '#5eead4'; ctx.textAlign = 'center'; ctx.fillText(txt, 0, -26);
+            ctx.fillStyle = '#9FD6C9'; ctx.textAlign = 'center'; ctx.fillText(txt, 0, -26);
             ctx.restore();
         }
     }

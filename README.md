@@ -26,6 +26,7 @@ respond to pain alerts and adjust prescriptions.
 | Reliability | — | Landmark-confidence gating, One-Euro smoothing, idempotent session saves, offline queue |
 | Safety | — | Consent screen, emergency STOP, pain escalation alerts, no sample prescriptions shown to patients |
 | Analytics | Weekly count | Digital twin: ROM / quality / symmetry / pain trends vs personal baseline, review flags, PDF report |
+| Interface | Dark neon theme, emoji icons, Tailwind CDN | Professional clinical theme: one design system (`css/app.css`, IBM Plex Sans, pine accent), SVG icons, accessible focus states, responsive to phone width; dashboards no longer depend on Tailwind |
 | AI | — | Multi-task **GRU/LSTM** (exercise + quality + phase) trained in Python, run **in the browser** with verified parity |
 
 ---
@@ -65,7 +66,7 @@ MediTask/
 ├── index.html, login.html, signup.html        public pages
 ├── patient-dashboard.html, doctor-dashboard.html
 ├── collect.html                               research dataset recorder (local-only export)
-├── css/app.css
+├── css/app.css                                design system (tokens + components) for all app pages
 ├── firestore.rules, firestore.indexes.json    security + indexes (deploy these!)
 ├── js/
 │   ├── config.js, patient-app.js, doctor-app.js

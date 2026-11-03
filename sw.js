@@ -1,7 +1,7 @@
 // MediTask service worker.
 // Network-first for app code (so updates reach patients immediately),
 // cache fallback for offline use. Firebase / CDN traffic is never cached here.
-const CACHE_NAME = 'meditask-v2';
+const CACHE_NAME = 'meditask-v3';
 const APP_SHELL = [
     './', './index.html', './login.html', './signup.html', './patient-dashboard.html', './doctor-dashboard.html',
     './css/app.css', './manifest.json',
@@ -12,7 +12,7 @@ const APP_SHELL = [
     './js/rehabilitation/movement-evaluator.js', './js/rehabilitation/feedback-engine.js', './js/rehabilitation/pose-engine.js',
     './js/intelligence/feature-extractor.js', './js/intelligence/dtw-analyzer.js', './js/intelligence/movement-classifier.js',
     './js/intelligence/rehabilitation-analytics.js', './js/digital-twin/progress-model.js',
-    './js/ui/dom.js', './js/ui/charts.js', './js/ui/exercise-visualizer.js', './js/ui/report-generator.js',
+    './js/ui/dom.js', './js/ui/icons.js', './js/ui/charts.js', './js/ui/exercise-visualizer.js', './js/ui/report-generator.js',
 ];
 
 self.addEventListener('install', event => {

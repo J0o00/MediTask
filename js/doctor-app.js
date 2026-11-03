@@ -7,9 +7,10 @@ import {
 } from "./services/db.js";
 import { EXERCISES, resolveExercise } from "./rehabilitation/exercise-configs.js";
 import { buildTwin } from "./digital-twin/progress-model.js";
-import { lineChart } from "./ui/charts.js";
+import { lineChart, SERIES } from "./ui/charts.js";
 import { exportPatientReport } from "./ui/report-generator.js";
-import { $, el, show, toast, fmtDate, fmtDateTime, renderChat, METRIC_LABEL } from "./ui/dom.js";
+import { icon, exerciseIcon, hydrateIcons } from "./ui/icons.js";
+import { $, el, show, toast, fmtDate, fmtDateTime, renderChat, initials, METRIC_LABEL } from "./ui/dom.js";
 
 let user, profile;
 let patients = [];
@@ -17,27 +18,34 @@ let alertsByPatient = {};
 let selected = null;        // { patient, sessions, twin, alerts, prescriptions }
 let chatUnsub = null;
 
-const COLORS = ['#22d3ee', '#a78bfa', '#f472b6', '#facc15', '#34d399'];
+const COLORS = [SERIES.primary, SERIES.blue, SERIES.amber, SERIES.teal2, SERIES.grey];
+const STATUS = {
+    completed: ['Completed', 'success'], stopped: ['Ended early', 'warning'], interrupted: ['Interrupted', 'warning'],
+};
+const ALERT_LABEL = { pain: 'High pain reported', pain_increase: 'Pain above baseline', emergency_stop: 'Stop button pressed', quality_decline: 'Quality declining' };
+
+hydrateIcons();
 
 // ------------------------------------------------------------------ boot
 (async function init() {
     ({ user, profile } = await requireRole('doctor'));
     show('loading-view', false); show('main-content', true);
-    $('doctor-line').textContent = `${profile.displayName || profile.email}`;
+    const name = profile.displayName || profile.email.split('@')[0];
+    $('doctor-line').textContent = name;
+    $('doctor-avatar').textContent = initials(name);
     populateExerciseSelect();
     await refreshPatients();
 })();
 
 $('logout-btn').addEventListener('click', () => logout());
-$('mobile-menu-btn').addEventListener('click', () => { $('sidebar').classList.remove('hidden'); $('sidebar').classList.add('flex'); });
-$('close-sidebar-btn').addEventListener('click', () => { $('sidebar').classList.add('hidden'); $('sidebar').classList.remove('flex'); });
+$('mobile-menu-btn').addEventListener('click', () => $('sidebar').classList.toggle('collapsed'));
 
 function populateExerciseSelect() {
     const sel = $('exercise-select');
-    sel.replaceChildren(...Object.values(EXERCISES).map(e => el('option', { value: e.id }, `${e.emoji} ${e.name}`)));
+    sel.replaceChildren(...Object.values(EXERCISES).map(e => el('option', { value: e.id }, e.name)));
     const desc = () => {
         const e = EXERCISES[sel.value];
-        $('exercise-desc').textContent = e ? `Target ${e.targetValue}° on ${METRIC_LABEL[e.primaryMetric] || e.primaryMetric} · ${e.rules.length} form checks` : '';
+        $('exercise-desc').textContent = e ? `Target ${e.targetValue}° at the ${(METRIC_LABEL[e.primaryMetric] || e.primaryMetric).toLowerCase()}, with ${e.rules.length} automatic form checks.` : '';
     };
     sel.addEventListener('change', desc); desc();
 }
@@ -48,11 +56,12 @@ async function refreshPatients() {
         patients = await getMyPatients(user.uid);   // only patients assigned to this doctor
     } catch (e) {
         console.error('Load patients:', e);
-        $('patient-list').textContent = 'Could not load patients.';
+        $('patient-list').replaceChildren(el('p', { class: 'empty small' }, 'Patients could not be loaded. Reload the page to try again.'));
         return;
     }
     const results = await Promise.allSettled(patients.map(p => getOpenAlerts(p.uid)));
     alertsByPatient = Object.fromEntries(patients.map((p, i) => [p.uid, results[i].status === 'fulfilled' ? results[i].value : []]));
+    $('patient-count').textContent = patients.length ? `(${patients.length})` : '';
     renderPatientList();
     renderPendingLinks();
 }
@@ -63,22 +72,26 @@ function renderPatientList() {
     list.replaceChildren();
     const shown = patients
         .filter(p => !q || (p.email || '').includes(q) || (p.displayName || '').toLowerCase().includes(q))
-        .sort((a, b) => (alertsByPatient[b.uid]?.length || 0) - (alertsByPatient[a.uid]?.length || 0));
+        .sort((a, b) => (alertsByPatient[b.uid]?.length || 0) - (alertsByPatient[a.uid]?.length || 0)
+            || (a.displayName || a.email).localeCompare(b.displayName || b.email));
     if (!shown.length) {
-        list.appendChild(el('p', { class: 'text-gray-400 p-3 text-sm' }, patients.length ? 'No match.' : 'No patients yet. Create an account or invite an existing patient.'));
+        list.appendChild(el('div', { class: 'empty small' }, patients.length
+            ? 'No patients match your search.'
+            : [el('h3', {}, 'No patients yet'), 'Create an account for a new patient or invite an existing one.']));
         return;
     }
     for (const p of shown) {
         const n = alertsByPatient[p.uid]?.length || 0;
-        const active = selected?.patient.uid === p.uid;
+        const name = p.displayName || p.email;
         list.appendChild(el('button', {
-            class: `w-full text-left p-3 rounded-lg transition-colors flex justify-between items-center gap-2 ${active ? 'bg-teal-600' : 'bg-gray-900 hover:bg-teal-800'}`,
+            class: 'patient-item', type: 'button', 'aria-current': String(selected?.patient.uid === p.uid),
             onclick: () => selectPatient(p),
         },
-            el('span', { class: 'min-w-0' },
-                el('span', { class: 'block font-medium truncate' }, p.displayName || p.email),
-                el('span', { class: 'block text-[11px] text-gray-400 truncate' }, p.email)),
-            n ? el('span', { class: 'bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5', title: 'Open alerts' }, n) : null));
+            el('span', { class: 'avatar' }, initials(name)),
+            el('span', { class: 'grow' },
+                el('span', { class: 'truncate strong block' }, name),
+                el('span', { class: 'truncate tiny muted block' }, p.email)),
+            n ? el('span', { class: 'count-dot', title: `${n} alert${n > 1 ? 's' : ''} to review` }, n) : null));
     }
 }
 $('patient-search').addEventListener('input', renderPatientList);
@@ -88,33 +101,36 @@ async function renderPendingLinks() {
     box.replaceChildren();
     let pending = [];
     try { pending = await getDoctorPendingLinks(user.uid); } catch (e) { console.warn(e); }
-    if (!pending.length) { box.appendChild(el('p', {}, 'None')); return; }
+    if (!pending.length) { box.appendChild(el('p', { class: 'muted' }, 'None')); return; }
     for (const r of pending) {
-        box.appendChild(el('div', { class: 'flex justify-between items-center gap-2' },
+        box.appendChild(el('div', { class: 'row between' },
             el('span', { class: 'truncate' }, r.patientEmail),
-            el('button', { class: 'text-red-300 hover:underline', onclick: async () => { await cancelLinkRequest(r.id); renderPendingLinks(); } }, 'cancel')));
+            el('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { await cancelLinkRequest(r.id); renderPendingLinks(); } }, 'Withdraw')));
     }
 }
 
-// ------------------------------------------------------------------ patient detail
+// ------------------------------------------------------------------ patient record
 async function selectPatient(patient) {
-    $('sidebar').classList.add('hidden'); $('sidebar').classList.remove('flex');
-    $('sidebar').classList.add('md:flex');
+    $('sidebar').classList.add('collapsed');
     show('report-placeholder', false); show('patient-detail', true);
-    $('pt-avatar').textContent = (patient.displayName || patient.email || '?')[0].toUpperCase();
-    $('pt-name').textContent = patient.displayName || patient.email;
-    $('pt-meta').textContent = `${patient.email} · ${patient.points || 0} points · consent ${patient.consent?.camera ? 'given' : 'pending'}`;
+    const name = patient.displayName || patient.email;
+    $('pt-avatar').textContent = initials(name);
+    $('pt-name').textContent = name;
+    $('pt-meta').replaceChildren(
+        el('span', {}, patient.email),
+        el('span', {}, el('b', {}, patient.points || 0), ' points'),
+        el('span', { class: `badge ${patient.consent?.camera ? 'success' : 'warning'}` }, patient.consent?.camera ? 'Camera consent given' : 'Consent pending'));
     selected = { patient, sessions: [], twin: buildTwin([]), alerts: alertsByPatient[patient.uid] || [], prescriptions: [] };
     renderPatientList();
     setTab('overview');
-    $('session-list').replaceChildren(el('div', { class: 'loader mx-auto' }));
+    $('session-list').replaceChildren(el('div', { class: 'empty' }, el('div', { class: 'spinner' })));
 
     const [sessions, prescriptions, alerts] = await Promise.all([
         getSessions(patient.uid, 100).catch(e => { console.error(e); return []; }),
         getPrescriptions(patient.uid, 'active').catch(e => { console.error(e); return []; }),
         getOpenAlerts(patient.uid).catch(() => []),
     ]);
-    if (selected?.patient.uid !== patient.uid) return;   // user clicked another patient meanwhile
+    if (selected?.patient.uid !== patient.uid) return;   // another patient was selected meanwhile
     Object.assign(selected, { sessions, prescriptions, alerts, twin: buildTwin(sessions) });
     renderAlerts(); renderTwin(); renderSessions(); renderPrescriptions();
 }
@@ -124,26 +140,30 @@ function renderAlerts() {
     box.replaceChildren();
     const { alerts, twin } = selected;
     for (const a of alerts) {
-        box.appendChild(el('div', { class: 'bg-red-900/40 border border-red-500/60 rounded-xl px-4 py-2 flex justify-between items-center gap-3 text-sm' },
-            el('span', {}, `⚠️ ${a.message} · ${fmtDateTime(a.createdAt)}`),
-            el('button', { class: 'text-xs bg-red-500/80 px-3 py-1 rounded-lg', onclick: async () => {
-                try { await acknowledgeAlert(selected.patient.uid, a.id); selected.alerts = selected.alerts.filter(x => x.id !== a.id); alertsByPatient[selected.patient.uid] = selected.alerts; renderAlerts(); renderPatientList(); }
-                catch (e) { toast(e.message, 'error'); }
-            } }, 'Mark reviewed')));
+        box.appendChild(el('div', { class: 'banner danger' }, icon('alert'),
+            el('div', { class: 'grow' },
+                el('p', { class: 'strong' }, ALERT_LABEL[a.type] || 'Alert'),
+                el('p', { class: 'small' }, `${a.message}, ${fmtDateTime(a.createdAt)}`)),
+            el('div', { class: 'banner-actions' },
+                el('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: async () => {
+                    try {
+                        await acknowledgeAlert(selected.patient.uid, a.id);
+                        selected.alerts = selected.alerts.filter(x => x.id !== a.id);
+                        alertsByPatient[selected.patient.uid] = selected.alerts;
+                        renderAlerts(); renderPatientList();
+                    } catch (e) { toast(e.message, 'error'); }
+                } }, 'Mark as reviewed'))));
     }
     for (const f of twin.flags) {
-        box.appendChild(el('div', { class: 'bg-amber-900/30 border border-amber-500/40 rounded-xl px-4 py-2 text-sm text-amber-100' }, `📉 ${f.message}`));
+        box.appendChild(el('div', { class: 'banner warning' }, icon('trend'), el('p', {}, f.message)));
     }
+    show(box, box.childElementCount > 0);
 }
 
 // ------------------------------------------------------------------ tabs
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 function setTab(name) {
-    document.querySelectorAll('.tab-btn').forEach(b => {
-        const on = b.dataset.tab === name;
-        b.classList.toggle('border-teal-400', on); b.classList.toggle('text-teal-300', on);
-        b.classList.toggle('border-transparent', !on); b.classList.toggle('text-gray-400', !on);
-    });
+    document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     document.querySelectorAll('.tab-panel').forEach(p => show(p, p.id === `tab-${name}`));
 }
 
@@ -156,17 +176,20 @@ function renderTwin() {
     sel.onchange = renderTwinExercise;
     renderTwinExercise();
 
-    // error breakdown across recent sessions
     const counts = {};
     for (const s of selected.sessions.slice(0, 10)) {
         const cfg = resolveExercise(s.exerciseId);
         for (const [id, n] of Object.entries(s.summary?.errorCounts || {})) {
-            const key = `${cfg?.name || s.exerciseId}: ${cfg?.rules.find(r => r.id === id)?.message || id}`;
+            const key = `${cfg?.name || s.exerciseId}|${cfg?.rules.find(r => r.id === id)?.message || id}`;
             counts[key] = (counts[key] || 0) + n;
         }
     }
     const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
-    $('error-breakdown').replaceChildren(...(top.length ? top.map(([k, n]) => el('p', {}, `• ${k} - ${n} rep(s)`)) : [el('p', { class: 'text-gray-500' }, 'No deviations recorded.')]));
+    const box = $('error-breakdown');
+    if (!top.length) { box.replaceChildren(el('p', { class: 'muted' }, 'No movement deviations recorded.')); return; }
+    box.replaceChildren(el('table', { class: 'table' },
+        el('thead', {}, el('tr', {}, el('th', {}, 'Exercise'), el('th', {}, 'Deviation'), el('th', {}, 'Repetitions'))),
+        el('tbody', {}, ...top.map(([k, n]) => { const [ex, msg] = k.split('|'); return el('tr', {}, el('td', {}, ex), el('td', {}, msg), el('td', {}, n)); }))));
 }
 
 function renderTwinExercise() {
@@ -176,31 +199,35 @@ function renderTwinExercise() {
     if (!ex) {
         $('twin-baseline-note').textContent = '';
         lineChart($('rom-chart'), [], []); lineChart($('quality-chart'), [], []);
-        tiles.appendChild(el('p', { class: 'col-span-full text-gray-400 text-sm' }, 'The digital twin is built from completed sessions. None recorded yet.'));
+        tiles.classList.remove('strip');
+        tiles.appendChild(el('div', { class: 'panel empty' }, el('h3', {}, 'No sessions yet'), 'The progress record builds automatically from completed sessions.'));
         return;
     }
-    $('twin-baseline-note').textContent = ex.baselineReady ? `Baseline = first 3 sessions · ${ex.sessions} sessions total` : `Baseline forming (${ex.sessions}/3 sessions)`;
+    tiles.classList.add('strip');
+    $('twin-baseline-note').textContent = ex.baselineReady
+        ? `Baseline is the first 3 sessions, ${ex.sessions} sessions in total`
+        : `Baseline forming, ${ex.sessions} of 3 sessions`;
     const tile = (label, cur, chg, unit, goodUp = true) => {
         const good = chg === null || chg === 0 ? null : (goodUp ? chg > 0 : chg < 0);
-        tiles.appendChild(el('div', { class: 'glass rounded-xl p-3' },
-            el('p', { class: 'text-xs text-gray-400' }, label),
-            el('p', { class: 'text-2xl font-bold' }, cur === null ? '--' : `${cur}${unit}`),
-            el('p', { class: `text-xs ${good === null ? 'text-gray-500' : good ? 'text-green-400' : 'text-red-400'}` },
-                chg === null ? 'vs baseline: n/a' : chg === 0 ? 'no change vs baseline' : `${chg > 0 ? '▲' : '▼'} ${Math.abs(chg)}${unit} vs baseline`)));
+        tiles.appendChild(el('div', { class: 'strip-item' },
+            el('div', { class: 'strip-label' }, label),
+            el('div', { class: 'strip-value' }, cur === null ? '–' : `${cur}`, cur !== null && unit ? el('small', {}, unit) : null),
+            el('div', { class: `strip-delta ${good === null ? '' : good ? 'good' : 'bad'}` },
+                chg === null ? 'No baseline yet' : chg === 0 ? 'No change from baseline' : `${chg > 0 ? '+' : '−'}${Math.abs(chg)}${unit} from baseline`)));
     };
-    tile(`ROM · ${METRIC_LABEL[ex.primaryJoint] || ex.primaryJoint}`, ex.current.rom, ex.change.rom, '°');
+    tile(`Range of motion, ${(METRIC_LABEL[ex.primaryJoint] || ex.primaryJoint).toLowerCase()}`, ex.current.rom, ex.change.rom, '°');
     tile('Movement quality', ex.current.quality, ex.change.quality, '');
-    tile('L-R asymmetry', ex.current.symmetry, ex.change.symmetry, '°', false);
+    tile('Left–right asymmetry', ex.current.symmetry, ex.change.symmetry, '°', false);
     tile('Reported pain', ex.current.pain, ex.change.pain, '', false);
 
     const labels = ex.timeline.map(t => new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
     const joints = [...new Set(ex.timeline.flatMap(t => Object.keys(t.romByJoint)))];
     lineChart($('rom-chart'), labels, joints.map((j, i) => ({ label: METRIC_LABEL[j] || j, data: ex.timeline.map(t => t.romByJoint[j] ?? null), color: COLORS[i % COLORS.length] })), { yTitle: 'degrees' });
     lineChart($('quality-chart'), labels, [
-        { label: 'Quality', data: ex.timeline.map(t => t.quality), color: '#a78bfa' },
-        { label: 'Consistency %', data: ex.timeline.map(t => t.consistency), color: '#34d399' },
-        { label: 'Asymmetry °', data: ex.timeline.map(t => t.symmetry), color: '#facc15' },
-        { label: 'Pain', data: ex.timeline.map(t => t.pain), color: '#f87171', axis: 'y2', dashed: true },
+        { label: 'Quality', data: ex.timeline.map(t => t.quality), color: SERIES.primary },
+        { label: 'Consistency (%)', data: ex.timeline.map(t => t.consistency), color: SERIES.blue },
+        { label: 'Asymmetry (°)', data: ex.timeline.map(t => t.symmetry), color: SERIES.amber },
+        { label: 'Pain', data: ex.timeline.map(t => t.pain), color: SERIES.red, axis: 'y2', dashed: true },
     ], { yTitle: 'score', y2Title: 'pain', y2Max: 10 });
 }
 
@@ -208,72 +235,92 @@ function renderTwinExercise() {
 function renderSessions() {
     const list = $('session-list');
     list.replaceChildren();
-    if (!selected.sessions.length) { list.appendChild(el('p', { class: 'text-gray-400 text-sm' }, 'No sessions yet.')); return; }
+    if (!selected.sessions.length) { list.appendChild(el('div', { class: 'empty' }, el('h3', {}, 'No sessions yet'), 'Sessions appear here as soon as the patient completes an exercise.')); return; }
     for (const s of selected.sessions) {
         const sm = s.summary || {};
-        const statusCls = s.status === 'completed' ? 'text-green-300' : 'text-amber-300';
-        const details = el('div', { class: 'hidden mt-3 space-y-2' });
-        const header = el('button', { class: 'w-full text-left flex flex-wrap justify-between gap-2', onclick: () => details.classList.toggle('hidden') },
-            el('span', {},
-                el('span', { class: 'font-semibold' }, `${s.exercise} `),
-                el('span', { class: `text-xs ${statusCls}` }, s.emergencyStop ? 'STOP pressed' : s.status),
-                el('span', { class: 'block text-xs text-gray-400' }, fmtDateTime(s.startedAt))),
-            el('span', { class: 'text-sm text-gray-300' },
-                `reps ${s.validReps}/${(s.targetSets || 0) * (s.targetReps || 0)} · quality ${sm.avgQuality ?? '-'} · consistency ${sm.consistency ?? '-'}%`,
-                s.feedback ? ` · pain ${s.feedback.pain}/10 (${s.feedback.difficulty})` : ''));
+        const [statusText, statusKind] = s.emergencyStop ? ['Stop pressed', 'danger'] : (STATUS[s.status] || [s.status, '']);
+        const details = el('div', { class: 'session-detail hidden' });
+        const summaryBtn = el('button', { class: 'session-summary', type: 'button', 'aria-expanded': 'false', onclick: () => {
+            const open = details.classList.toggle('hidden') === false;
+            summaryBtn.setAttribute('aria-expanded', String(open));
+        } },
+            el('span', { class: 'ex-icon' }, exerciseIcon(resolveExercise(s.exerciseId))),
+            el('span', { class: 'grow' },
+                el('span', { class: 'strong block' }, s.exercise),
+                el('span', { class: 'tiny muted block' }, fmtDateTime(s.startedAt))),
+            el('span', { class: 'meta' },
+                el('span', {}, el('b', {}, `${s.validReps}/${(s.targetSets || 0) * (s.targetReps || 0)}`), ' reps'),
+                el('span', {}, 'quality ', el('b', {}, sm.avgQuality ?? '–')),
+                s.feedback ? el('span', {}, 'pain ', el('b', {}, `${s.feedback.pain}/10`)) : null),
+            el('span', { class: `badge ${statusKind}` }, statusText));
 
         const rom = Object.entries(sm.rom || {}).map(([k, v]) => `${METRIC_LABEL[k] || k} ${v.bestRange}°`).join(', ');
         details.append(
-            el('p', { class: 'text-xs text-gray-400' }, `ROM: ${rom || 'n/a'} · tracking lost ${sm.lowConfidencePct ?? 0}% of frames · ${sm.fps ?? '-'} fps · template ${sm.templateSource || '-'}${sm.mlModel ? ` · model ${sm.mlModel}` : ''}`),
-            sm.performanceDecline ? el('p', { class: 'text-xs text-amber-300' }, 'Within-session performance decline detected (experimental indicator).') : null,
-            s.feedback?.notes ? el('p', { class: 'text-sm' }, `Patient note: "${s.feedback.notes}"`) : null,
+            el('div', { class: 'meta' },
+                el('span', {}, 'Best range: ', el('b', {}, rom || 'n/a')),
+                el('span', {}, 'Consistency ', el('b', {}, `${sm.consistency ?? '–'}%`)),
+                el('span', {}, 'Tracking lost ', el('b', {}, `${sm.lowConfidencePct ?? 0}%`)),
+                el('span', {}, el('b', {}, sm.fps ?? '–'), ' fps'),
+                el('span', {}, 'Reference ', el('b', {}, sm.templateSource || '–')),
+                sm.mlModel ? el('span', {}, 'Model ', el('b', {}, sm.mlModel)) : null,
+                s.feedback ? el('span', {}, 'Difficulty ', el('b', {}, s.feedback.difficulty)) : null),
+            sm.performanceDecline ? el('p', { class: 'banner warning small' }, 'Movement quality declined during this session (experimental indicator).') : null,
+            s.feedback?.notes ? el('p', { class: 'small' }, `Patient's note: "${s.feedback.notes}"`) : null,
             repTable(s),
             reviewBox(s));
-        list.appendChild(el('div', { class: 'glass rounded-xl p-4' }, header, details));
+        list.appendChild(el('div', { class: 'session-card' }, summaryBtn, details));
     }
 }
 
 function repTable(s) {
     const cfg = resolveExercise(s.exerciseId);
-    const rows = (s.reps || []).map(r => el('tr', { class: 'border-t border-gray-700' },
-        el('td', { class: 'py-1 pr-2' }, r.index),
-        el('td', { class: 'pr-2' }, r.label),
-        el('td', { class: 'pr-2' }, Math.round(r.quality)),
-        el('td', { class: 'pr-2' }, `${(r.durationMs / 1000).toFixed(1)}s`),
-        el('td', { class: 'pr-2' }, r.ml ? `${r.ml.quality} (${Math.round(r.ml.qualityProb * 100)}%)` : '-'),
-        el('td', {}, (r.errors || []).map(e => cfg?.rules.find(x => x.id === e.id)?.message || e.id).join('; ') || '-')));
-    return el('div', { class: 'overflow-x-auto' }, el('table', { class: 'w-full text-xs text-gray-300' },
-        el('thead', {}, el('tr', { class: 'text-gray-400 text-left' }, ...['#', 'Label', 'Quality', 'Time', 'AI model', 'Deviations'].map(h => el('th', { class: 'pr-2 pb-1' }, h)))),
+    if (!(s.reps || []).length) return el('p', { class: 'small muted' }, 'No per-repetition data for this session.');
+    const labels = { correct: ['Good form', 'success'], incorrect: ['Needs correction', 'warning'], incomplete: ['Partial', ''] };
+    const rows = s.reps.map(r => el('tr', {},
+        el('td', {}, r.index),
+        el('td', {}, el('span', { class: `badge ${labels[r.label]?.[1] || ''}` }, labels[r.label]?.[0] || r.label)),
+        el('td', {}, Math.round(r.quality)),
+        el('td', {}, `${(r.durationMs / 1000).toFixed(1)} s`),
+        el('td', {}, r.ml ? `${r.ml.quality} (${Math.round(r.ml.qualityProb * 100)}%)` : '–'),
+        el('td', {}, (r.errors || []).map(e => cfg?.rules.find(x => x.id === e.id)?.message || e.id).join('; ') || '–')));
+    return el('div', { class: 'table-wrap' }, el('table', { class: 'table' },
+        el('thead', {}, el('tr', {}, ...['Rep', 'Result', 'Quality', 'Duration', 'AI model', 'Deviations'].map(h => el('th', {}, h)))),
         el('tbody', {}, ...rows)));
 }
 
 function reviewBox(s) {
-    if (s.review) return el('p', { class: 'text-sm text-teal-200' }, `Your review: ${s.review.text}`);
-    const input = el('input', { class: 'flex-1 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-1.5 text-sm', placeholder: 'Add a clinical review note...', maxlength: '2000' });
-    const btn = el('button', { class: 'bg-teal-500 text-black text-sm font-semibold px-3 rounded-lg', onclick: async () => {
+    if (s.review) return el('div', { class: 'banner success small' }, icon('check'), el('p', {}, `Your review: ${s.review.text}`));
+    const input = el('input', { class: 'input', placeholder: 'Add a clinical note for this session', maxlength: '2000', 'aria-label': 'Clinical note' });
+    const btn = el('button', { class: 'btn btn-secondary', type: 'button', onclick: async () => {
         if (!input.value.trim()) return;
-        try { await addSessionReview(selected.patient.uid, s.id, input.value.trim()); s.review = { text: input.value.trim() }; renderSessions(); }
+        try { await addSessionReview(selected.patient.uid, s.id, input.value.trim()); s.review = { text: input.value.trim() }; renderSessions(); toast('Note saved', 'success'); }
         catch (e) { toast(e.message, 'error'); }
-    } }, 'Save');
-    return el('div', { class: 'flex gap-2' }, input, btn);
+    } }, 'Save note');
+    return el('div', { class: 'row' }, input, btn);
 }
 
 // ------------------------------------------------------------------ prescriptions
 function renderPrescriptions() {
     const list = $('rx-list');
     list.replaceChildren();
-    if (!selected.prescriptions.length) { list.appendChild(el('p', { class: 'text-gray-400 text-sm' }, 'No active prescriptions.')); return; }
+    if (!selected.prescriptions.length) { list.appendChild(el('div', { class: 'empty small' }, 'No active prescriptions. Assign one with the form.')); return; }
+    const ul = el('ul', { class: 'list' });
     for (const rx of selected.prescriptions) {
         const cfg = resolveExercise(rx.exerciseId || rx.exercise);
-        const sets = el('input', { type: 'number', min: '1', max: '20', value: rx.sets, class: 'w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1' });
-        const reps = el('input', { type: 'number', min: '1', max: '100', value: rx.reps, class: 'w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1' });
-        list.appendChild(el('div', { class: 'glass rounded-xl p-3 text-sm space-y-2' },
-            el('div', { class: 'flex justify-between' }, el('span', { class: 'font-semibold' }, `${cfg?.emoji || ''} ${cfg?.name || rx.exercise}`), el('span', { class: 'text-xs text-gray-400' }, `assigned ${fmtDate(rx.assignedAt)}`)),
-            rx.notes ? el('p', { class: 'text-xs text-gray-400' }, rx.notes) : null,
-            el('div', { class: 'flex items-center gap-2 flex-wrap' }, sets, el('span', {}, 'sets ×'), reps, el('span', {}, 'reps'),
-                el('button', { class: 'ml-auto bg-teal-600 px-3 py-1 rounded-lg text-xs', onclick: () => editRx(rx, { sets: +sets.value, reps: +reps.value }) }, 'Update'),
-                el('button', { class: 'bg-red-600/80 px-3 py-1 rounded-lg text-xs', onclick: () => editRx(rx, { status: 'cancelled' }) }, 'Cancel'))));
+        const sets = el('input', { type: 'number', min: '1', max: '20', value: rx.sets, class: 'input input-num', 'aria-label': 'Sets' });
+        const reps = el('input', { type: 'number', min: '1', max: '100', value: rx.reps, class: 'input input-num', 'aria-label': 'Repetitions per set' });
+        ul.appendChild(el('li', { class: 'list-item list-item-top' },
+            el('span', { class: 'ex-icon' }, exerciseIcon(cfg)),
+            el('div', { class: 'grow stack' },
+                el('div', {},
+                    el('h3', {}, cfg?.name || rx.exercise),
+                    el('p', { class: 'tiny muted' }, `Assigned ${fmtDate(rx.assignedAt)}`),
+                    rx.notes ? el('p', { class: 'small mt-1' }, rx.notes) : null),
+                el('div', { class: 'row wrap' }, sets, el('span', { class: 'small muted' }, 'sets of'), reps, el('span', { class: 'small muted' }, 'reps'),
+                    el('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => editRx(rx, { sets: +sets.value, reps: +reps.value }) }, 'Update'),
+                    el('button', { class: 'btn btn-danger-outline btn-sm', type: 'button', onclick: () => { if (confirm(`Cancel ${cfg?.name || rx.exercise}?`)) editRx(rx, { status: 'cancelled' }); } }, 'Cancel prescription')))));
     }
+    list.appendChild(ul);
 }
 
 async function editRx(rx, changes) {
@@ -299,21 +346,22 @@ $('prescription-form').addEventListener('submit', async (e) => {
         $('notes-input').value = '';
         selected.prescriptions = await getPrescriptions(selected.patient.uid, 'active');
         renderPrescriptions();
-    } catch (err) { console.error(err); toast(`Could not assign: ${err.message}`, 'error'); }
+    } catch (err) { console.error(err); toast(`Could not assign the exercise: ${err.message}`, 'error'); }
 });
 
 // ------------------------------------------------------------------ actions
 $('export-pdf-btn').addEventListener('click', () => {
     if (!selected) return;
-    if (!window.jspdf) { toast('PDF library still loading, try again', 'error'); return; }
+    if (!window.jspdf) { toast('The PDF tool is still loading. Try again in a moment.', 'error'); return; }
     exportPatientReport(selected.patient, selected.twin, selected.sessions, selected.alerts);
 });
 
 $('unlink-btn').addEventListener('click', async () => {
-    if (!selected || !confirm(`Stop supervising ${selected.patient.email}? You will lose access to their records.`)) return;
+    if (!selected || !confirm(`Discharge ${selected.patient.displayName || selected.patient.email}? You will no longer have access to their records.`)) return;
     try {
         await unlinkPatient(selected.patient.uid);
         selected = null; show('patient-detail', false); show('report-placeholder', true);
+        toast('Patient discharged', 'success');
         await refreshPatients();
     } catch (e) { toast(e.message, 'error'); }
 });
@@ -321,28 +369,37 @@ $('unlink-btn').addEventListener('click', async () => {
 // ------------------------------------------------------------------ chat
 $('open-chat-btn').addEventListener('click', () => {
     if (!selected) return;
-    $('chat-patient-name').textContent = `💬 ${selected.patient.displayName || selected.patient.email}`;
+    $('chat-patient-name').textContent = selected.patient.displayName || selected.patient.email;
     show('chat-modal', true);
+    $('chat-input').focus();
     chatUnsub?.();
     chatUnsub = subscribeToChat(selected.patient.uid, msgs => renderChat($('chat-messages'), msgs, user.uid), e => toast(e.message, 'error'));
 });
-$('close-chat-btn').addEventListener('click', () => { show('chat-modal', false); chatUnsub?.(); chatUnsub = null; });
+function closeChat() { show('chat-modal', false); chatUnsub?.(); chatUnsub = null; }
+$('close-chat-btn').addEventListener('click', closeChat);
 $('send-msg-btn').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
 async function sendChat() {
     const text = $('chat-input').value.trim();
     if (!text || !selected) return;
     try { await sendMessage(selected.patient.uid, profile, text); $('chat-input').value = ''; }
-    catch (e) { toast(`Not sent: ${e.message}`, 'error'); }
+    catch (e) { toast(`Message not sent: ${e.message}`, 'error'); }
 }
 
-// ------------------------------------------------------------------ add / invite patient
-$('add-patient-btn').addEventListener('click', () => { $('add-patient-form').reset(); show('add-patient-error', false); show('add-patient-modal', true); });
+// ------------------------------------------------------------------ new / invite patient
+function openModal(id, focusId) { show(id, true); setTimeout(() => $(focusId)?.focus(), 0); }
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    ['add-patient-modal', 'link-patient-modal'].forEach(id => show(id, false));
+    closeChat();
+});
+
+$('add-patient-btn').addEventListener('click', () => { $('add-patient-form').reset(); show('add-patient-error', false); openModal('add-patient-modal', 'new-patient-name'); });
 $('cancel-add-patient-btn').addEventListener('click', () => show('add-patient-modal', false));
 $('add-patient-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = $('submit-add-patient-btn');
-    btn.disabled = true; btn.textContent = 'Creating...';
+    btn.disabled = true; btn.textContent = 'Creating account…';
     try {
         await createPatientAccount($('new-patient-email').value, $('new-patient-password').value, user.uid, $('new-patient-name').value.trim());
         show('add-patient-modal', false);
@@ -350,19 +407,19 @@ $('add-patient-form').addEventListener('submit', async (e) => {
         await refreshPatients();
     } catch (err) {
         $('add-patient-error').textContent = err.code === 'auth/email-already-in-use'
-            ? 'That email already has an account - use "Invite existing patient" instead.' : `Error: ${err.message}`;
+            ? 'This email already has an account. Use "Invite patient" instead.' : `The account could not be created: ${err.message}`;
         show('add-patient-error', true);
-    } finally { btn.disabled = false; btn.textContent = 'Create'; }
+    } finally { btn.disabled = false; btn.textContent = 'Create account'; }
 });
 
-$('link-patient-btn').addEventListener('click', () => { $('link-patient-form').reset(); show('link-patient-error', false); show('link-patient-modal', true); });
+$('link-patient-btn').addEventListener('click', () => { $('link-patient-form').reset(); show('link-patient-error', false); openModal('link-patient-modal', 'link-patient-email'); });
 $('cancel-link-patient-btn').addEventListener('click', () => show('link-patient-modal', false));
 $('link-patient-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
         await createLinkRequest(profile, $('link-patient-email').value);
         show('link-patient-modal', false);
-        toast('Invitation sent. The patient must accept it from their dashboard.', 'success', 5000);
+        toast('Invitation sent. The patient needs to accept it from their dashboard.', 'success', 5000);
         renderPendingLinks();
     } catch (err) {
         $('link-patient-error').textContent = err.message;

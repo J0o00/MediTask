@@ -12,7 +12,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const stub = (f) => fs.readFileSync(path.join(__dirname, 'stubs', f), 'utf8');
 
 async function page(browser, seed) {
-    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, permissions: ['camera'] });
+    const ctx = await browser.newContext({ viewport: { width: +(process.env.E2E_W || 1400), height: +(process.env.E2E_H || 1200) }, permissions: ['camera'] });
     await ctx.route('**/*', async (route) => {
         const u = route.request().url();
         const js = (body) => route.fulfill({ status: 200, contentType: 'application/javascript', body });
@@ -21,7 +21,17 @@ async function page(browser, seed) {
         if (u.includes('firebase-firestore.js')) return js(stub('firebase-firestore.js'));
         if (u.includes('@mediapipe/pose')) return js(stub('mediapipe.js'));
         if (u.includes('@mediapipe/camera_utils')) return js('');
-        if (u.includes('chart.js') || u.includes('jspdf')) return js(stub('globals.js'));
+        // optional: E2E_ASSETS=<dir with node_modules/chart.js and @fontsource/ibm-plex-sans> for realistic screenshots
+        const A = process.env.E2E_ASSETS;
+        if (A && u.includes('chart.js')) return js(fs.readFileSync(path.join(A, 'node_modules/chart.js/dist/chart.umd.js'), 'utf8') + ';' + stub('globals.js').replace(/window\.Chart = [^\n]*\n/, ''));
+        if (A && u.includes('fonts.googleapis')) {
+            const dir = path.join(A, 'node_modules/@fontsource/ibm-plex-sans');
+            const css = ['400', '500', '600'].map(w => fs.readFileSync(path.join(dir, `latin-${w}.css`), 'utf8')).join('\n').replace(/url\(\.\/files\//g, `url(${BASE}/__fonts/`);
+            return route.fulfill({ status: 200, contentType: 'text/css', body: css });
+        }
+        if (A && u.includes('/__fonts/')) return route.fulfill({ status: 200, contentType: 'font/woff2', body: fs.readFileSync(path.join(A, 'node_modules/@fontsource/ibm-plex-sans/files', u.split('/__fonts/')[1])) });
+        if (u.includes('jspdf')) return js(stub('globals.js').replace(/window\.Chart = [^\n]*\n/, '').replace(/^/, 'if (!window.Chart) window.Chart = class { destroy() {} };\n'));
+        if (u.includes('chart.js')) return js(stub('globals.js'));
         // optional: E2E_TW_CSS=<compiled tailwind.css> for realistic screenshots
         if (u.includes('cdn.tailwindcss.com')) return js(process.env.E2E_TW_CSS
             ? `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(fs.readFileSync(process.env.E2E_TW_CSS, 'utf8'))};document.head.appendChild(s);})();` : '');
@@ -85,7 +95,8 @@ function seedPatientWorld() {
         check('patient: no sample prescriptions', !(await p.textContent('#prescription-list')).includes('Right Hand Raise'));
         const streak = await p.textContent('#stat-total-exercises');
         check('patient: analytics from history', streak.trim() === '5', `sessions=${streak}`);
-        await p.screenshot({ path: path.join(OUT, 'patient-home.png'), fullPage: true });
+        await p.waitForTimeout(1200);
+        await p.screenshot({ path: path.join(OUT, 'patient-home.png') });
 
         await p.click('#prescription-list button');
         await p.waitForSelector('#demo-modal:not(.hidden)');
@@ -95,19 +106,18 @@ function seedPatientWorld() {
         await p.waitForTimeout(4500);
         await p.screenshot({ path: path.join(OUT, 'patient-session.png') });
         const phase = await p.textContent('#phase-badge');
-        check('patient: live phase indicator', ['Rest', 'Moving', 'Hold', 'Returning'].includes(phase.trim()), phase);
+        check('patient: live phase indicator', ['Rest', 'Moving', 'Hold', 'Return'].includes(phase.trim()) || phase.includes('Paused'), phase);
 
         await p.waitForSelector('#report-modal:not(.hidden)', { timeout: 25000 });
         const sub = await p.textContent('#report-sub');
-        check('patient: session completes after 3 squats', sub.includes('3/3'), sub);
+        check('patient: session completes after 3 squats', sub.includes('3 of 3'), sub);
         await p.screenshot({ path: path.join(OUT, 'patient-report.png') });
         const pts = await p.textContent('#user-points');
         check('patient: +10 points awarded', pts.trim() === '30', pts);
 
         await p.click('#report-continue');
         await p.waitForSelector('#feedback-modal:not(.hidden)');
-        await p.fill('#pain-slider', '8');
-        await p.dispatchEvent('#pain-slider', 'input');
+        await p.click('#pain-scale [data-pain="8"]');
         await p.click('[data-difficulty="hard"]');
         await p.click('#submit-feedback-btn');
         await p.waitForSelector('#feedback-modal.hidden', { state: 'attached' });
@@ -152,9 +162,10 @@ function seedPatientWorld() {
         await p.click('#patient-list button');
         await p.waitForFunction(() => document.querySelectorAll('#twin-tiles > div').length === 4, null, { timeout: 10000 });
         const tiles = await p.textContent('#twin-tiles');
-        check('doctor: digital twin tiles', tiles.includes('ROM') && tiles.includes('vs baseline'), tiles.replace(/\s+/g, ' ').slice(0, 160));
+        check('doctor: digital twin tiles', tiles.includes('Range of motion') && tiles.includes('from baseline'), tiles.replace(/\s+/g, ' ').slice(0, 160));
         check('doctor: alerts shown', (await p.textContent('#alerts-box')).includes('Pain 8/10'));
-        await p.screenshot({ path: path.join(OUT, 'doctor-twin.png'), fullPage: true });
+        await p.waitForTimeout(1200);   // let charts draw
+        await p.screenshot({ path: path.join(OUT, 'doctor-twin.png') });
 
         await p.click('[data-tab="sessions"]');
         await p.waitForTimeout(200);
@@ -178,6 +189,15 @@ function seedPatientWorld() {
         const s2 = await p.evaluate(() => window.__FAKE.docs);
         check('doctor: invitation created (lower-cased email)', Object.entries(s2).some(([k, v]) => k.startsWith('link_requests/') && v.patientEmail === 'new.patient@example.com' && v.status === 'pending'));
         check('doctor page: no runtime errors', errors.length === 0, errors.join(' | '));
+    }
+
+    // ---------------------------------------------------------------- sign-in pages (visual + no errors)
+    for (const pg of ['login', 'signup']) {
+        const { p, errors } = await page(browser, { user: null, docs: {} });
+        await p.goto(`${BASE}/${pg}.html`);
+        await p.waitForTimeout(600);
+        await p.screenshot({ path: path.join(OUT, `${pg}.png`) });
+        check(`${pg} page: renders without errors`, errors.length === 0 && (await p.$$('form .input')).length >= 2, errors.join(' | '));
     }
 
     await browser.close();

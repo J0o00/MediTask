@@ -4,278 +4,258 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#14b8a6">
-    <meta name="description" content="MediTask - AI-assisted rehabilitation companion for guided exercises and recovery tracking">
+    <meta name="theme-color" content="#0E5A52">
+    <meta name="description" content="MediTask - guided home rehabilitation with real-time movement feedback">
     <link rel="manifest" href="./manifest.json">
-    <title>Patient Dashboard - MediTask</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>My rehabilitation - MediTask</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/app.css">
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E5A52'/%3E%3Cpath d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
 </head>
 
-<body class="gradient-bg text-white min-h-screen p-4 antialiased overflow-x-hidden">
-    <div id="app-container" class="w-full max-w-6xl mx-auto">
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="./patient-dashboard.html" aria-label="MediTask home">
+                <span class="brand-mark"><span data-icon="logo"></span></span>
+                <span class="brand-name">MediTask</span>
+            </a>
+            <div class="topbar-actions">
+                <div id="rewards-card" class="points hidden" title="Earned by completing prescribed exercises">
+                    <span data-icon="award"></span>
+                    <span class="num"><b id="user-points">0</b><span class="hide-sm"> points <span class="muted">(₹<span id="user-currency">0.00</span>)</span></span></span>
+                </div>
+                <button id="chat-toggle-btn" class="btn btn-secondary btn-sm" type="button"><span data-icon="chat"></span><span class="hide-sm">Messages</span></button>
+                <div class="user-chip">
+                    <span id="user-avatar" class="avatar" aria-hidden="true"></span>
+                    <span id="user-name" class="small strong hide-sm"></span>
+                </div>
+                <button id="logout-btn" class="btn btn-ghost btn-sm" type="button"><span data-icon="logout"></span><span class="hide-sm">Sign out</span></button>
+            </div>
+        </div>
+    </header>
 
-        <!-- Header -->
-        <header class="glass-strong rounded-2xl shadow-2xl p-4 md:p-6 mb-6 fade-in glow-teal">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+    <div id="loading-view" class="loading" role="status">
+        <div><div class="spinner"></div>Loading your programme…</div>
+    </div>
+
+    <main id="main-content" class="page hidden">
+
+        <!-- ===================== Home ===================== -->
+        <div id="prescription-list-view" class="stack-lg">
+            <div class="page-head">
                 <div>
-                    <h1 class="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">🏋️ MediTask</h1>
-                    <p id="welcome-line" class="text-sm text-gray-400"></p>
-                </div>
-                <div class="flex items-center justify-center gap-3 md:gap-4 w-full md:w-auto flex-wrap">
-                    <div id="rewards-card" class="hidden glass px-4 py-2 rounded-xl border border-yellow-500/30 flex items-center gap-2 glow-yellow">
-                        <span class="text-2xl">🏆</span>
-                        <div>
-                            <p class="text-xs text-gray-400">Rewards</p>
-                            <p class="font-bold text-yellow-400"><span id="user-points">0</span> Pts (<span id="user-currency">₹0.00</span>)</p>
-                        </div>
-                    </div>
-                    <button id="logout-btn" class="bg-red-500/80 hover:bg-red-600 text-white font-semibold py-2 px-4 md:px-6 rounded-xl transition-all text-sm md:text-base">Logout</button>
-                </div>
-            </div>
-        </header>
-
-        <main id="main-content" class="hidden">
-
-            <!-- Doctor link status / invitations -->
-            <section id="link-section" class="mb-6 space-y-3"></section>
-
-            <!-- ===================== Home view ===================== -->
-            <div id="prescription-list-view">
-                <div class="mb-6">
-                    <h2 class="text-2xl md:text-3xl font-bold mb-2">Your Rehabilitation Journey</h2>
-                    <p class="text-gray-400">Complete the exercises your physiotherapist has prescribed. MediTask guides your form in real time.</p>
-                </div>
-
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold text-teal-400">📋 Prescribed Exercises</h3>
-                    <div id="prescription-loading" class="text-gray-400 text-sm pulse-slow">Loading...</div>
-                </div>
-                <div id="prescription-list" class="grid gap-4"></div>
-
-                <!-- Progress / digital rehabilitation twin -->
-                <div class="mt-8">
-                    <h3 class="text-xl font-bold text-cyan-400 mb-4">📊 Your Progress</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="glass p-4 rounded-xl text-center">
-                            <div class="text-3xl mb-1">🏃</div>
-                            <p id="stat-total-exercises" class="text-2xl font-bold text-teal-400">0</p>
-                            <p class="text-xs text-gray-400">Sessions completed</p>
-                        </div>
-                        <div class="glass p-4 rounded-xl text-center">
-                            <div class="text-3xl mb-1">🔥</div>
-                            <p id="stat-streak" class="text-2xl font-bold text-orange-400">0</p>
-                            <p class="text-xs text-gray-400">Day streak</p>
-                        </div>
-                        <div class="glass p-4 rounded-xl text-center">
-                            <div class="text-3xl mb-1">📅</div>
-                            <p id="stat-adherence" class="text-2xl font-bold text-green-400">0/14</p>
-                            <p class="text-xs text-gray-400">Active days (last 14)</p>
-                        </div>
-                        <div class="glass p-4 rounded-xl text-center">
-                            <div class="text-3xl mb-1">⭐</div>
-                            <p id="stat-avg-accuracy" class="text-2xl font-bold text-yellow-400">--</p>
-                            <p class="text-xs text-gray-400">Avg. movement quality</p>
-                        </div>
-                    </div>
-
-                    <div class="grid lg:grid-cols-2 gap-6">
-                        <div class="glass-strong rounded-2xl p-6 glow-teal">
-                            <h4 class="font-bold mb-4 text-gray-300">Weekly activity</h4>
-                            <div class="h-56"><canvas id="weekly-chart"></canvas></div>
-                        </div>
-                        <div class="glass-strong rounded-2xl p-6 glow-teal">
-                            <div class="flex justify-between items-center mb-4 gap-2">
-                                <h4 class="font-bold text-gray-300">Recovery trend</h4>
-                                <select id="trend-exercise" class="bg-gray-800 border border-gray-700 rounded-lg text-sm p-1.5"></select>
-                            </div>
-                            <div class="h-56"><canvas id="trend-chart"></canvas></div>
-                            <p id="trend-summary" class="text-xs text-gray-400 mt-3"></p>
-                        </div>
-                    </div>
+                    <h1 id="welcome-line">Your rehabilitation</h1>
+                    <p id="physio-line">Complete the exercises your physiotherapist has prescribed. MediTask checks your movement as you go.</p>
                 </div>
             </div>
 
-            <!-- ===================== Exercise session view ===================== -->
-            <div id="exercise-session-view" class="hidden">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-                    <h3 id="current-exercise-title" class="text-2xl font-bold text-teal-400">Exercise Session</h3>
-                    <div class="flex gap-2 w-full sm:w-auto">
-                        <label class="glass flex items-center gap-2 px-3 py-2 rounded-xl text-sm cursor-pointer">
-                            <input id="voice-toggle" type="checkbox" class="accent-teal-500"> 🔊 Voice
-                        </label>
-                        <button id="back-to-prescriptions" class="glass text-white font-semibold py-2 px-4 rounded-xl border border-teal-500/30 hover:border-teal-500 flex-1 sm:flex-none">← End session</button>
+            <section id="link-section" class="stack hidden" aria-live="polite"></section>
+
+            <div class="grid cols-main align-start">
+                <section class="panel" aria-labelledby="plan-title">
+                    <div class="panel-head">
+                        <h2 id="plan-title">Today's exercises</h2>
+                        <span id="prescription-loading" class="small muted">Loading…</span>
                     </div>
+                    <ul id="prescription-list" class="list"></ul>
+                </section>
+
+                <aside class="panel">
+                    <div class="panel-head"><h2>Before you start</h2></div>
+                    <div class="panel-body stack small">
+                        <div class="row-top"><span data-icon="camera"></span><p>Place your device about 2 metres away so your whole body is in view, in good light.</p></div>
+                        <div class="row-top"><span data-icon="activity"></span><p>Move slowly and with control. A repetition counts when you reach the prescribed range.</p></div>
+                        <div class="row-top"><span data-icon="alert"></span><p>Stop if anything causes pain, dizziness or breathlessness, and message your physiotherapist. In an emergency call 112.</p></div>
+                    </div>
+                </aside>
+            </div>
+
+            <section aria-labelledby="progress-title" class="stack">
+                <div class="section-title"><h2 id="progress-title">Your progress</h2></div>
+                <div class="strip">
+                    <div class="strip-item"><div class="strip-label">Sessions completed</div><div id="stat-total-exercises" class="strip-value">0</div></div>
+                    <div class="strip-item"><div class="strip-label">Day streak</div><div class="strip-value"><span id="stat-streak">0</span><small>days</small></div></div>
+                    <div class="strip-item"><div class="strip-label">Active days, last 14</div><div class="strip-value"><span id="stat-adherence">0</span><small>/ 14</small></div></div>
+                    <div class="strip-item"><div class="strip-label">Average movement quality</div><div class="strip-value"><span id="stat-avg-accuracy">–</span><small>/ 100</small></div></div>
                 </div>
 
-                <div class="grid lg:grid-cols-5 gap-6">
-                    <!-- Camera -->
-                    <div class="lg:col-span-3 glass-strong rounded-2xl p-4 md:p-6 glow-teal">
-                        <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black mb-3 border-2 border-gray-700">
-                            <video id="webcam" class="w-full h-full object-cover mirror" autoplay playsinline muted></video>
-                            <canvas id="pose-canvas" class="absolute top-0 left-0 w-full h-full mirror"></canvas>
-                            <div id="phase-badge" class="absolute top-3 left-3 px-3 py-1 rounded-full text-sm font-bold bg-gray-900/80">Rest</div>
-                            <div id="ml-badge" class="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold bg-gray-900/80 text-gray-300">Rule-based</div>
-                            <div id="rep-flash" class="hidden absolute inset-0 flex items-center justify-center text-7xl font-extrabold text-green-400 drop-shadow-lg pointer-events-none"></div>
-                        </div>
-                        <div id="feedback-box" class="glass-strong text-center text-lg font-bold p-4 rounded-xl transition-all border border-gray-700">
-                            <span class="text-gray-400">Initializing camera...</span>
-                        </div>
-                        <div class="mt-3 flex items-center gap-3 text-xs text-gray-400">
-                            <span>Tracking confidence</span>
-                            <div class="flex-1 bg-gray-700 rounded-full h-2 overflow-hidden"><div id="confidence-bar" class="h-2 bg-teal-500 transition-all" style="width:0%"></div></div>
-                            <span id="fps-label">-- fps</span>
-                        </div>
-                        <button id="emergency-stop-btn" class="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-extrabold py-3 rounded-xl tracking-wide shadow-lg">
-                            ⛔ STOP - I feel pain or discomfort
-                        </button>
+                <div class="grid cols-2">
+                    <div class="panel">
+                        <div class="panel-head"><h3>Sessions this week</h3></div>
+                        <div class="panel-body"><div class="chart"><canvas id="weekly-chart" aria-label="Sessions per day, last 7 days"></canvas></div></div>
                     </div>
-
-                    <!-- Info panel -->
-                    <div class="lg:col-span-2 space-y-4">
-                        <div class="glass-strong rounded-2xl p-5 glow-teal">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div class="glass p-3 rounded-xl text-center">
-                                    <span class="text-gray-400 text-xs">Set</span>
-                                    <p class="font-bold text-2xl text-cyan-400"><span id="current-set">1</span>/<span id="total-sets">-</span></p>
-                                </div>
-                                <div class="glass p-3 rounded-xl text-center">
-                                    <span class="text-gray-400 text-xs">Reps in set</span>
-                                    <p class="font-bold text-2xl text-teal-400"><span id="current-reps">0</span>/<span id="target-reps">-</span></p>
-                                </div>
-                            </div>
-                            <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                                <div id="progress-bar" class="bg-gradient-to-r from-teal-500 to-cyan-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
-                            </div>
-                            <p id="incomplete-note" class="text-xs text-gray-400 mt-2"></p>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <h3>Recovery trend</h3>
+                            <label class="sr-only" for="trend-exercise">Exercise</label>
+                            <select id="trend-exercise" class="select select-sm"></select>
                         </div>
+                        <div class="panel-body">
+                            <div class="chart"><canvas id="trend-chart" aria-label="Range of motion, quality and pain over sessions"></canvas></div>
+                            <p id="trend-summary" class="small muted mt-3"></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
 
-                        <div class="glass-strong rounded-2xl p-5 glow-teal">
-                            <h5 class="font-bold mb-3 text-cyan-400">🤖 Live movement analysis</h5>
-                            <div class="flex items-center gap-4">
-                                <div class="relative w-24 h-24 shrink-0">
-                                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                                        <circle cx="50" cy="50" r="45" stroke="#374151" stroke-width="8" fill="none" />
-                                        <circle id="accuracy-ring" cx="50" cy="50" r="45" stroke="#14b8a6" stroke-width="8" fill="none" stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" class="transition-all duration-300" />
-                                    </svg>
-                                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                        <span id="accuracy-percent" class="text-2xl font-bold text-teal-400">0</span>
-                                        <span class="text-[10px] text-gray-400 -mt-1">form</span>
-                                    </div>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p id="angle-readout" class="text-sm text-gray-200 font-semibold">--</p>
-                                    <div class="w-full bg-gray-700 rounded-full h-2 mt-2 overflow-hidden"><div id="rom-bar" class="h-2 bg-cyan-400 transition-all" style="width:0%"></div></div>
-                                    <p class="text-[11px] text-gray-500 mt-1">Range towards prescribed target</p>
-                                    <div id="phase-steps" class="flex gap-1 mt-3 text-[11px]"></div>
-                                </div>
+        <!-- ===================== Live session ===================== -->
+        <div id="exercise-session-view" class="hidden">
+            <div class="page-head">
+                <div>
+                    <h1 id="current-exercise-title">Exercise</h1>
+                    <p id="session-sub">Follow the instruction under the video.</p>
+                </div>
+                <div class="row wrap">
+                    <label class="check check-inline small"><input id="voice-toggle" type="checkbox"> Spoken instructions</label>
+                    <button id="back-to-prescriptions" class="btn btn-secondary" type="button"><span data-icon="arrowLeft"></span>End session</button>
+                </div>
+            </div>
+
+            <div class="session-grid">
+                <div>
+                    <div class="stage">
+                        <div class="stage-view">
+                            <div class="video-frame">
+                                <video id="webcam" class="mirror" autoplay playsinline muted></video>
+                                <canvas id="pose-canvas" class="mirror"></canvas>
+                                <span id="phase-badge" class="video-tag left">Rest</span>
+                                <span id="ml-badge" class="video-tag right">Rule-based analysis</span>
+                                <div id="rep-flash" class="rep-flash hidden" aria-hidden="true"></div>
+                            </div>
+                            <div class="rom-meter" aria-label="Range of motion towards the prescribed target">
+                                <div class="rom-track"><div id="rom-fill" class="rom-fill"></div></div>
+                                <div class="rom-target" title="Prescribed target"></div>
+                                <span class="rom-label">ROM</span>
                             </div>
                         </div>
+                        <div id="phase-steps" class="phase-track"></div>
+                    </div>
 
-                        <div class="glass-strong rounded-2xl p-5 glow-teal">
-                            <h5 class="font-bold mb-2 text-purple-400">Repetitions</h5>
-                            <ul id="rep-log" class="space-y-1.5 max-h-56 overflow-y-auto text-sm"></ul>
+                    <div id="feedback-box" class="feedback-bar info" role="status" aria-live="polite">Starting camera…</div>
+                    <div class="confidence">
+                        <span>Tracking confidence</span>
+                        <div id="confidence-wrap" class="bar"><span id="confidence-bar"></span></div>
+                        <span id="fps-label" class="num">– fps</span>
+                    </div>
+                    <button id="emergency-stop-btn" class="btn btn-danger btn-lg btn-block stop-btn" type="button">
+                        <span data-icon="stop"></span>Stop now, I feel pain or discomfort
+                    </button>
+                </div>
+
+                <aside class="panel">
+                    <div class="counters">
+                        <div class="counter"><div class="strip-label">Set</div><div class="counter-value"><span id="current-set">1</span> <span class="of">/ <span id="total-sets">–</span></span></div></div>
+                        <div class="counter"><div class="strip-label">Repetitions</div><div class="counter-value"><span id="current-reps">0</span> <span class="of">/ <span id="target-reps">–</span></span></div></div>
+                    </div>
+                    <div class="panel-body stack">
+                        <div class="bar lg" aria-label="Session progress"><span id="progress-bar"></span></div>
+                        <p id="incomplete-note" class="tiny muted"></p>
+                        <div class="score">
+                            <div class="ring" aria-label="Live form score">
+                                <svg viewBox="0 0 84 84"><circle class="track" cx="42" cy="42" r="38"/><circle id="accuracy-ring" class="value" cx="42" cy="42" r="38"/></svg>
+                                <div class="ring-label"><div><b id="accuracy-percent">0</b><small>form</small></div></div>
+                            </div>
+                            <div class="grow">
+                                <p id="angle-readout" class="strong num">–</p>
+                                <p class="tiny muted mt-1">Live joint angle and prescribed target</p>
+                            </div>
                         </div>
                     </div>
+                    <div class="panel-head ruled"><h3>Repetitions</h3></div>
+                    <div id="rep-log" class="rep-log"><p class="empty small">Each repetition and its quality appears here.</p></div>
+                </aside>
+            </div>
+        </div>
+    </main>
+
+    <!-- Chat -->
+    <aside id="chat-modal" class="drawer hidden" aria-label="Messages with your physiotherapist">
+        <div class="drawer-head">
+            <h2 class="grow">Messages</h2>
+            <button id="close-chat-btn" class="icon-btn" type="button" aria-label="Close messages"><span data-icon="x"></span></button>
+        </div>
+        <div id="chat-messages" class="drawer-body"></div>
+        <div class="drawer-foot">
+            <label class="sr-only" for="chat-input">Message</label>
+            <input type="text" id="chat-input" class="input" maxlength="2000" placeholder="Write a message">
+            <button id="send-msg-btn" class="btn btn-primary" type="button" aria-label="Send"><span data-icon="send"></span></button>
+        </div>
+    </aside>
+
+    <!-- Consent -->
+    <div id="consent-modal" class="backdrop hidden">
+        <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+            <div class="modal-head"><h2 id="consent-title">Before your first session</h2></div>
+            <div class="modal-body small">
+                <div class="row-top"><span data-icon="camera"></span><p>MediTask uses your camera to track body movement. <b>Video is processed on this device only and is never uploaded or stored.</b></p></div>
+                <div class="row-top"><span data-icon="clipboard"></span><p>Only movement measurements (joint angles, repetitions, quality scores) and the pain and difficulty you report are saved and shared with your physiotherapist.</p></div>
+                <div class="row-top"><span data-icon="users"></span><p>MediTask supports your physiotherapist. It does not diagnose conditions or change your treatment.</p></div>
+                <div class="row-top"><span data-icon="alert"></span><p>Stop immediately if an exercise causes pain, dizziness or breathlessness. In an emergency call 112.</p></div>
+                <label class="check"><input id="consent-camera" type="checkbox"> I understand and agree to camera-based movement tracking.</label>
+            </div>
+            <div class="modal-foot"><button id="consent-accept" class="btn btn-primary" type="button" disabled>Continue</button></div>
+        </div>
+    </div>
+
+    <!-- Exercise instructions -->
+    <div id="demo-modal" class="backdrop hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="demo-title">
+            <div class="modal-head row">
+                <span id="demo-animation" class="ex-icon"></span>
+                <div><h2 id="demo-title">Exercise</h2><p id="demo-dose" class="small muted"></p></div>
+            </div>
+            <div class="modal-body">
+                <ol id="demo-instructions" class="steps small"></ol>
+                <p id="demo-notes" class="banner info hidden"></p>
+                <p class="tiny muted">Stand about 2 metres from the camera with the exercising limb clearly visible.</p>
+            </div>
+            <div class="modal-foot">
+                <button id="cancel-demo-btn" class="btn btn-ghost" type="button">Cancel</button>
+                <button id="start-exercise-btn" class="btn btn-primary" type="button"><span data-icon="play"></span>Start exercise</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session report -->
+    <div id="report-modal" class="backdrop hidden">
+        <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="report-title">
+            <div class="modal-head"><h2 id="report-title">Session report</h2><p id="report-sub"></p></div>
+            <div id="report-body" class="modal-body"></div>
+            <div class="modal-foot"><button id="report-continue" class="btn btn-primary" type="button">Continue</button></div>
+        </div>
+    </div>
+
+    <!-- Pain / difficulty -->
+    <div id="feedback-modal" class="backdrop hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+            <div class="modal-head"><h2 id="fb-title">How did that feel?</h2><p>Your physiotherapist sees this with your session results.</p></div>
+            <div class="modal-body">
+                <div class="field">
+                    <span class="label" id="pain-label">Pain during the exercise (0 none, 10 worst)</span>
+                    <div id="pain-scale" class="scale" role="group" aria-labelledby="pain-label"></div>
+                    <p class="hint">Selected: <b id="pain-value">0</b></p>
                 </div>
-            </div>
-        </main>
-
-        <div id="loading-view" class="text-center py-20">
-            <div class="glass-strong rounded-3xl p-12 inline-block glow-teal">
-                <div class="loader mx-auto mb-4"></div>
-                <p class="text-gray-400 text-lg">Authenticating...</p>
-            </div>
-        </div>
-
-        <!-- Chat -->
-        <button id="chat-toggle-btn" aria-label="Chat with your physiotherapist" class="fixed bottom-6 right-6 bg-gradient-to-r from-teal-500 to-cyan-500 text-black p-4 rounded-full shadow-2xl transition-all hover:scale-110 z-40 glow-teal">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-        </button>
-        <div id="chat-modal" class="hidden fixed bottom-24 right-4 left-4 sm:left-auto sm:w-96 glass-strong border border-gray-700 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden glow-teal" style="height: 480px;">
-            <div class="glass-strong p-4 flex justify-between items-center border-b border-gray-700">
-                <h3 class="font-bold text-teal-400">💬 Chat with your physiotherapist</h3>
-                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-xl">✕</button>
-            </div>
-            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3"></div>
-            <div class="p-3 glass-strong border-t border-gray-700 flex gap-2">
-                <input type="text" id="chat-input" maxlength="2000" placeholder="Type a message..." class="flex-1 bg-gray-800/50 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 border border-gray-700">
-                <button id="send-msg-btn" class="bg-gradient-to-r from-teal-500 to-cyan-500 text-black p-2 rounded-xl" aria-label="Send">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- Consent modal (first use) -->
-        <div id="consent-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-            <div class="glass-strong rounded-3xl p-8 w-full max-w-lg glow-teal">
-                <h3 class="text-2xl font-bold text-teal-400 mb-4">Before you start</h3>
-                <ul class="text-sm text-gray-300 space-y-2 mb-5 list-disc pl-5">
-                    <li>MediTask uses your camera to track body movement. <b>Video is processed on this device only and is never uploaded or stored.</b></li>
-                    <li>Only movement measurements (joint angles, repetitions, quality scores) and the pain/difficulty you report are saved and shared with your linked physiotherapist.</li>
-                    <li>MediTask <b>supports</b> your physiotherapist. It does not diagnose conditions or change your treatment.</li>
-                    <li>Stop immediately if an exercise causes pain, dizziness or breathlessness, and contact your physiotherapist. In an emergency call <b>112</b>.</li>
-                </ul>
-                <label class="flex items-start gap-3 text-sm mb-3"><input id="consent-camera" type="checkbox" class="mt-1 accent-teal-500"> I understand and agree to camera-based movement tracking.</label>
-                <button id="consent-accept" disabled class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">Continue</button>
-            </div>
-        </div>
-
-        <!-- Exercise demo modal -->
-        <div id="demo-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-lg glow-teal">
-                <h3 id="demo-title" class="text-2xl font-bold text-teal-400 mb-4 text-center">Exercise</h3>
-                <div class="aspect-video bg-gray-800 rounded-xl flex items-center justify-center mb-4">
-                    <div id="demo-animation" class="text-7xl animate-bounce">🏋️</div>
-                </div>
-                <ol id="demo-instructions" class="text-gray-300 space-y-2 mb-3 list-decimal pl-5"></ol>
-                <p id="demo-notes" class="text-sm text-amber-300 mb-3"></p>
-                <p class="text-xs text-gray-500 mb-5">Place the device so your whole body (or the exercising limb) is visible, in good light, about 2 metres away.</p>
-                <button id="start-exercise-btn" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Start exercise</button>
-                <button id="cancel-demo-btn" class="w-full mt-3 text-gray-500 hover:text-gray-300 text-sm">Cancel</button>
-            </div>
-        </div>
-
-        <!-- Session report modal -->
-        <div id="report-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl p-6 md:p-8 w-full max-w-lg glow-teal max-h-[90vh] overflow-y-auto">
-                <h3 id="report-title" class="text-2xl font-bold text-teal-400 mb-1">Session report</h3>
-                <p id="report-sub" class="text-sm text-gray-400 mb-5"></p>
-                <div id="report-body" class="space-y-4"></div>
-                <button id="report-continue" class="w-full mt-6 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Continue</button>
-            </div>
-        </div>
-
-        <!-- Post-exercise feedback modal -->
-        <div id="feedback-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl shadow-xl p-8 w-full max-w-md glow-teal">
-                <h3 class="text-2xl font-bold text-teal-400 mb-6 text-center">📝 How did that feel?</h3>
-                <div class="mb-6">
-                    <label for="pain-slider" class="block text-sm font-medium text-gray-300 mb-3">Pain during the exercise</label>
-                    <div class="flex items-center gap-2">
-                        <span class="text-2xl">😊</span>
-                        <input type="range" id="pain-slider" min="0" max="10" value="0" class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-teal-500">
-                        <span class="text-2xl">😖</span>
-                    </div>
-                    <div class="flex justify-between text-xs text-gray-500 mt-1"><span>0 None</span><span id="pain-value" class="text-teal-400 font-bold">0</span><span>10 Worst</span></div>
-                </div>
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-300 mb-3">Difficulty</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button data-difficulty="easy" class="difficulty-btn glass py-3 px-4 rounded-xl border border-gray-700 text-center"><span class="text-2xl block mb-1">💪</span><span class="text-sm">Easy</span></button>
-                        <button data-difficulty="medium" class="difficulty-btn glass py-3 px-4 rounded-xl border border-gray-700 text-center"><span class="text-2xl block mb-1">🏋️</span><span class="text-sm">Medium</span></button>
-                        <button data-difficulty="hard" class="difficulty-btn glass py-3 px-4 rounded-xl border border-gray-700 text-center"><span class="text-2xl block mb-1">🔥</span><span class="text-sm">Hard</span></button>
+                <div class="field">
+                    <span class="label" id="diff-label">Difficulty</span>
+                    <div class="segmented" role="group" aria-labelledby="diff-label">
+                        <button type="button" class="difficulty-btn" data-difficulty="easy" aria-pressed="false">Easy</button>
+                        <button type="button" class="difficulty-btn" data-difficulty="medium" aria-pressed="false">Moderate</button>
+                        <button type="button" class="difficulty-btn" data-difficulty="hard" aria-pressed="false">Hard</button>
                     </div>
                 </div>
-                <div class="mb-6">
-                    <label for="feedback-notes" class="block text-sm font-medium text-gray-300 mb-2">Notes (optional)</label>
-                    <textarea id="feedback-notes" rows="2" maxlength="1000" placeholder="Any discomfort or comments..." class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700 focus:ring-2 focus:ring-teal-500 text-white resize-none"></textarea>
+                <div class="field">
+                    <label for="feedback-notes">Notes (optional)</label>
+                    <textarea id="feedback-notes" class="textarea" rows="2" maxlength="1000" placeholder="Anything your physiotherapist should know"></textarea>
                 </div>
-                <p id="pain-warning" class="hidden text-sm text-amber-300 mb-4">High pain will be flagged to your physiotherapist for review. If the pain is severe or does not settle, contact them directly.</p>
-                <button id="submit-feedback-btn" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Submit feedback</button>
-                <button id="skip-feedback-btn" class="w-full mt-3 text-gray-500 hover:text-gray-300 text-sm">Skip for now</button>
+                <p id="pain-warning" class="banner warning hidden">Pain of 7 or more is flagged to your physiotherapist. If it is severe or does not settle, contact them directly.</p>
+            </div>
+            <div class="modal-foot">
+                <button id="skip-feedback-btn" class="btn btn-ghost" type="button">Skip</button>
+                <button id="submit-feedback-btn" class="btn btn-primary" type="button">Save feedback</button>
             </div>
         </div>
     </div>

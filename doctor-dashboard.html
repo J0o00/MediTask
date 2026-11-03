@@ -4,188 +4,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Physiotherapist Dashboard - MediTask</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0E5A52">
+    <title>Patients - MediTask Clinical</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/app.css">
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E5A52'/%3E%3Cpath d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
 </head>
 
-<body class="gradient-bg text-white min-h-screen p-4 antialiased overflow-x-hidden">
-    <div id="app-container" class="w-full max-w-7xl mx-auto min-h-[95vh] flex flex-col">
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="./doctor-dashboard.html" aria-label="MediTask Clinical home">
+                <span class="brand-mark"><span data-icon="logo"></span></span>
+                <span class="brand-name">MediTask</span>
+                <span class="brand-tag">Clinical</span>
+            </a>
+            <div class="topbar-actions">
+                <button id="link-patient-btn" class="btn btn-secondary btn-sm" type="button"><span data-icon="link"></span><span class="hide-sm">Invite patient</span></button>
+                <button id="add-patient-btn" class="btn btn-primary btn-sm" type="button"><span data-icon="userPlus"></span><span class="hide-sm">New patient</span></button>
+                <div class="user-chip">
+                    <span id="doctor-avatar" class="avatar" aria-hidden="true"></span>
+                    <span id="doctor-line" class="small strong hide-sm"></span>
+                </div>
+                <button id="logout-btn" class="icon-btn" type="button" aria-label="Sign out" title="Sign out"><span data-icon="logout"></span></button>
+            </div>
+        </div>
+    </header>
 
-        <header class="glass-strong rounded-2xl shadow-2xl p-4 md:p-5 mb-4 fade-in glow-teal">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-3 w-full md:w-auto">
-                    <button id="mobile-menu-btn" class="md:hidden glass p-2 rounded-lg" aria-label="Patients">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                    </button>
-                    <div>
-                        <h1 class="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">⚕️ MediTask Clinical</h1>
-                        <p id="doctor-line" class="text-xs text-gray-400"></p>
+    <div id="loading-view" class="loading" role="status"><div><div class="spinner"></div>Loading your patients…</div></div>
+
+    <main id="main-content" class="page hidden">
+        <div class="clinic">
+            <!-- Patient list -->
+            <aside id="sidebar" class="panel rail" aria-label="Patients">
+                <div class="panel-head">
+                    <h2>Patients <span id="patient-count" class="muted small num"></span></h2>
+                    <button id="mobile-menu-btn" class="icon-btn mobile-only" type="button" aria-label="Show or hide patient list"><span data-icon="menu"></span></button>
+                </div>
+                <div class="rail-search">
+                    <label class="sr-only" for="patient-search">Search patients</label>
+                    <input id="patient-search" type="search" class="input" placeholder="Search by name or email">
+                </div>
+                <div id="patient-list" class="patient-list"><p class="empty small">Loading…</p></div>
+                <div class="rail-foot">
+                    <h3 class="small">Pending invitations</h3>
+                    <div id="pending-links" class="stack small mt-2"></div>
+                </div>
+            </aside>
+
+            <!-- Patient record -->
+            <section aria-live="polite">
+                <div id="report-placeholder" class="panel empty empty-lg">
+                    <h3>Select a patient</h3>
+                    <p>Their rehabilitation record, session results and prescriptions open here.</p>
+                </div>
+
+                <div id="patient-detail" class="hidden">
+                    <div class="record-head">
+                        <span id="pt-avatar" class="avatar lg" aria-hidden="true"></span>
+                        <div class="grow">
+                            <h1 id="pt-name"></h1>
+                            <div id="pt-meta" class="meta mt-1"></div>
+                        </div>
+                        <div class="record-actions">
+                            <button id="open-chat-btn" class="btn btn-secondary" type="button"><span data-icon="chat"></span>Message</button>
+                            <button id="export-pdf-btn" class="btn btn-secondary" type="button"><span data-icon="file"></span>Export report</button>
+                            <button id="unlink-btn" class="btn btn-ghost" type="button">Discharge</button>
+                        </div>
+                    </div>
+
+                    <div id="alerts-box" class="stack alerts"></div>
+
+                    <div class="tabs" role="tablist">
+                        <button data-tab="overview" class="tab tab-btn" role="tab" type="button">Progress</button>
+                        <button data-tab="sessions" class="tab tab-btn" role="tab" type="button">Sessions</button>
+                        <button data-tab="prescriptions" class="tab tab-btn" role="tab" type="button">Prescriptions</button>
+                    </div>
+
+                    <!-- Digital twin -->
+                    <div id="tab-overview" class="tab-panel stack-lg">
+                        <div class="row wrap">
+                            <label for="twin-exercise" class="label">Exercise</label>
+                            <select id="twin-exercise" class="select select-sm"></select>
+                            <span id="twin-baseline-note" class="small muted"></span>
+                        </div>
+                        <div id="twin-tiles" class="strip"></div>
+                        <div class="grid cols-2">
+                            <div class="panel">
+                                <div class="panel-head"><h3>Joint mobility, best range per session</h3></div>
+                                <div class="panel-body"><div class="chart"><canvas id="rom-chart"></canvas></div></div>
+                            </div>
+                            <div class="panel">
+                                <div class="panel-head"><h3>Quality, consistency, asymmetry and pain</h3></div>
+                                <div class="panel-body"><div class="chart"><canvas id="quality-chart"></canvas></div></div>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-head"><h3>Most frequent movement deviations</h3><span class="small muted">Last 10 sessions</span></div>
+                            <div id="error-breakdown" class="panel-body small"></div>
+                        </div>
+                        <p class="tiny muted">Measurements come from webcam pose estimation and have not been clinically validated. Use them alongside, not instead of, your own assessment.</p>
+                    </div>
+
+                    <!-- Sessions -->
+                    <div id="tab-sessions" class="tab-panel hidden">
+                        <div id="session-list" class="panel"></div>
+                    </div>
+
+                    <!-- Prescriptions -->
+                    <div id="tab-prescriptions" class="tab-panel hidden">
+                        <div class="grid cols-main align-start">
+                            <div class="panel">
+                                <div class="panel-head"><h3>Active prescriptions</h3></div>
+                                <div id="rx-list"></div>
+                            </div>
+                            <form id="prescription-form" class="panel">
+                                <div class="panel-head"><h3>Assign an exercise</h3></div>
+                                <div class="panel-body stack">
+                                    <div class="field">
+                                        <label for="exercise-select">Exercise</label>
+                                        <select id="exercise-select" class="select"></select>
+                                        <p id="exercise-desc" class="hint"></p>
+                                    </div>
+                                    <div class="grid cols-2 gap-sm">
+                                        <div class="field"><label for="sets-input">Sets</label><input type="number" id="sets-input" class="input" value="3" min="1" max="20" required></div>
+                                        <div class="field"><label for="reps-input">Reps per set</label><input type="number" id="reps-input" class="input" value="10" min="1" max="100" required></div>
+                                    </div>
+                                    <div class="field">
+                                        <label for="notes-input">Instructions for the patient</label>
+                                        <textarea id="notes-input" class="textarea" rows="2" maxlength="500" placeholder="Optional, e.g. keep within a pain-free range"></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-block">Assign exercise</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-center gap-2 w-full md:w-auto">
-                    <button id="add-patient-btn" class="bg-blue-500/80 hover:bg-blue-600 font-semibold py-2 px-4 rounded-xl text-sm flex-1 md:flex-none">+ New patient account</button>
-                    <button id="link-patient-btn" class="bg-indigo-500/80 hover:bg-indigo-600 font-semibold py-2 px-4 rounded-xl text-sm flex-1 md:flex-none">Invite existing patient</button>
-                    <button id="logout-btn" class="bg-red-500/80 hover:bg-red-600 font-semibold py-2 px-4 rounded-xl text-sm flex-1 md:flex-none">Logout</button>
-                </div>
-            </div>
-        </header>
-
-        <main id="main-content" class="hidden flex-1">
-            <div class="grid md:grid-cols-12 gap-4">
-                <!-- Sidebar -->
-                <aside id="sidebar" class="md:col-span-3 glass-strong rounded-2xl p-4 hidden md:flex flex-col fixed md:static z-30 inset-4 md:inset-auto glow-teal">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-bold text-lg text-teal-400">👥 My patients</h3>
-                        <button id="close-sidebar-btn" class="md:hidden text-gray-400 hover:text-white text-xl">✕</button>
-                    </div>
-                    <input id="patient-search" type="search" placeholder="Search..." class="mb-3 bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm">
-                    <div id="patient-list" class="flex-1 overflow-y-auto space-y-2 max-h-[55vh]"><p class="text-gray-400 text-sm pulse-slow">Loading...</p></div>
-                    <div class="mt-4 border-t border-gray-700 pt-3">
-                        <h4 class="text-sm font-semibold text-gray-300 mb-2">Pending invitations</h4>
-                        <div id="pending-links" class="space-y-1 text-xs text-gray-400"></div>
-                    </div>
-                </aside>
-
-                <!-- Detail -->
-                <section class="md:col-span-9 glass-strong rounded-2xl p-4 md:p-6 glow-teal min-h-[70vh]">
-                    <div id="report-placeholder" class="text-center text-gray-400 mt-20">
-                        <div class="glass rounded-2xl p-12 inline-block">
-                            <div class="text-6xl mb-4">📋</div>
-                            <p class="text-xl">Select a patient to view their rehabilitation profile</p>
-                        </div>
-                    </div>
-
-                    <div id="patient-detail" class="hidden">
-                        <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-3 mb-4">
-                            <div class="flex items-center gap-3">
-                                <div id="pt-avatar" class="w-11 h-11 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-lg"></div>
-                                <div>
-                                    <h2 id="pt-name" class="font-bold text-xl"></h2>
-                                    <p id="pt-meta" class="text-xs text-gray-400"></p>
-                                </div>
-                            </div>
-                            <div class="flex gap-2 flex-wrap">
-                                <button id="export-pdf-btn" class="bg-purple-600 hover:bg-purple-700 font-semibold py-2 px-4 rounded-lg text-sm">📄 Export report</button>
-                                <button id="open-chat-btn" class="glass font-semibold py-2 px-4 rounded-lg text-sm">💬 Message</button>
-                                <button id="unlink-btn" class="glass text-red-300 font-semibold py-2 px-3 rounded-lg text-sm">Unlink</button>
-                            </div>
-                        </div>
-
-                        <div id="alerts-box" class="space-y-2 mb-4"></div>
-
-                        <nav class="flex gap-1 border-b border-gray-700 mb-4 text-sm">
-                            <button data-tab="overview" class="tab-btn px-4 py-2 -mb-px border-b-2">Digital twin</button>
-                            <button data-tab="sessions" class="tab-btn px-4 py-2 -mb-px border-b-2">Sessions</button>
-                            <button data-tab="prescriptions" class="tab-btn px-4 py-2 -mb-px border-b-2">Prescriptions</button>
-                        </nav>
-
-                        <!-- Overview / twin -->
-                        <div id="tab-overview" class="tab-panel">
-                            <div class="flex flex-wrap items-center gap-3 mb-4">
-                                <label for="twin-exercise" class="text-sm text-gray-400">Exercise</label>
-                                <select id="twin-exercise" class="bg-gray-800 border border-gray-700 rounded-lg text-sm p-2"></select>
-                                <span id="twin-baseline-note" class="text-xs text-gray-500"></span>
-                            </div>
-                            <div id="twin-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4"></div>
-                            <div class="grid lg:grid-cols-2 gap-4">
-                                <div class="glass rounded-xl p-4"><h4 class="text-sm font-semibold mb-2 text-gray-300">Joint mobility (best ROM per session)</h4><div class="h-60"><canvas id="rom-chart"></canvas></div></div>
-                                <div class="glass rounded-xl p-4"><h4 class="text-sm font-semibold mb-2 text-gray-300">Movement quality, symmetry and pain</h4><div class="h-60"><canvas id="quality-chart"></canvas></div></div>
-                            </div>
-                            <div class="glass rounded-xl p-4 mt-4">
-                                <h4 class="text-sm font-semibold mb-2 text-gray-300">Most frequent movement deviations (last 10 sessions)</h4>
-                                <div id="error-breakdown" class="text-sm text-gray-300 space-y-1"></div>
-                            </div>
-                            <p class="text-[11px] text-gray-500 mt-3">Measurements come from webcam pose estimation and are not clinically validated. Use them to support, not replace, your clinical assessment.</p>
-                        </div>
-
-                        <!-- Sessions -->
-                        <div id="tab-sessions" class="tab-panel hidden">
-                            <div id="session-list" class="space-y-3"></div>
-                        </div>
-
-                        <!-- Prescriptions -->
-                        <div id="tab-prescriptions" class="tab-panel hidden">
-                            <div class="grid lg:grid-cols-2 gap-4">
-                                <div>
-                                    <h4 class="font-semibold mb-2">Active prescriptions</h4>
-                                    <div id="rx-list" class="space-y-2"></div>
-                                </div>
-                                <form id="prescription-form" class="glass rounded-xl p-4 space-y-4">
-                                    <h4 class="font-semibold text-teal-400">🎯 Assign new exercise</h4>
-                                    <div>
-                                        <label for="exercise-select" class="block text-sm text-gray-300 mb-1">Exercise</label>
-                                        <select id="exercise-select" class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3"></select>
-                                        <p id="exercise-desc" class="text-xs text-gray-400 mt-1"></p>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div><label for="sets-input" class="block text-sm text-gray-300 mb-1">Sets</label><input type="number" id="sets-input" value="3" min="1" max="20" required class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3"></div>
-                                        <div><label for="reps-input" class="block text-sm text-gray-300 mb-1">Reps per set</label><input type="number" id="reps-input" value="10" min="1" max="100" required class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3"></div>
-                                    </div>
-                                    <div><label for="notes-input" class="block text-sm text-gray-300 mb-1">Instructions for the patient (optional)</label><textarea id="notes-input" rows="2" maxlength="500" class="w-full bg-gray-800/60 border border-gray-700 rounded-xl p-3 resize-none"></textarea></div>
-                                    <button type="submit" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Assign exercise</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </main>
-
-        <div id="loading-view" class="flex-1 flex items-center justify-center">
-            <div class="glass-strong rounded-3xl p-12 glow-teal"><div class="loader mx-auto mb-4"></div><p class="text-gray-400 text-lg">Authenticating...</p></div>
+            </section>
         </div>
+    </main>
 
-        <!-- Chat -->
-        <div id="chat-modal" class="hidden fixed bottom-6 right-4 left-4 sm:left-auto sm:w-96 glass-strong border border-gray-700 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden glow-teal" style="height: 480px;">
-            <div class="glass-strong p-4 flex justify-between items-center border-b border-gray-700">
-                <h3 class="font-bold text-teal-400 truncate" id="chat-patient-name">💬 Chat</h3>
-                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-xl">✕</button>
-            </div>
-            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3"></div>
-            <div class="p-3 glass-strong border-t border-gray-700 flex gap-2">
-                <input type="text" id="chat-input" maxlength="2000" placeholder="Type a message..." class="flex-1 bg-gray-800/50 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 border border-gray-700">
-                <button id="send-msg-btn" class="bg-gradient-to-r from-teal-500 to-cyan-500 text-black p-2 rounded-xl" aria-label="Send">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                </button>
-            </div>
+    <!-- Chat -->
+    <aside id="chat-modal" class="drawer hidden" aria-label="Messages">
+        <div class="drawer-head">
+            <h2 id="chat-patient-name" class="grow truncate">Messages</h2>
+            <button id="close-chat-btn" class="icon-btn" type="button" aria-label="Close messages"><span data-icon="x"></span></button>
         </div>
+        <div id="chat-messages" class="drawer-body"></div>
+        <div class="drawer-foot">
+            <label class="sr-only" for="chat-input">Message</label>
+            <input type="text" id="chat-input" class="input" maxlength="2000" placeholder="Write a message">
+            <button id="send-msg-btn" class="btn btn-primary" type="button" aria-label="Send"><span data-icon="send"></span></button>
+        </div>
+    </aside>
 
-        <!-- Add patient -->
-        <div id="add-patient-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl p-8 w-full max-w-md glow-teal">
-                <h3 class="text-2xl font-bold text-teal-400 mb-2">➕ New patient account</h3>
-                <p class="text-xs text-gray-400 mb-5">Creates a login for the patient that is linked to you. Share the password with them securely and ask them to change it.</p>
-                <form id="add-patient-form" class="space-y-4">
-                    <div><label for="new-patient-name" class="block text-sm text-gray-300 mb-1">Name</label><input id="new-patient-name" maxlength="80" class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
-                    <div><label for="new-patient-email" class="block text-sm text-gray-300 mb-1">Email</label><input type="email" id="new-patient-email" required class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
-                    <div><label for="new-patient-password" class="block text-sm text-gray-300 mb-1">Temporary password</label><input type="password" id="new-patient-password" required minlength="8" class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
-                    <div id="add-patient-error" class="hidden text-red-300 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
-                    <div class="flex gap-3 pt-2">
-                        <button type="button" id="cancel-add-patient-btn" class="flex-1 glass font-semibold py-3 rounded-xl">Cancel</button>
-                        <button type="submit" id="submit-add-patient-btn" class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Create</button>
-                    </div>
-                </form>
+    <!-- New patient -->
+    <div id="add-patient-modal" class="backdrop hidden">
+        <form id="add-patient-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="add-title">
+            <div class="modal-head"><h2 id="add-title">New patient account</h2><p>Creates a login linked to you. Share the temporary password securely and ask the patient to change it.</p></div>
+            <div class="modal-body">
+                <div class="field"><label for="new-patient-name">Full name</label><input id="new-patient-name" class="input" maxlength="80" autocomplete="off"></div>
+                <div class="field"><label for="new-patient-email">Email</label><input type="email" id="new-patient-email" class="input" required autocomplete="off"></div>
+                <div class="field"><label for="new-patient-password">Temporary password</label><input type="password" id="new-patient-password" class="input" required minlength="8" autocomplete="new-password"><p class="hint">At least 8 characters.</p></div>
+                <div id="add-patient-error" class="form-error hidden" role="alert"></div>
             </div>
-        </div>
+            <div class="modal-foot">
+                <button type="button" id="cancel-add-patient-btn" class="btn btn-ghost">Cancel</button>
+                <button type="submit" id="submit-add-patient-btn" class="btn btn-primary">Create account</button>
+            </div>
+        </form>
+    </div>
 
-        <!-- Invite patient -->
-        <div id="link-patient-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div class="glass-strong rounded-3xl p-8 w-full max-w-md glow-teal">
-                <h3 class="text-2xl font-bold text-teal-400 mb-2">🔗 Invite an existing patient</h3>
-                <p class="text-xs text-gray-400 mb-5">The patient sees the invitation on their dashboard. You get access to their data only after they accept.</p>
-                <form id="link-patient-form" class="space-y-4">
-                    <div><label for="link-patient-email" class="block text-sm text-gray-300 mb-1">Patient email</label><input type="email" id="link-patient-email" required class="w-full bg-gray-800/50 p-3 rounded-xl border border-gray-700"></div>
-                    <div id="link-patient-error" class="hidden text-red-300 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50"></div>
-                    <div class="flex gap-3 pt-2">
-                        <button type="button" id="cancel-link-patient-btn" class="flex-1 glass font-semibold py-3 rounded-xl">Cancel</button>
-                        <button type="submit" id="submit-link-patient-btn" class="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-bold py-3 rounded-xl">Send invitation</button>
-                    </div>
-                </form>
+    <!-- Invite patient -->
+    <div id="link-patient-modal" class="backdrop hidden">
+        <form id="link-patient-form" class="modal" role="dialog" aria-modal="true" aria-labelledby="link-title">
+            <div class="modal-head"><h2 id="link-title">Invite an existing patient</h2><p>The patient sees the invitation on their dashboard. You can see their records only after they accept.</p></div>
+            <div class="modal-body">
+                <div class="field"><label for="link-patient-email">Patient's email</label><input type="email" id="link-patient-email" class="input" required></div>
+                <div id="link-patient-error" class="form-error hidden" role="alert"></div>
             </div>
-        </div>
+            <div class="modal-foot">
+                <button type="button" id="cancel-link-patient-btn" class="btn btn-ghost">Cancel</button>
+                <button type="submit" id="submit-link-patient-btn" class="btn btn-primary">Send invitation</button>
+            </div>
+        </form>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
