@@ -512,16 +512,20 @@
     <!-- MODAL: Session Completion Report -->
     <div id="report-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
         <div class="glass-panel rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-            <div class="border-b border-slate-200/60 pb-3">
-                <h3 id="report-title" class="text-base font-bold text-slate-900">Session Complete!</h3>
-                <p id="report-sub" class="text-xs text-slate-500">Shoulder Abduction • 10 Repetitions</p>
+            <div class="flex items-center justify-between border-b border-slate-200/60 pb-3">
+                <div>
+                    <h3 id="report-title" class="text-base font-bold text-slate-900">Session Complete!</h3>
+                    <p id="report-sub" class="text-xs text-slate-500">Shoulder Abduction • 10 Repetitions</p>
+                </div>
+                <button type="button" id="close-report-btn" class="w-8 h-8 rounded-full glass-chip flex items-center justify-center text-slate-700 hover:text-slate-900">✕</button>
             </div>
             <div id="report-body" class="space-y-3 text-xs text-slate-700">
                 <!-- Injected report summary -->
             </div>
-            <button id="report-continue" class="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">
-                Continue to Feedback
-            </button>
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="return-dashboard-btn" class="flex-1 py-2.5 rounded-2xl bg-white/70 hover:bg-white text-xs font-semibold text-slate-700">Dashboard</button>
+                <button type="button" id="report-continue" class="flex-1 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">Feedback</button>
+            </div>
         </div>
     </div>
 

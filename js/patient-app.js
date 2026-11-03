@@ -279,6 +279,9 @@ async function startSession(rx, cfg) {
     await startCamera();
 }
 
+let animFrameId = null;
+let isProcessingFrame = false;
+
 async function startCamera() {
     const video = $('webcam'), canvas = $('pose-canvas');
     if (!video || !canvas) return;
@@ -288,13 +291,9 @@ async function startCamera() {
         return;
     }
 
-    pose = new window.Pose({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}` });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    pose.onResults(results => {
-        if (!current || current.finishing) return;
-        const now = performance.now();
-        current.engine.processResults(results, now, now - sendT);
-    });
+    if ($('feedback-box')) {
+        $('feedback-box').textContent = 'Starting camera and computer vision...';
+    }
 
     try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -302,44 +301,105 @@ async function startCamera() {
             audio: false
         });
         video.srcObject = stream;
-        await new Promise(r => video.onloadedmetadata = r);
-        video.play();
-        camera = new window.Camera(video, {
-            onFrame: async () => {
-                if (!current || current.finishing) return;
-                if (pose && video.readyState >= 2) {
-                    sendT = performance.now();
-                    await pose.send({ image: video });
-                }
-            },
-            width: 640, height: 480,
+        await new Promise(r => {
+            if (video.readyState >= 1) r();
+            else video.onloadedmetadata = r;
         });
-        camera.start();
-        if ($('feedback-box')) $('feedback-box').textContent = 'Get into starting position in front of camera';
+        await video.play();
+
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        if (!pose) {
+            pose = new window.Pose({
+                locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`
+            });
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            pose.onResults(onPoseResults);
+        }
+
+        if ($('feedback-box')) {
+            $('feedback-box').textContent = 'Get into starting position in front of camera';
+        }
+
+        isProcessingFrame = false;
+        animFrameId = requestAnimationFrame(processVideoFrame);
     } catch (err) {
         console.error('Camera start error:', err);
         toast(`Camera access error: ${err.message}`, 'error');
-        if ($('feedback-box')) $('feedback-box').textContent = `Camera error: ${err.message}. Please allow webcam access.`;
+        if ($('feedback-box')) {
+            $('feedback-box').textContent = `Camera error: ${err.message}. Please allow webcam access in your browser.`;
+        }
+    }
+}
+
+async function processVideoFrame() {
+    if (!current || current.finishing) return;
+    const video = $('webcam');
+    if (video && video.readyState >= 2 && pose && !isProcessingFrame) {
+        const now = performance.now();
+        if (now - sendT >= 33) {
+            sendT = now;
+            isProcessingFrame = true;
+            try {
+                await pose.send({ image: video });
+            } catch (err) {
+                console.warn('Pose processing error:', err);
+            } finally {
+                isProcessingFrame = false;
+            }
+        }
+    }
+    if (current && !current.finishing) {
+        animFrameId = requestAnimationFrame(processVideoFrame);
     }
 }
 
 function stopCamera() {
-    try { camera?.stop?.(); } catch {}
-    try { stream?.getTracks()?.forEach(t => t.stop()); } catch {}
-    const v = $('webcam'); if (v) v.srcObject = null;
-    try { pose?.close?.(); } catch {}
-    camera = null; stream = null; pose = null;
+    if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+    }
+    isProcessingFrame = false;
+    try {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
+    } catch {}
+    const v = $('webcam');
+    if (v) {
+        v.pause();
+        v.srcObject = null;
+    }
+    const canvas = $('pose-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    stream = null;
     current?.engine?.feedback?.cancel?.();
+}
+
+function onPoseResults(results) {
+    if (!current || current.finishing) return;
+    const now = performance.now();
+    current.engine.processResults(results, now, now - sendT);
 }
 
 let frameCount = 0, fpsT0 = performance.now();
 function handleFrame(state) {
     if (!current || current.finishing) return;
     const canvas = $('pose-canvas');
-    if (canvas && state.landmarks) {
-        canvas.width = canvas.clientWidth || 640;
-        canvas.height = canvas.clientHeight || 480;
-        drawPose(canvas, state.landmarks, current.cfg);
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            drawPose(ctx, canvas, state, current.cfg);
+        }
     }
     frameCount++;
     const now = performance.now();
@@ -410,7 +470,7 @@ $('back-to-prescriptions')?.addEventListener('click', () => {
 });
 
 $('emergency-stop-btn')?.addEventListener('click', () => {
-    current.engine.emergencyStop = true;
+    if (current) current.engine.emergencyStop = true;
     finishSession('stopped', true);
 });
 
@@ -419,13 +479,24 @@ async function finishSession(status, emergency = false) {
     current.finishing = true;
     stopCamera();
 
-    const record = current.engine.finish({ status, startedAt: current.startedAt });
+    const record = current.engine.buildRecord({
+        id: current.sessionId,
+        status,
+        prescription: current.rx,
+        startedAt: current.startedAt,
+        endedAt: new Date()
+    });
+    if (emergency) record.emergencyStop = true;
     lastSaved = { record, pointsEarned: 0 };
 
     if (!isDemoMode) {
         try {
-            await saveSession(user.uid, profile, current.rx, record);
-            lastSaved.pointsEarned = 10;
+            const res = await saveSession(profile, record, current.rx);
+            lastSaved.pointsEarned = res.pointsEarned || 0;
+            if (res.pointsEarned) {
+                profile.points = (profile.points || 0) + res.pointsEarned;
+                updatePointsUI(profile.points);
+            }
         } catch (err) {
             console.error('Session save failed:', err);
         }
@@ -457,6 +528,16 @@ function showSessionReport(rec, emergency) {
 $('report-continue')?.addEventListener('click', () => {
     show('report-modal', false);
     show('feedback-modal', true);
+});
+
+$('close-report-btn')?.addEventListener('click', () => {
+    show('report-modal', false);
+    show('prescription-list-view', true);
+});
+
+$('return-dashboard-btn')?.addEventListener('click', () => {
+    show('report-modal', false);
+    show('prescription-list-view', true);
 });
 
 function buildPainScale() {
