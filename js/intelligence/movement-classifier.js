@@ -102,6 +102,22 @@ export class MovementClassifier {
         return new MovementClassifier(manifest, await bin.arrayBuffer());
     }
 
+    /** Model class for an app exercise id, or null when the model was not trained on it. */
+    modelClassFor(appExerciseId) {
+        const map = this.m.app_exercise_to_model_class;
+        if (map && appExerciseId in map) return map[appExerciseId];
+        return this.m.exercises.includes(appExerciseId) ? appExerciseId : null;
+    }
+
+    supports(appExerciseId) { return !!this.modelClassFor(appExerciseId); }
+
+    /** True when the model's quality verdict for this exercise was reliable on held-out patients. */
+    qualityReliable(appExerciseId, minAccuracy = 0.65) {
+        const cls = this.modelClassFor(appExerciseId);
+        const acc = this.m.quality_by_exercise?.[cls];
+        return !!cls && (acc === undefined || acc >= minAccuracy);
+    }
+
     get info() {
         const { model_name, arch, exercises, quality_labels, trained_on, metrics } = this.m;
         return { model_name, arch, exercises, quality_labels, trained_on, metrics };

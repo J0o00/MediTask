@@ -10,29 +10,8 @@
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&amp;display=swap" rel="stylesheet" />
     <!-- Tailwind CSS v3 with Plugins -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="./css/tw-doctor-dashboard.css">
     <!-- Tailwind Custom Configuration -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        surface: '#FAF8F4',
-                        'surface-dim': '#F3ECE2',
-                        charcoal: '#1D1C16',
-                        slate: '#444845',
-                        'slate-light': '#665D51',
-                        'border-warm': '#E5DFD5',
-                        'border-subtle': '#EDE7DD',
-                    },
-                    fontFamily: {
-                        sans: ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-                        serif: ['Newsreader', 'Georgia', 'serif'],
-                    }
-                }
-            }
-        }
-    </script>
     <!-- Chart.js & jsPDF for telemetry rendering -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -154,7 +133,7 @@
                         <h1 class="text-base font-semibold tracking-tight text-charcoal">MediTask</h1>
                         <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full bg-stone-200/70 text-stone-700 border border-stone-300">Clinical</span>
                     </div>
-                    <p id="doctor-line" class="text-[11px] text-slate-light font-normal">Dr. R. Reynolds, MD</p>
+                    <p id="doctor-line" class="text-[11px] text-slate-light font-normal"></p>
                 </div>
             </a>
 
@@ -170,9 +149,7 @@
                         <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
-                <div id="doctor-avatar" class="w-9 h-9 rounded-2xl border border-stone-300 overflow-hidden shadow-sm bg-stone-200 flex items-center justify-center text-xs font-semibold text-charcoal">
-                    RR
-                </div>
+                <div id="doctor-avatar" class="w-9 h-9 rounded-2xl border border-stone-300 overflow-hidden shadow-sm bg-stone-200 flex items-center justify-center text-xs font-semibold text-charcoal"></div>
             </div>
         </header>
         <!-- END: TopBar / Header -->
@@ -207,10 +184,10 @@
         <div id="view-overview" class="space-y-4">
             <!-- BEGIN: Hero Clinician Banner -->
             <section class="mb-1" data-purpose="hero-title-section">
-                <p class="text-xs uppercase tracking-widest text-slate-light font-semibold mb-1">Rehabilitation Telemetry</p>
+                <p class="text-xs uppercase tracking-widest text-slate-light font-semibold mb-1">Rehabilitation Overview</p>
                 <h2 class="text-2xl font-normal tracking-tight text-charcoal leading-tight">
-                    Patient Recovery Looks <br />
-                    <span class="font-serif italic font-normal text-charcoal">Promising</span>
+                    <span id="hero-line">Your patients</span> <br />
+                    <span id="hero-status" class="font-serif italic font-normal text-charcoal">at a glance</span>
                 </h2>
             </section>
             <!-- END: Hero Clinician Banner -->
@@ -223,54 +200,55 @@
                 <!-- Card Top: Patient Info & Status Badge -->
                 <div class="flex items-start justify-between relative z-10 mb-3">
                     <div class="flex items-center space-x-3">
-                        <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center font-medium text-charcoal shadow-inner">
-                            AQ
-                        </div>
+                        <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center font-medium text-charcoal shadow-inner">–</div>
                         <div>
                             <div class="flex items-center space-x-1.5">
-                                <h3 id="pt-name" class="text-base font-semibold text-charcoal tracking-tight">Aarav Q.</h3>
-                                <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 glow-dot-green"></span>
+                                <h3 id="pt-name" class="text-base font-semibold text-charcoal tracking-tight">No patient selected</h3>
+                                <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-stone-300"></span>
                             </div>
-                            <p id="pt-meta" class="text-xs text-slate-light">aq@gmail.com • ACL Rehab Wk 4</p>
+                            <p id="pt-meta" class="text-xs text-slate-light">Add or invite a patient to begin</p>
                         </div>
                     </div>
-                    <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center space-x-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        <span id="pt-status-text">On Track</span>
+                    <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-stone-50 text-stone-600 border border-stone-200 flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
+                        <span id="pt-status-text">–</span>
                     </span>
                 </div>
+
+                <!-- Clinical alerts for the selected patient -->
+                <div id="alerts-box" class="space-y-2 mb-3 relative z-10 hidden" aria-live="polite"></div>
 
                 <!-- Quick Metrics Grid (Score & Bio telemetry) -->
                 <div class="grid grid-cols-2 gap-2.5 mb-3.5 relative z-10">
                     <!-- AI Pose Accuracy Metric Card -->
                     <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
                         <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-normal text-slate-light">Pose Accuracy</span>
-                            <span id="pt-accuracy-delta" class="text-[10px] text-emerald-700 font-semibold">+4.2%</span>
+                            <span class="text-[11px] font-normal text-slate-light">Movement Quality</span>
+                            <span id="pt-accuracy-delta" class="text-[10px] text-stone-500 font-semibold"></span>
                         </div>
                         <div class="mt-2 flex items-baseline space-x-1">
-                            <span id="pt-accuracy-val" class="text-2xl font-light text-charcoal tracking-tight">92</span>
+                            <span id="pt-accuracy-val" class="text-2xl font-light text-charcoal tracking-tight">–</span>
                             <span class="text-xs text-stone-400">/100</span>
                         </div>
                         <!-- Mini progress bar -->
                         <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div id="pt-accuracy-bar" class="bg-gradient-to-r from-stone-700 to-stone-900 h-full rounded-full" style="width: 92%"></div>
+                            <div id="pt-accuracy-bar" class="bg-gradient-to-r from-stone-700 to-stone-900 h-full rounded-full transition-all" style="width: 0%"></div>
                         </div>
                     </div>
 
                     <!-- Exercise Routine Adherence Card -->
                     <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
                         <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-normal text-slate-light">Exercises Today</span>
-                            <span id="pt-adherence-pct" class="text-[10px] text-stone-600 font-semibold">83%</span>
+                            <span class="text-[11px] font-normal text-slate-light">Sessions, last 7 days</span>
+                            <span id="pt-adherence-pct" class="text-[10px] text-stone-600 font-semibold"></span>
                         </div>
                         <div class="mt-2 flex items-baseline space-x-1">
-                            <span id="pt-completed-val" class="text-2xl font-light text-charcoal tracking-tight">5</span>
-                            <span id="pt-target-val" class="text-xs text-stone-400">/6 completed</span>
+                            <span id="pt-completed-val" class="text-2xl font-light text-charcoal tracking-tight">–</span>
+                            <span id="pt-target-val" class="text-xs text-stone-400"></span>
                         </div>
                         <!-- Mini progress bar -->
                         <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div id="pt-adherence-bar" class="bg-gradient-to-r from-stone-500 to-stone-700 h-full rounded-full" style="width: 83.3%"></div>
+                            <div id="pt-adherence-bar" class="bg-gradient-to-r from-stone-500 to-stone-700 h-full rounded-full transition-all" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>
@@ -279,10 +257,10 @@
                 <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10 border border-stone-200/80" data-purpose="telemetry-chart">
                     <div class="flex items-center justify-between mb-1">
                         <div>
-                            <p id="rom-title" class="text-xs font-semibold text-charcoal">Range of Motion (Knee Extension)</p>
-                            <p id="twin-baseline-note" class="text-[10px] text-slate-light">Live Sensor Stream • Smart Knee Sleeve</p>
+                            <p id="rom-title" class="text-xs font-semibold text-charcoal">Range of Motion</p>
+                            <p id="twin-baseline-note" class="text-[10px] text-slate-light">Best range per session, webcam pose estimation</p>
                         </div>
-                        <span id="rom-degrees" class="text-xs font-semibold text-charcoal">124° <span class="text-[9px] font-normal text-stone-400">/ 130°</span></span>
+                        <span id="rom-degrees" class="text-xs font-semibold text-charcoal">–</span>
                     </div>
 
                     <!-- Canvas with styled height -->
@@ -290,13 +268,7 @@
                         <canvas id="rom-chart" class="w-full h-full"></canvas>
                     </div>
 
-                    <div class="flex justify-between text-[9px] text-stone-500 tracking-wider uppercase pt-1">
-                        <span>Warmup</span>
-                        <span>Set 1</span>
-                        <span>Set 2</span>
-                        <span>Peak Extension</span>
-                        <span>Cooldown</span>
-                    </div>
+                    <p id="rom-empty" class="hidden text-[10px] text-stone-500 text-center pt-1">No sessions recorded yet for this patient.</p>
                 </div>
 
                 <!-- Action Buttons inside Patient Card -->
@@ -432,7 +404,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
-                    <span id="chat-unread-dot" class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-stone-700"></span>
+                    <span id="chat-unread-dot" class="hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-stone-700"></span>
                 </div>
                 <span class="text-[9px] font-medium mt-0.5">Chats</span>
             </button>
@@ -446,7 +418,7 @@
             <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
                 <div>
                     <h3 class="text-base font-semibold text-charcoal">Clinical Telemetry & AI Pose</h3>
-                    <p id="telemetry-patient-name" class="text-xs text-slate-light">Aarav Q. • Movement Analysis</p>
+                    <p id="telemetry-patient-name" class="text-xs text-slate-light"></p>
                 </div>
                 <button id="close-telemetry-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
             </div>
@@ -572,7 +544,7 @@
         <div class="flex items-center justify-between border-b border-stone-200/80 pb-3">
             <div>
                 <h3 class="text-sm font-semibold text-charcoal">Patient Messages</h3>
-                <p id="chat-patient-name" class="text-xs text-slate-light">Aarav Q.</p>
+                <p id="chat-patient-name" class="text-xs text-slate-light"></p>
             </div>
             <button id="close-chat-btn" class="lumis-glass-subtle w-8 h-8 rounded-full flex items-center justify-center text-charcoal hover:bg-white border border-stone-200">✕</button>
         </div>

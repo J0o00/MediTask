@@ -116,28 +116,133 @@ def _kimore_quality(label_dir: Path, es: str, group: str, tx: dict) -> str:
 
 
 # --------------------------------------------------------------------------- UI-PRMD
-def load_ui_prmd(root: str | Path, fps: float = 30.0, **_) -> list[Sample]:
+# UI-PRMD Kinect "positions" are NOT absolute coordinates: joint 0 (waist) is absolute and every
+# other joint is an offset from its parent, expressed in the parent's local frame. Absolute
+# positions are recovered by forward kinematics with the matching "angles" file (Euler angles in
+# degrees, applied as Rz(a) @ Ry(b) @ Rx(g)). This is a vectorised port of the dataset authors'
+# reference visualisation code (Vakanski et al. 2018), verified on the downloaded files.
+# Kinematic chain: (child, parent, rotation chain of joints whose angles accumulate)
+_UIPRMD_CHAIN = [
+    (1, 0, [0]), (2, 1, [0, 1]), (3, 2, [0, 1, 2]), (4, 3, [0, 1, 2, 3]), (5, 4, [0, 1, 2, 3, 4]),
+    (6, 2, [2]), (7, 6, [2, 6]), (8, 7, [2, 6, 7]), (9, 8, [2, 6, 7, 8]),
+    (10, 2, [2]), (11, 10, [2, 10]), (12, 11, [2, 10, 11]), (13, 12, [2, 10, 11, 12]),
+    (14, 0, [0]), (15, 14, [0, 14]), (16, 15, [0, 14, 15]), (17, 16, [0, 14, 15, 16]),
+    (18, 0, [0]), (19, 18, [0, 18]), (20, 19, [0, 18, 19]), (21, 20, [0, 18, 19, 20]),
+]
+
+
+def _euler_to_rot(ang_deg: np.ndarray) -> np.ndarray:
+    """(N,3) degrees [g, b, a] -> (N,3,3) = Rz(a) @ Ry(b) @ Rx(g)."""
+    g, b, a = np.deg2rad(ang_deg).T
+    cg, sg, cb, sb, ca, sa = np.cos(g), np.sin(g), np.cos(b), np.sin(b), np.cos(a), np.sin(a)
+    one, zero = np.ones_like(g), np.zeros_like(g)
+    Rx = np.stack([np.stack([one, zero, zero], -1), np.stack([zero, cg, -sg], -1), np.stack([zero, sg, cg], -1)], -2)
+    Ry = np.stack([np.stack([cb, zero, sb], -1), np.stack([zero, one, zero], -1), np.stack([-sb, zero, cb], -1)], -2)
+    Rz = np.stack([np.stack([ca, -sa, zero], -1), np.stack([sa, ca, zero], -1), np.stack([zero, zero, one], -1)], -2)
+    return Rz @ Ry @ Rx
+
+
+def _smooth(x: np.ndarray, w: int) -> np.ndarray:
+    """Centred moving average along axis 0 with shrinking windows at the ends (MATLAB smooth())."""
+    if w <= 1 or len(x) < w:
+        return x
+    k = w // 2
+    out = np.empty_like(x)
+    c = np.concatenate([np.zeros((1,) + x.shape[1:]), np.cumsum(x, axis=0)])
+    for i in range(len(x)):
+        h = min(k, i, len(x) - 1 - i)
+        out[i] = (c[i + h + 1] - c[i - h]) / (2 * h + 1)
+    return out
+
+
+def uiprmd_forward_kinematics(pos: np.ndarray, ang: np.ndarray, smooth: int = 5) -> np.ndarray:
+    """pos, ang: (N, 66) raw UI-PRMD Kinect rows -> (N, 22, 3) absolute joint positions."""
+    n = min(len(pos), len(ang))
+    p = _smooth(pos[:n].astype(np.float64), smooth).reshape(n, 22, 3)
+    a = _smooth(ang[:n].astype(np.float64), smooth).reshape(n, 22, 3)
+    R = {j: _euler_to_rot(a[:, j]) for j in range(22)}
+    out = p.copy()
+    for child, parent, chain in _UIPRMD_CHAIN:
+        rot = R[chain[0]]
+        for j in chain[1:]:
+            rot = rot @ R[j]
+        out[:, child] = np.einsum("nij,nj->ni", rot, p[:, child]) + out[:, parent]
+    return out
+
+
+def load_ui_prmd(root: str | Path, fps: float = 30.0, smooth: int = 5, **_) -> list[Sample]:
     root = Path(root)
     emap = taxonomy()["sources"]["ui_prmd"]["exercise_map"]
-    out = []
-    # VERIFY layout: "Segmented Movements/Kinect/Positions/m01_s01_e01_positions.txt" and
-    # "Incorrect Segmented Movements/Kinect/Positions/m01_s01_e01_positions_inc.txt"
+    out, skipped = [], 0
     for f in sorted(root.rglob("*_positions*.txt")):
-        if "kinect" not in str(f).lower():
+        if "kinect" not in str(f).lower() or "filtered" in str(f).lower():
             continue
         m = re.match(r"(m\d\d)_(s\d\d)_(e\d\d)", f.name)
         if not m or m.group(1) not in emap:
             continue
-        incorrect = "incorrect" in str(f).lower() or f.stem.endswith("_inc")
-        arr = _read_numeric(f)
-        if arr.shape[1] < 66:
-            print(f"[ui_prmd] skip {f.name}: {arr.shape[1]} columns")
+        af = f.parent.parent / "Angles" / f.name.replace("_positions", "_angles")
+        if not af.exists():
+            skipped += 1
             continue
-        arr = arr[:, :66].reshape(len(arr), 22, 3)
-        pts = remap(arr, UIPRMD_KINECT_INDEX)
+        pos, ang = _read_numeric(f), _read_numeric(af)
+        if pos.shape[1] < 66 or ang.shape[1] < 66 or len(pos) < 5:
+            skipped += 1
+            continue
+        skel = uiprmd_forward_kinematics(pos[:, :66], ang[:, :66], smooth)
+        pts = remap(skel, UIPRMD_KINECT_INDEX)
+        incorrect = "incorrect" in str(f).lower() or f.stem.endswith("_inc")
         out.append(Sample("ui_prmd", f"ui_prmd:{m.group(2)}", emap[m.group(1)], "incorrect" if incorrect else "correct",
                           pts, np.ones((len(pts), 12)), None,
-                          {"file": f.name, "episode": m.group(3), "fps": fps, "duration_ms": len(pts) * 1000.0 / fps, "pre_segmented": True}))
+                          {"file": f.name, "episode": m.group(3), "fps": fps, "duration_ms": len(pts) * 1000.0 / fps,
+                           "pre_segmented": True}))
+    if skipped:
+        print(f"[ui_prmd] skipped {skipped} files (missing angles file or bad shape)")
+    return out
+
+
+# --------------------------------------------------------------------------- REHAB24-6 (standardised CSVs)
+_R246_JOINTS = ["LeftShoulder", "RightShoulder", "LeftElbow", "RightElbow", "LeftWrist", "RightWrist",
+                "LeftHip", "RightHip", "LeftKnee", "RightKnee", "LeftAnkle", "RightAnkle"]
+
+
+def load_rehab24_6_csv(root: str | Path, **_) -> list[Sample]:
+    """REHAB24-6 per-exercise CSVs of hip-centred 3-D motion-capture joint positions (metres, y up),
+    one row per frame, with rep boundaries and correctness from the dataset's Segmentation.csv.
+
+    The source skeleton has a single central 'Hips' joint, so both hip columns are zero. Hip joint
+    centres are approximated as +/-0.25 x shoulder-joint width along the horizontal shoulder axis
+    (typical adult hip-to-shoulder width ratio ~0.5). Reps flagged mocap_erroneous are excluded."""
+    root = Path(root)
+    seg = pd.read_csv(root / "Segmentation.csv", sep=";")
+    seg = seg.set_index(["video_id", "repetition_number"])
+    emap = taxonomy()["sources"]["rehab24_6"]["exercise_map"]
+    out, dropped = [], 0
+    for f in sorted(root.glob("rehab246_*_positions_standardized.csv")):
+        df = pd.read_csv(f)
+        for (vid, rep), g in df.groupby(["subject_id", "repetition"], sort=False):
+            meta = seg.loc[(vid, int(rep))] if (vid, int(rep)) in seg.index else None
+            if meta is None or int(meta["mocap_erroneous"]) == 1 or len(g) < 5:
+                dropped += 1
+                continue
+            g = g.sort_values("frame")
+            pts = np.stack([g[[f"{j}_X", f"{j}_Y", f"{j}_Z"]].to_numpy(float) for j in _R246_JOINTS], axis=1)
+            sv = pts[:, 0] - pts[:, 1]
+            sv[:, 1] = 0.0
+            width = np.linalg.norm(sv, axis=1, keepdims=True)
+            lateral = sv / np.maximum(width, 1e-6)
+            pts[:, 6] = 0.25 * width * lateral        # left hip (hips are at the origin)
+            pts[:, 7] = -0.25 * width * lateral       # right hip
+            movement = str(g["movement"].iloc[0])
+            ex = emap.get(movement, movement.lower())
+            t = g["timestamp_offset_ms"].to_numpy(float)
+            out.append(Sample("rehab24_6", f"rehab24_6:P{int(meta['person_id']):02d}", ex,
+                              "correct" if bool(g["is_correct"].iloc[0]) else "incorrect",
+                              pts, np.ones((len(pts), 12)), t - t[0],
+                              {"file": f.name, "video": vid, "rep": int(rep), "fps": 30,
+                               "subtype": meta["exercise_subtype"], "camera": meta["cam17_orientation"],
+                               "duration_ms": float(t[-1] - t[0]), "pre_segmented": True}))
+    if dropped:
+        print(f"[rehab24_6] excluded {dropped} reps (mocap error flag, missing annotation or too short)")
     return out
 
 
@@ -190,5 +295,7 @@ def load_manifest(root: str | Path, manifest: str = "manifest.csv", source: str 
 
 
 def load_rehab24_6(root: str | Path, **kw) -> list[Sample]:
-    """REHAB24-6: prepare manifest.csv (see load_manifest) from the dataset's annotation files."""
+    """REHAB24-6: standardised per-exercise CSVs if present, otherwise a manifest.csv (see load_manifest)."""
+    if list(Path(root).glob("rehab246_*_positions_standardized.csv")):
+        return load_rehab24_6_csv(root, **kw)
     return load_manifest(root, source="rehab24_6", **kw)

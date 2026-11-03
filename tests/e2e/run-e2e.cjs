@@ -36,7 +36,7 @@ async function page(browser, seed) {
         if (u.includes('cdn.tailwindcss.com')) return js(process.env.E2E_TW_CSS
             ? `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(fs.readFileSync(process.env.E2E_TW_CSS, 'utf8'))};document.head.appendChild(s);})();` : '');
         if (u.includes('fonts.googleapis') || u.includes('fonts.gstatic')) return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
-        if (u.includes('/models/web/') || u.includes('/models/templates/')) return route.fulfill({ status: 404, body: '' });
+        if (u.includes('/models/templates/')) return route.fulfill({ status: 404, body: '' });
         if (u.startsWith(BASE)) return route.continue();
         return route.fulfill({ status: 404, body: '' });
     });
@@ -89,20 +89,25 @@ function seedPatientWorld() {
     {
         const { p, errors } = await page(browser, { user: { uid: 'pat1', email: 'pat1@example.com' }, docs: seedPatientWorld() });
         await p.goto(`${BASE}/patient-dashboard.html`);
-        await p.waitForSelector('#main-content:not(.hidden)', { timeout: 10000 });
+        await p.waitForFunction(() => document.getElementById('user-name').textContent === 'Meera', null, { timeout: 10000 });
         await p.waitForFunction(() => document.querySelectorAll('#prescription-list button').length > 0, null, { timeout: 10000 });
-        check('patient: prescription card rendered', true);
-        check('patient: no sample prescriptions', !(await p.textContent('#prescription-list')).includes('Right Hand Raise'));
-        const streak = await p.textContent('#stat-total-exercises');
-        check('patient: analytics from history', streak.trim() === '5', `sessions=${streak}`);
+        check('patient: real prescription card rendered', (await p.textContent('#prescription-list')).includes('Go slowly'));
+        check('patient: no demo banner for signed-in user', await p.$eval('#demo-banner', n => n.classList.contains('hidden')));
+        check('patient: analytics from history', (await p.textContent('#stat-total-exercises')).trim() === '5');
+        check('patient: streak from history (last session 2 days ago)', (await p.textContent('#stat-streak')).trim() === '0');
+        check('patient: quality gauge from history', (await p.textContent('#stat-avg-accuracy')).trim() === '76');
+        check('patient: physio name shown', (await p.textContent('#physio-line')).includes('Dr. Asha'));
         await p.waitForTimeout(1200);
         await p.screenshot({ path: path.join(OUT, 'patient-home.png') });
 
         await p.click('#prescription-list button');
         await p.waitForSelector('#demo-modal:not(.hidden)');
-        check('patient: demo shows physio note', (await p.textContent('#demo-notes')).includes('Go slowly'));
+        check('patient: instructions show physio note', (await p.textContent('#demo-notes')).includes('Go slowly'));
         await p.click('#start-exercise-btn');
         await p.waitForSelector('#exercise-session-view:not(.hidden)');
+        await p.waitForTimeout(500);
+        check('patient: trained model loaded (squat: exercise check only)', (await p.textContent('#ml-badge')).includes('AI exercise check'), await p.textContent('#ml-badge'));
+        check('patient: blur reduced during session', await p.evaluate(() => document.body.classList.contains('session-live')));
         await p.waitForTimeout(4500);
         await p.screenshot({ path: path.join(OUT, 'patient-session.png') });
         const phase = await p.textContent('#phase-badge');
@@ -111,9 +116,11 @@ function seedPatientWorld() {
         await p.waitForSelector('#report-modal:not(.hidden)', { timeout: 25000 });
         const sub = await p.textContent('#report-sub');
         check('patient: session completes after 3 squats', sub.includes('3 of 3'), sub);
+        check('patient: camera released after session', await p.evaluate(() => !document.getElementById('webcam').srcObject));
         await p.screenshot({ path: path.join(OUT, 'patient-report.png') });
         const pts = await p.textContent('#user-points');
         check('patient: +10 points awarded', pts.trim() === '30', pts);
+        check('patient: report shows real points', (await p.textContent('#report-body')).includes('+10'));
 
         await p.click('#report-continue');
         await p.waitForSelector('#feedback-modal:not(.hidden)');
@@ -128,11 +135,13 @@ function seedPatientWorld() {
         const sess = store[sessKey];
         check('store: session saved with standard record', !!sess && sess.validReps === 3 && sess.reps.length >= 3 && sess.summary && sess.status === 'completed',
             sess ? `valid=${sess.validReps} reps=${sess.reps.length} q=${sess.summary.avgQuality}` : 'missing');
+        check('store: model ran on every rep in the browser', sess?.reps?.every(r => r.ml && r.ml.exercise) && sess.summary.mlModel === 'gru_coords', JSON.stringify(sess?.reps?.[0]?.ml));
         check('store: per-rep ROM recorded', !!sess?.reps?.[0]?.rom?.knee_l, JSON.stringify(sess?.reps?.[0]?.rom || {}));
         check('store: prescription completed', store['users/pat1/prescriptions/rx1'].status === 'completed' && store['users/pat1/prescriptions/rx1'].lastSessionId === sessKey.split('/').pop());
         check('store: feedback attached', sess?.feedback?.pain === 8 && sess.feedback.difficulty === 'hard');
         const alerts = Object.entries(store).filter(([k]) => k.startsWith('users/pat1/alerts/')).map(([, v]) => v.type);
         check('store: pain alert raised', alerts.includes('pain'), alerts.join(','));
+        check('patient: dashboard refreshed after session', (await p.textContent('#stat-total-exercises')).trim() === '6' && (await p.textContent('#stat-streak')).trim() === '1');
 
         await p.click('#chat-toggle-btn');
         await p.waitForTimeout(400);
@@ -147,6 +156,37 @@ function seedPatientWorld() {
         fs.writeFileSync(path.join(OUT, 'patient-store.json'), JSON.stringify(store2, null, 1));
     }
 
+    // ---------------------------------------------------------------- patient emergency stop
+    {
+        const { p, errors } = await page(browser, { user: { uid: 'pat1', email: 'pat1@example.com' }, docs: seedPatientWorld() });
+        await p.goto(`${BASE}/patient-dashboard.html`);
+        await p.waitForFunction(() => document.querySelectorAll('#prescription-list button').length > 0, null, { timeout: 10000 });
+        await p.click('#dock-camera-fab');
+        await p.waitForSelector('#demo-modal:not(.hidden)');
+        await p.click('#start-exercise-btn');
+        await p.waitForTimeout(2500);
+        await p.click('#emergency-stop-btn');
+        await p.waitForSelector('#report-modal:not(.hidden)', { timeout: 5000 });
+        await p.waitForTimeout(400);
+        const store = await p.evaluate(() => window.__FAKE.docs);
+        const alerts = Object.entries(store).filter(([k]) => k.startsWith('users/pat1/alerts/')).map(([, v]) => v.type);
+        check('emergency: STOP raises alert for physio', alerts.includes('emergency_stop'), alerts.join(','));
+        check('emergency: report tells patient to rest', (await p.textContent('#report-body')).includes('alerted'));
+        check('emergency page: no runtime errors', errors.length === 0, errors.join(' | '));
+    }
+
+    // ---------------------------------------------------------------- signed-out demo
+    {
+        const { p, errors } = await page(browser, { user: null, docs: {} });
+        await p.goto(`${BASE}/patient-dashboard.html`);
+        await p.waitForSelector('#demo-banner:not(.hidden)', { timeout: 10000 });
+        await p.waitForFunction(() => document.querySelectorAll('#prescription-list button').length > 0, null, { timeout: 10000 });
+        check('demo: labelled sample data when signed out', (await p.textContent('#physio-line')).includes('demo'));
+        const store = await p.evaluate(() => window.__FAKE.docs);
+        check('demo: nothing written to the database', Object.keys(store).length === 0);
+        check('demo page: no runtime errors', errors.length === 0, errors.join(' | '));
+    }
+
     // ---------------------------------------------------------------- doctor
     {
         const docs = seedPatientWorld();
@@ -154,50 +194,76 @@ function seedPatientWorld() {
         docs['users/pat2'] = { uid: 'pat2', role: 'patient', email: 'other@example.com', doctorId: 'drB', points: 0 };
         const { p, errors } = await page(browser, { user: { uid: 'drA', email: 'dra@example.com' }, docs });
         await p.goto(`${BASE}/doctor-dashboard.html`);
-        await p.waitForSelector('#main-content:not(.hidden)', { timeout: 10000 });
         await p.waitForFunction(() => document.querySelectorAll('#patient-list button').length > 0, null, { timeout: 10000 });
         const list = await p.textContent('#patient-list');
         check('doctor: only own patients listed', list.includes('Meera') && !list.includes('other@example.com'));
-        check('doctor: alert badge', list.includes('1'));
-        await p.click('#patient-list button');
-        await p.waitForFunction(() => document.querySelectorAll('#twin-tiles > div').length === 4, null, { timeout: 10000 });
-        const tiles = await p.textContent('#twin-tiles');
-        check('doctor: digital twin tiles', tiles.includes('Range of motion') && tiles.includes('from baseline'), tiles.replace(/\s+/g, ' ').slice(0, 160));
+        check('doctor: alert status in roster', list.includes('1 alert'));
+        await p.waitForFunction(() => document.getElementById('pt-name').textContent === 'Meera', null, { timeout: 10000 });
+        await p.waitForFunction(() => document.getElementById('pt-accuracy-val').textContent !== '–', null, { timeout: 10000 });
+        check('doctor: quality from real sessions', (await p.textContent('#pt-accuracy-val')).trim() === '76');
+        check('doctor: ROM chart from sessions', await p.$eval('#rom-empty', n => n.classList.contains('hidden')) && (await p.textContent('#rom-title')).includes('Squat'));
+        check('doctor: baseline from digital twin', (await p.textContent('#twin-baseline-note')).includes('Baseline'));
         check('doctor: alerts shown', (await p.textContent('#alerts-box')).includes('Pain 8/10'));
-        await p.waitForTimeout(1200);   // let charts draw
-        await p.screenshot({ path: path.join(OUT, 'doctor-twin.png') });
+        check('doctor: hero summarises alerts', (await p.textContent('#hero-status')).includes('1 open alert'));
+        await p.waitForTimeout(1200);
+        await p.screenshot({ path: path.join(OUT, 'doctor-overview.png') });
 
-        await p.click('[data-tab="sessions"]');
+        await p.click('#alerts-box button');
+        await p.waitForTimeout(300);
+        const sA = await p.evaluate(() => window.__FAKE.docs);
+        check('doctor: alert acknowledged', sA['users/pat1/alerts/a1'].acknowledged === true);
+
+        await p.click('#pill-sessions');
         await p.waitForTimeout(200);
         check('doctor: sessions listed', (await p.$$('#session-list > div')).length === 5);
-        await p.click('[data-tab="prescriptions"]');
+        await p.click('#session-list > div button');
+        await p.fill('#session-list textarea', 'Good progress, keep depth');
+        await p.click('#session-list > div button:has-text("Save note")');
+        await p.waitForTimeout(300);
+        const sR = await p.evaluate(() => window.__FAKE.docs);
+        check('doctor: review note saved', Object.values(sR).some(v => v.review?.text === 'Good progress, keep depth'));
+        await p.screenshot({ path: path.join(OUT, 'doctor-sessions.png') });
+
+        await p.click('#pill-protocols');
+        await p.click('#prescribe-tab-add-btn');
+        await p.waitForSelector('#prescribe-modal:not(.hidden)');
         await p.selectOption('#exercise-select', 'shoulder_abduction');
         await p.fill('#sets-input', '2'); await p.fill('#reps-input', '8');
         await p.click('#prescription-form button[type=submit]');
         await p.waitForTimeout(500);
         const store = await p.evaluate(() => window.__FAKE.docs);
         check('doctor: prescription written under patient', Object.entries(store).some(([k, v]) => k.startsWith('users/pat1/prescriptions/') && v.exerciseId === 'shoulder_abduction' && v.sets === 2 && v.doctorId === 'drA'));
-        await p.screenshot({ path: path.join(OUT, 'doctor-prescriptions.png'), fullPage: true });
+        check('doctor: protocol list updated', (await p.textContent('#rx-list')).includes('Shoulder Abduction'));
+        await p.screenshot({ path: path.join(OUT, 'doctor-protocols.png') });
 
+        await p.click('#pill-overview');
+        await p.click('#review-telemetry-btn');
+        await p.waitForSelector('#telemetry-modal:not(.hidden)');
+        await p.waitForTimeout(600);
+        check('doctor: deviation breakdown from sessions', (await p.textContent('#error-breakdown')).includes('Squat'));
         await p.click('#export-pdf-btn');
         await p.waitForTimeout(200);
         check('doctor: PDF report generated', !!(await p.evaluate(() => window.__pdfSaved)));
+        await p.click('#close-telemetry-btn');
+
         await p.click('#link-patient-btn');
         await p.fill('#link-patient-email', 'New.Patient@Example.com');
         await p.click('#submit-link-patient-btn');
         await p.waitForTimeout(400);
         const s2 = await p.evaluate(() => window.__FAKE.docs);
         check('doctor: invitation created (lower-cased email)', Object.entries(s2).some(([k, v]) => k.startsWith('link_requests/') && v.patientEmail === 'new.patient@example.com' && v.status === 'pending'));
+        await p.click('#pill-invites');
+        check('doctor: pending invitation listed', (await p.textContent('#pending-links')).includes('new.patient@example.com'));
         check('doctor page: no runtime errors', errors.length === 0, errors.join(' | '));
     }
 
-    // ---------------------------------------------------------------- sign-in pages (visual + no errors)
-    for (const pg of ['login', 'signup']) {
+    // ---------------------------------------------------------------- public pages (visual + no errors)
+    for (const pg of ['index', 'login', 'signup']) {
         const { p, errors } = await page(browser, { user: null, docs: {} });
         await p.goto(`${BASE}/${pg}.html`);
         await p.waitForTimeout(600);
         await p.screenshot({ path: path.join(OUT, `${pg}.png`) });
-        check(`${pg} page: renders without errors`, errors.length === 0 && (await p.$$('form .input')).length >= 2, errors.join(' | '));
+        check(`${pg} page: renders without errors`, errors.length === 0, errors.join(' | '));
     }
 
     await browser.close();

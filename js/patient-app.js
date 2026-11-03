@@ -1,4 +1,6 @@
-// MediTask - Patient Dashboard Controller (Lumis Aesthetic)
+// MediTask - Patient dashboard controller.
+// Signed-in patients only ever see their own real data. Signed-out visitors get a clearly
+// labelled demo (no Firebase writes). All user-provided text is rendered with textContent.
 import { requireRole, logout } from "./services/auth.js";
 import {
     getProfile, updateOwnProfile, getPrescriptions, getSessions, saveSession, addSessionFeedback,
@@ -6,739 +8,803 @@ import {
 } from "./services/db.js";
 import { resolveExercise } from "./rehabilitation/exercise-configs.js";
 import { RehabSession } from "./rehabilitation/pose-engine.js";
-import { PHASES } from "./rehabilitation/repetition-counter.js";
 import { tryLoadClassifier } from "./intelligence/movement-classifier.js";
 import { buildTwin } from "./digital-twin/progress-model.js";
 import { drawPose } from "./ui/exercise-visualizer.js";
-import { barChart, lineChart, SERIES } from "./ui/charts.js";
-import { icon, exerciseIcon, hydrateIcons } from "./ui/icons.js";
-import { $, el, show, toast, fmtDate, toDate, renderChat, initials, PHASE_LABEL, METRIC_LABEL } from "./ui/dom.js";
+import { $, el, show, toast, fmtDate, fmtDateTime, toDate, initials, PHASE_LABEL, METRIC_LABEL } from "./ui/dom.js";
 
 // ------------------------------------------------------------------ state
 let user, profile;
+let isDemo = false;
+let prescriptions = [];
 let sessions = [];
-let twin = null;
-let classifier;                 // undefined = not tried, null = unavailable
-let current = null;             // { rx, cfg, engine, sessionId, startedAt, finishing }
+let twin = buildTwin([]);
+let classifier;                       // undefined = not tried yet, null = unavailable
+let current = null;                   // { rx, cfg, engine, sessionId, startedAt, finishing }
 let pendingRx = null;
-let camera = null, pose = null, stream = null, sendT = 0;
-let chatUnsub = null;
-let lastSaved = null;           // { record, pointsEarned }
+let pose = null, stream = null, loopHandle = null, inFlight = false, sendT = 0;
+let lastSaved = null;                 // { record, pointsEarned, emergency }
 let selectedDifficulty = null;
 let selectedPain = 0;
-let isDemoMode = false;
+let chatUnsub = null, chatSeen = 0, doctorName = 'your physiotherapist';
+const latency = { sum: 0, n: 0, downgraded: false };
 
 const PENDING_KEY = 'meditask_pending_sessions';
-const RING = 239;               // circumference of the form-score ring (r = 38)
+const MODEL_URL = './models/web/meditask_model';
+const DAY = 864e5;
 
-const DEMO_PRESCRIPTIONS = [
-    {
-        id: "rx-demo-1",
-        exercise: "Shoulder Abduction",
-        exerciseId: "shoulder_abduction",
-        sets: 3,
-        reps: 10,
-        notes: "Keep movements fluid. Stop if shoulder impingement pain occurs.",
-        assignedAt: new Date(Date.now() - 86400000)
-    },
-    {
-        id: "rx-demo-2",
-        exercise: "Isometric Knee Extension",
-        exerciseId: "squat",
-        sets: 2,
-        reps: 15,
-        notes: "Move into 90° flexion, hold steady, and return slowly.",
-        assignedAt: new Date(Date.now() - 172800000)
-    }
+// ------------------------------------------------------------------ demo data (signed-out preview only)
+const DEMO_RX = [
+    { id: 'demo-rx-1', exercise: 'Squat', exerciseId: 'squat', sets: 2, reps: 5, notes: 'Keep your heels down and go only as low as is comfortable.', assignedAt: new Date(Date.now() - DAY) },
+    { id: 'demo-rx-2', exercise: 'Shoulder Abduction', exerciseId: 'shoulder_abduction', sets: 2, reps: 8, notes: 'Stop at shoulder height.', assignedAt: new Date(Date.now() - 2 * DAY) },
 ];
-
-const DEMO_SESSIONS = [
-    { id: "s1", exercise: "Shoulder Abduction", exerciseId: "shoulder_abduction", startedAt: new Date(Date.now() - 86400000), validReps: 10, targetSets: 3, targetReps: 10, status: "completed", summary: { avgQuality: 88, consistency: 84, rom: { shoulder: { bestRange: 120 } } } },
-    { id: "s2", exercise: "Shoulder Abduction", exerciseId: "shoulder_abduction", startedAt: new Date(Date.now() - 172800000), validReps: 10, targetSets: 3, targetReps: 10, status: "completed", summary: { avgQuality: 85, consistency: 80, rom: { shoulder: { bestRange: 115 } } } },
-    { id: "s3", exercise: "Isometric Knee Extension", exerciseId: "squat", startedAt: new Date(Date.now() - 259200000), validReps: 15, targetSets: 2, targetReps: 15, status: "completed", summary: { avgQuality: 92, consistency: 90, rom: { knee: { bestRange: 90 } } } }
-];
-
-hydrateIcons();
+function demoSessions() {
+    return Array.from({ length: 6 }, (_, i) => ({
+        id: `demo-s${i}`, exercise: 'Squat', exerciseId: 'squat', status: 'completed', validReps: 10, targetSets: 2, targetReps: 5,
+        startedAt: new Date(Date.now() - (6 - i) * DAY),
+        summary: { avgQuality: 72 + 3 * i, consistency: 80 + i, rom: { knee_l: { bestRange: 58 + 4 * i, meanRange: 54 + 4 * i } }, symmetry: {} },
+        feedback: { pain: Math.max(1, 4 - Math.floor(i / 2)), difficulty: 'medium' },
+    }));
+}
 
 // ------------------------------------------------------------------ boot
 (async function init() {
     try {
-        const authResult = await requireRole('patient').catch(() => null);
-        if (authResult && authResult.user) {
-            user = authResult.user;
-            profile = authResult.profile;
-        } else {
-            activateDemoMode();
-        }
-    } catch {
-        activateDemoMode();
+        ({ user, profile } = await requireRole('patient'));
+    } catch (e) {
+        if (e?.code !== 'signed-out') console.warn(e);
+        activateDemo();
     }
-
-    const name = profile.displayName || profile.email.split('@')[0];
-    const h = new Date().getHours();
-    if ($('welcome-line')) $('welcome-line').innerHTML = `Good ${h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'}, <span class="text-indigo-900 font-extrabold">${name}</span>`;
-    if ($('user-avatar')) $('user-avatar').textContent = initials(name);
-    if ($('user-name')) $('user-name').textContent = name;
-    updatePointsUI(profile.points || 0);
-    show('rewards-card', true);
-    if ($('voice-toggle')) $('voice-toggle').checked = !!profile.voiceEnabled;
+    renderHeader();
     buildPainScale();
-    setupNavigation();
-
-    if (!profile.consent?.camera && !isDemoMode) show('consent-modal', true);
-    await flushPendingSessions();
-    await Promise.all([renderLinkSection(), loadPrescriptions(), loadAnalytics()]);
+    wireNavigation();
     if (window.lucide) lucide.createIcons();
+
+    if (!isDemo) {
+        if (!profile.consent?.camera) show('consent-modal', true);
+        await flushPendingSessions();
+    }
+    await Promise.all([renderLinkSection(), loadPrescriptions(), loadAnalytics()]);
+    if (!isDemo) startChatListener();
 })();
 
-function activateDemoMode() {
-    isDemoMode = true;
-    user = { uid: "demo-pt-1", email: "aq@gmail.com" };
-    profile = { uid: "demo-pt-1", email: "aq@gmail.com", displayName: "aq", role: "patient", points: 40, doctorId: "demo-doc-1", consent: { camera: true } };
-    show("demo-banner", true);
+function activateDemo() {
+    isDemo = true;
+    user = { uid: 'demo-patient', email: 'demo.patient@example.com' };
+    profile = { uid: 'demo-patient', email: 'demo.patient@example.com', displayName: 'Demo patient', role: 'patient', points: 20, doctorId: 'demo-doctor', consent: { camera: true } };
+    doctorName = 'the demo physiotherapist';
+    show('demo-banner', true);
+}
+
+function renderHeader() {
+    const name = profile.displayName || profile.email.split('@')[0];
+    const h = new Date().getHours();
+    $('welcome-line').textContent = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    $('user-name').textContent = name;                      // textContent: names are user-provided
+    $('user-avatar').textContent = initials(name);
+    updatePointsUI(profile.points || 0);
+    $('voice-toggle').checked = !!profile.voiceEnabled;
 }
 
 $('logout-btn')?.addEventListener('click', async () => {
     stopCamera();
-    if (isDemoMode) {
-        window.location.href = "./index.html";
-        return;
-    }
+    if (isDemo) { window.location.href = './index.html'; return; }
     await logout();
 });
 
 // ------------------------------------------------------------------ consent
-$('consent-camera')?.addEventListener('change', e => { if ($('consent-accept')) $('consent-accept').disabled = !e.target.checked; });
+$('consent-camera')?.addEventListener('change', e => { $('consent-accept').disabled = !e.target.checked; });
 $('consent-accept')?.addEventListener('click', async () => {
     const consent = { camera: true, version: 1, at: new Date().toISOString() };
-    try { await updateOwnProfile(user.uid, { consent }); profile.consent = consent; } catch (e) { console.error(e); }
+    try { await updateOwnProfile(user.uid, { consent }); profile.consent = consent; }
+    catch (e) { console.error(e); toast('Consent could not be saved. Check your connection and try again.', 'error'); return; }
     show('consent-modal', false);
 });
 
 // ------------------------------------------------------------------ physiotherapist link
 async function renderLinkSection() {
     const box = $('link-section');
-    if (!box) return;
-
-    if (isDemoMode) {
+    box.replaceChildren();
+    if (isDemo) {
+        $('physio-line').textContent = 'This is a demo with sample data. Sign in to see your own programme.';
         show(box, false);
-        if ($('physio-line')) $('physio-line').textContent = "Your programme is prescribed by Dr. R. Reynolds, MD. MediTask checks your movement in real time.";
         return;
     }
-
-    box.replaceChildren();
     let requests = [];
     try { requests = await getMyPendingLinkRequests(profile.email); } catch (e) { console.warn('link requests', e); }
 
     for (const r of requests) {
         const reassign = profile.doctorId && profile.doctorId !== r.doctorId;
-        box.appendChild(el('div', { class: 'p-3 rounded-2xl glass-panel text-xs flex items-center justify-between' },
-            el('div', { class: 'grow' },
-                el('p', { class: 'font-semibold text-slate-900' }, `${r.doctorName || r.doctorEmail} has invited you to join their care.`),
-                el('p', { class: 'text-[11px] text-slate-500' }, reassign ? 'Accepting replaces your current therapist.' : 'Accepting shares kinematic results with them.')),
-            el('div', { class: 'flex gap-2' },
-                el('button', { class: 'px-2.5 py-1 rounded-xl glass-chip text-xs', type: 'button', onclick: () => respond(r, false) }, 'Decline'),
-                el('button', { class: 'px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-semibold text-xs', type: 'button', onclick: () => respond(r, true) }, 'Accept'))));
+        box.appendChild(el('div', { class: 'glass-panel rounded-2xl p-3.5 shadow-glass flex items-start gap-3' },
+            el('div', { class: 'w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 font-bold text-xs' }, initials(r.doctorName || r.doctorEmail)),
+            el('div', { class: 'flex-1 text-xs leading-relaxed text-slate-700' },
+                el('p', { class: 'font-semibold text-slate-900 mb-0.5' }, `${r.doctorName || r.doctorEmail} has invited you to join their care`),
+                reassign ? 'Accepting replaces your current physiotherapist. They will see your session results and messages.'
+                    : 'Accepting lets them prescribe exercises and see your session results and messages.'),
+            el('div', { class: 'flex flex-col gap-1.5 shrink-0' },
+                el('button', { class: 'px-3 py-1 rounded-xl bg-indigo-600 text-white font-semibold text-xs', type: 'button', onclick: () => respond(r, true) }, 'Accept'),
+                el('button', { class: 'px-3 py-1 rounded-xl glass-chip text-xs text-slate-700', type: 'button', onclick: () => respond(r, false) }, 'Decline'))));
     }
-
     if (!profile.doctorId) {
-        show(box, true);
-        if ($('physio-line')) $('physio-line').textContent = 'Once your physiotherapist links your account, your prescribed exercises appear here.';
+        box.appendChild(el('div', { class: 'glass-panel rounded-2xl p-3.5 shadow-glass flex items-start gap-3 border-amber-200/50' },
+            el('div', { class: 'w-8 h-8 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 font-bold' }, '!'),
+            el('div', { class: 'flex-1 text-xs leading-relaxed text-slate-700' },
+                el('p', { class: 'font-semibold text-slate-900 mb-0.5' }, 'Not linked to a physiotherapist yet'),
+                'Ask your physiotherapist to send an invitation to ', el('b', {}, profile.email), '.')));
+        $('physio-line').textContent = 'Once your physiotherapist links your account, your prescribed exercises appear here.';
     } else {
         try {
             const dr = await getProfile(profile.doctorId);
-            if (dr && $('physio-line')) $('physio-line').textContent = `Your programme is prescribed and reviewed by ${dr.displayName || dr.email}. MediTask checks your movement as you go.`;
-        } catch { /* best-effort */ }
+            if (dr) doctorName = dr.displayName || dr.email;
+        } catch { /* best effort */ }
+        $('physio-line').textContent = `Your programme is prescribed and reviewed by ${doctorName}. MediTask checks your movement as you go.`;
+        $('chat-doctor-name').textContent = doctorName;
     }
+    show(box, box.childElementCount > 0);
 }
 
 async function respond(request, accept) {
     try {
         await respondToLinkRequest(user.uid, request, accept);
         if (accept) profile.doctorId = request.doctorId;
-        toast(accept ? 'Linked to your physiotherapist' : 'Invitation declined', 'success');
+        toast(accept ? 'You are now linked to your physiotherapist' : 'Invitation declined', 'success');
         await Promise.all([renderLinkSection(), loadPrescriptions()]);
-    } catch (e) { console.error(e); toast(`Could not update invitation: ${e.message}`, 'error'); }
+        if (accept) startChatListener();
+    } catch (e) { console.error(e); toast(`The invitation could not be updated: ${e.message}`, 'error'); }
 }
 
 // ------------------------------------------------------------------ prescriptions
 async function loadPrescriptions() {
     const list = $('prescription-list');
-    if (!list) return;
     list.replaceChildren();
-    if ($('prescription-loading')) $('prescription-loading').textContent = 'Loading…';
-
-    let items = [];
-    if (isDemoMode) {
-        items = DEMO_PRESCRIPTIONS;
-    } else {
-        try { items = await getPrescriptions(user.uid, 'active'); }
+    $('prescription-loading').textContent = 'Loading…';
+    if (isDemo) prescriptions = DEMO_RX;
+    else {
+        try { prescriptions = await getPrescriptions(user.uid, 'active'); }
         catch (err) {
+            // Never fall back to sample data for a real patient.
             console.error('Prescription load error:', err);
-            items = DEMO_PRESCRIPTIONS;
+            prescriptions = [];
+            $('prescription-loading').textContent = 'Unavailable';
+            list.appendChild(emptyCard('Exercises could not be loaded', 'Check your internet connection and reload the page.'));
+            return;
         }
     }
-
-    if (!items.length) {
-        if ($('prescription-loading')) $('prescription-loading').textContent = '0 Modules';
-        list.appendChild(el('div', { class: 'glass-panel rounded-3xl p-5 text-center text-xs text-slate-500' },
-            el('h4', { class: 'font-bold text-slate-800 text-sm mb-1' }, 'No exercises prescribed'),
-            'Your exercises will appear here as soon as your physiotherapist assigns them.'));
+    if (!prescriptions.length) {
+        $('prescription-loading').textContent = 'None today';
+        list.appendChild(emptyCard(profile.doctorId ? 'Nothing prescribed right now' : 'No programme yet',
+            profile.doctorId ? 'New exercises from your physiotherapist will appear here.' : 'Your exercises appear here once a physiotherapist links your account.'));
         return;
     }
-
-    if ($('prescription-loading')) $('prescription-loading').textContent = `${items.length} Modules`;
-
-    for (const rx of items) {
-        const cfg = resolveExercise(rx.exerciseId || rx.exercise);
-        const card = el('div', { class: 'glass-panel rounded-3xl p-4 shadow-glass border-white/90 relative overflow-hidden transition hover:shadow-lg' },
-            el('div', { class: 'flex items-start justify-between' },
-                el('div', { class: 'space-y-1' },
-                    el('div', { class: 'flex items-center space-x-2' },
-                        el('span', { class: 'px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold tracking-wider uppercase' }, cfg?.bodyRegion || 'Rehab'),
-                        el('span', { class: 'text-[11px] text-slate-500 font-medium flex items-center gap-1' }, '5-10 mins')
-                    ),
-                    el('h3', { class: 'text-base font-bold text-slate-900' }, cfg?.name || rx.exercise),
-                    el('p', { class: 'text-xs text-slate-600' }, `${rx.sets} Sets × ${rx.reps} Reps • Prescribed Range ${cfg?.targetValue ? `0°–${cfg.targetValue}°` : 'Guided'}`),
-                    rx.notes ? el('p', { class: 'text-[11px] text-indigo-900/80 italic mt-1' }, `“${rx.notes}”`) : null
-                ),
-                el('div', { class: 'w-12 h-12 rounded-2xl bg-gradient-to-b from-indigo-100/80 to-purple-100/50 border border-white flex items-center justify-center shadow-inner text-indigo-600 font-bold' },
-                    initials(cfg?.name || rx.exercise)
-                )
-            ),
-            el('div', { class: 'mt-4 pt-3 border-t border-white/50 flex items-center justify-between' },
-                el('div', { class: 'flex items-center space-x-1.5 text-xs font-semibold text-slate-600' },
-                    el('span', { class: 'w-2 h-2 rounded-full bg-emerald-500' }),
-                    el('span', {}, 'Vision tracking enabled')
-                ),
-                el('button', {
-                    class: 'px-4 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-md active:scale-95 transition-all',
-                    type: 'button',
-                    onclick: () => showDemo(rx, cfg)
-                }, el('span', {}, 'Start Session'), el('span', {}, '›'))
-            )
-        );
-        list.appendChild(card);
-    }
-    if (window.lucide) lucide.createIcons();
+    $('prescription-loading').textContent = `${prescriptions.length} to do`;
+    for (const rx of prescriptions) list.appendChild(prescriptionCard(rx));
 }
 
-function showDemo(rx, cfg) {
-    if (!cfg) { toast('Exercise definition unavailable', 'error'); return; }
+function emptyCard(title, text) {
+    return el('div', { class: 'glass-panel rounded-3xl p-5 text-center text-xs text-slate-500' },
+        el('h4', { class: 'font-bold text-slate-800 text-sm mb-1' }, title), text);
+}
+
+function prescriptionCard(rx) {
+    const cfg = resolveExercise(rx.exerciseId || rx.exercise);
+    const minutes = Math.max(2, Math.round(rx.sets * rx.reps * 4 / 60 + (rx.sets - 1) * 0.75));
+    const range = cfg ? `${cfg.restValue}° to ${cfg.targetValue}° at the ${(METRIC_LABEL[cfg.primaryMetric] || 'joint').toLowerCase()}` : 'Guided';
+    return el('div', { class: 'glass-panel rounded-3xl p-4 shadow-glass relative overflow-hidden' },
+        el('div', { class: 'flex items-start justify-between gap-3' },
+            el('div', { class: 'space-y-1 min-w-0' },
+                el('div', { class: 'flex items-center gap-2' },
+                    el('span', { class: 'px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold tracking-wider uppercase' }, cfg?.bodyRegion || 'Rehab'),
+                    el('span', { class: 'text-[11px] text-slate-500 font-medium' }, `About ${minutes} min`)),
+                el('h3', { class: 'text-base font-bold text-slate-900' }, cfg?.name || rx.exercise),
+                el('p', { class: 'text-xs text-slate-600' }, `${rx.sets} ${rx.sets === 1 ? 'set' : 'sets'} × ${rx.reps} reps, range ${range}`),
+                rx.notes ? el('p', { class: 'text-[11px] text-indigo-900/80 italic mt-1' }, `“${rx.notes}”`) : null,
+                el('p', { class: 'text-[10px] text-slate-400' }, `Assigned ${fmtDate(rx.assignedAt)}`)),
+            el('div', { class: 'w-12 h-12 rounded-2xl bg-gradient-to-b from-indigo-100/80 to-purple-100/50 border border-white flex items-center justify-center shadow-inner text-indigo-600 font-bold shrink-0' },
+                initials(cfg?.name || rx.exercise))),
+        el('div', { class: 'mt-4 pt-3 border-t border-white/50 flex items-center justify-between' },
+            el('div', { class: 'flex items-center gap-1.5 text-xs font-semibold text-slate-600' },
+                el('span', { class: `w-2 h-2 rounded-full ${cfg ? 'bg-emerald-500' : 'bg-amber-500'}` }),
+                el('span', {}, cfg ? 'Camera guidance available' : 'Not supported in this version')),
+            cfg ? el('button', {
+                class: 'px-4 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md active:scale-95 transition-all',
+                type: 'button', onclick: () => openInstructions(rx, cfg),
+            }, el('span', {}, 'Start session'), el('span', { 'aria-hidden': 'true' }, '›')) : null));
+}
+
+function openInstructions(rx, cfg) {
+    if (!isDemo && !profile.consent?.camera) { show('consent-modal', true); return; }
     pendingRx = { rx, cfg };
-    if ($('demo-title')) $('demo-title').textContent = cfg.name;
-    if ($('demo-dose')) $('demo-dose').textContent = `${rx.sets} ${rx.sets === 1 ? 'set' : 'sets'} of ${rx.reps} repetitions`;
-    if ($('demo-instructions')) $('demo-instructions').replaceChildren(...cfg.steps.map(s => el('li', {}, s)));
-    if ($('demo-notes')) {
-        $('demo-notes').textContent = rx.notes ? `From your physiotherapist: ${rx.notes}` : '';
-        show('demo-notes', !!rx.notes);
-    }
+    $('demo-title').textContent = cfg.name;
+    $('demo-dose').textContent = `${rx.sets} ${rx.sets === 1 ? 'set' : 'sets'} of ${rx.reps} repetitions`;
+    $('demo-instructions').replaceChildren(...cfg.steps.map(s => el('li', {}, s)));
+    $('demo-notes').textContent = rx.notes ? `From your physiotherapist: ${rx.notes}` : '';
+    show('demo-notes', !!rx.notes);
     show('demo-modal', true);
+    $('start-exercise-btn').focus();
+}
+$('cancel-demo-btn')?.addEventListener('click', () => { show('demo-modal', false); pendingRx = null; });
+$('start-exercise-btn')?.addEventListener('click', () => { show('demo-modal', false); if (pendingRx) startSession(pendingRx.rx, pendingRx.cfg); });
+
+function startFirstExercise() {
+    const rx = prescriptions.find(r => resolveExercise(r.exerciseId || r.exercise));
+    if (!rx) { toast(prescriptions.length ? 'None of your exercises supports camera guidance yet' : 'No exercises prescribed yet'); $('section-exercises')?.scrollIntoView({ behavior: 'smooth' }); return; }
+    openInstructions(rx, resolveExercise(rx.exerciseId || rx.exercise));
 }
 
-$('cancel-demo-btn')?.addEventListener('click', () => { show('demo-modal', false); pendingRx = null; });
-$('start-exercise-btn')?.addEventListener('click', () => {
-    show('demo-modal', false);
-    if (pendingRx) startSession(pendingRx.rx, pendingRx.cfg);
-});
+// ------------------------------------------------------------------ live session
+async function loadTemplate(exerciseId) {
+    try {
+        const r = await fetch(`./models/templates/${exerciseId}.json`, { cache: 'no-cache' });
+        if (!r.ok) return null;
+        const t = await r.json();
+        return Array.isArray(t.progress) && t.progress.length >= 10 ? t : null;
+    } catch { return null; }
+}
 
-// ------------------------------------------------------------------ session run
 async function startSession(rx, cfg) {
-    if (!profile.consent?.camera && !isDemoMode) { show('consent-modal', true); return; }
-    if (classifier === undefined) classifier = await tryLoadClassifier(cfg.id);
-
-    show('prescription-list-view', false);
-    show('exercise-session-view', true);
-
-    if ($('ml-badge')) $('ml-badge').textContent = classifier ? `AI ${classifier.info.model_name}` : 'Kinematic analysis';
+    if (classifier === undefined) classifier = await tryLoadClassifier(MODEL_URL);
+    const template = await loadTemplate(cfg.id);
+    const mlActive = classifier?.supports(cfg.id);
+    const mlQuality = mlActive && classifier.qualityReliable(cfg.id);
+    $('ml-badge').textContent = mlQuality ? 'AI model + rules' : mlActive ? 'Rules + AI exercise check' : 'Rule-based analysis';
+    $('ml-badge').title = mlQuality ? `Trained model ${classifier.info.model_name} gives a second opinion on each repetition`
+        : mlActive ? 'The trained model checks that you are doing the right exercise; form is judged by the rule engine'
+            : 'No trained model covers this exercise yet';
 
     current = {
         rx, cfg, sessionId: newId(), startedAt: new Date(), finishing: false,
         engine: new RehabSession({
-            exercise: cfg,
-            sets: rx.sets,
-            reps: rx.reps,
-            classifier,
-            voice: $('voice-toggle')?.checked ?? false,
-            onFrame: handleFrame,
-            onRep: handleRep,
-            onEvent: handleEngineEvent,
+            exercise: cfg, sets: rx.sets, reps: rx.reps,
+            template: template?.progress, templateSource: template?.source,
+            classifier: mlActive ? classifier : null, voice: $('voice-toggle').checked,
+            onFrame: handleFrame, onRep: handleRep, onEvent: handleEngineEvent,
         }),
     };
+    latency.sum = 0; latency.n = 0;
 
-    if ($('current-exercise-title')) $('current-exercise-title').textContent = cfg.name;
-    if ($('session-sub')) $('session-sub').textContent = `${rx.sets} sets of ${rx.reps} reps. Follow camera instructions.`;
-    if ($('total-sets')) $('total-sets').textContent = rx.sets;
-    if ($('target-reps')) $('target-reps').textContent = rx.reps;
-    if ($('current-set')) $('current-set').textContent = 1;
-    if ($('current-reps')) $('current-reps').textContent = 0;
-    if ($('rep-log')) $('rep-log').replaceChildren(el('p', { class: 'text-slate-400 text-xs italic' }, 'Repetitions and form scores will appear here.'));
-    if ($('incomplete-note')) $('incomplete-note').textContent = '';
-
+    $('current-exercise-title').textContent = cfg.name;
+    $('session-sub').textContent = `${rx.sets} ${rx.sets === 1 ? 'set' : 'sets'} of ${rx.reps} repetitions. Follow the instruction under the video.`;
+    $('total-sets').textContent = rx.sets; $('target-reps').textContent = rx.reps;
+    $('current-set').textContent = 1; $('current-reps').textContent = 0;
+    $('accuracy-percent').textContent = 0; $('progress-bar').style.width = '0%'; $('rom-fill').style.height = '0%';
+    $('rep-log').replaceChildren(el('p', { class: 'text-slate-400 text-xs italic' }, 'Each repetition and its quality appears here.'));
+    $('incomplete-note').textContent = '';
+    show('prescription-list-view', false); show('exercise-session-view', true);
+    document.body.classList.add('session-live');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     await startCamera();
 }
 
-let animFrameId = null;
-let isProcessingFrame = false;
-let latestState = null;
-
 async function startCamera() {
     const video = $('webcam'), canvas = $('pose-canvas');
-    if (!video || !canvas) return;
-
-    if (!window.Pose) {
-        toast('MediaPipe library loading. Please wait a moment...', 'warning');
+    if (!window.Pose) { setFeedback('The movement tracker is still loading. Wait a moment and start again.', 'error'); return; }
+    setFeedback('Starting camera…', 'info');
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+    } catch (err) {
+        setFeedback(err.name === 'NotAllowedError'
+            ? 'Camera access is blocked. Allow camera access for this site in your browser settings, then start again.'
+            : `The camera could not be started (${err.message}).`, 'error');
         return;
     }
+    video.srcObject = stream;
+    await new Promise(r => (video.readyState >= 1 ? r() : (video.onloadedmetadata = r)));
+    try { await video.play(); } catch { /* autoplay muted is allowed */ }
+    canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
 
-    if ($('feedback-box')) {
-        $('feedback-box').textContent = 'Starting camera and computer vision...';
+    if (!pose) {
+        pose = new window.Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}` });
+        pose.onResults(onPoseResults);
     }
-
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-            audio: false
-        });
-        video.srcObject = stream;
-        await new Promise(r => {
-            if (video.readyState >= 1) r();
-            else video.onloadedmetadata = r;
-        });
-        await video.play();
-
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-
-        if (!pose) {
-            pose = new window.Pose({
-                locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`
-            });
-            pose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-            pose.onResults(onPoseResults);
-        }
-
-        if ($('feedback-box')) {
-            $('feedback-box').textContent = 'Get into starting position in front of camera';
-        }
-
-        isProcessingFrame = false;
-        latestState = null;
-        animFrameId = requestAnimationFrame(processVideoFrame);
-    } catch (err) {
-        console.error('Camera start error:', err);
-        toast(`Camera access error: ${err.message}`, 'error');
-        if ($('feedback-box')) {
-            $('feedback-box').textContent = `Camera error: ${err.message}. Please allow webcam access in your browser.`;
-        }
-    }
+    // Lighter model on phones / low-end devices; upgraded paths can still downgrade at runtime.
+    const lowEnd = (navigator.hardwareConcurrency || 4) <= 4 || /Android|iPhone|iPad/i.test(navigator.userAgent);
+    latency.downgraded = lowEnd;
+    pose.setOptions({ modelComplexity: lowEnd ? 0 : 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    setFeedback('Get into the starting position', 'info');
+    scheduleNextFrame();
 }
 
-async function processVideoFrame() {
-    if (!current || current.finishing) return;
+// The <video> element displays the camera natively (smooth); pose estimation runs on its own
+// schedule, one frame in flight at a time, and the canvas only draws the skeleton overlay.
+function scheduleNextFrame() {
     const video = $('webcam');
-    const canvas = $('pose-canvas');
-
-    if (video && video.readyState >= 2 && canvas) {
-        if (video.videoWidth && canvas.width !== video.videoWidth) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-        }
-
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            drawPose(ctx, canvas, latestState, current.cfg, video);
-        }
-
-        if (pose && !isProcessingFrame) {
-            const now = performance.now();
-            if (now - sendT >= 33) {
-                sendT = now;
-                isProcessingFrame = true;
-                try {
-                    await pose.send({ image: video });
-                } catch (err) {
-                    console.warn('Pose processing error:', err);
-                } finally {
-                    isProcessingFrame = false;
-                }
-            }
-        }
-    }
-
-    if (current && !current.finishing) {
-        animFrameId = requestAnimationFrame(processVideoFrame);
-    }
+    if (!current || current.finishing || !stream) return;
+    loopHandle = video.requestVideoFrameCallback
+        ? { type: 'vfc', id: video.requestVideoFrameCallback(poseTick) }
+        : { type: 'raf', id: requestAnimationFrame(poseTick) };
 }
 
-function stopCamera() {
-    if (animFrameId) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-    }
-    isProcessingFrame = false;
-    latestState = null;
-    try {
-        if (stream) {
-            stream.getTracks().forEach(t => t.stop());
+async function poseTick() {
+    const video = $('webcam');
+    if (!current || current.finishing || !pose) return;
+    if (!inFlight && video.readyState >= 2 && !document.hidden) {
+        const now = performance.now();
+        if (now - sendT >= 30) {
+            inFlight = true; sendT = now;
+            try { await pose.send({ image: video }); }
+            catch (err) { console.warn('Pose processing error:', err); }
+            finally { inFlight = false; }
         }
-    } catch {}
-    const v = $('webcam');
-    if (v) {
-        v.pause();
-        v.srcObject = null;
     }
-    const canvas = $('pose-canvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
-    stream = null;
-    current?.engine?.feedback?.cancel?.();
+    scheduleNextFrame();
 }
 
 function onPoseResults(results) {
     if (!current || current.finishing) return;
     const now = performance.now();
-    current.engine.processResults(results, now, now - sendT);
+    const lat = now - sendT;
+    current.engine.processResults(results, now, lat);
+    // Adaptive quality: if inference is slow, switch to the lighter pose model once.
+    latency.sum += lat; latency.n++;
+    if (!latency.downgraded && latency.n >= 45) {
+        if (latency.sum / latency.n > 70) {
+            latency.downgraded = true;
+            pose.setOptions({ modelComplexity: 0 });
+            toast('Switched to faster tracking for this device');
+        }
+        latency.sum = 0; latency.n = 0;
+    }
 }
 
-let frameCount = 0, fpsT0 = performance.now();
+function stopCamera() {
+    const video = $('webcam');
+    if (loopHandle) {
+        if (loopHandle.type === 'vfc') video?.cancelVideoFrameCallback?.(loopHandle.id);
+        else cancelAnimationFrame(loopHandle.id);
+        loopHandle = null;
+    }
+    inFlight = false;
+    stream?.getTracks().forEach(t => t.stop());
+    stream = null;
+    if (video) { video.pause(); video.srcObject = null; }
+    const canvas = $('pose-canvas');
+    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    current?.engine?.feedback?.cancel();
+    document.body.classList.remove('session-live');
+}
+
+let frameCount = 0, fpsT0 = performance.now(), lastPhase = null;
 function handleFrame(state) {
     if (!current || current.finishing) return;
-    latestState = state;
+    const canvas = $('pose-canvas'), video = $('webcam');
+    drawPose(canvas.getContext('2d'), canvas, state, current.cfg, video);
 
     frameCount++;
     const now = performance.now();
-    if (now - fpsT0 > 1000) {
-        if ($('fps-label')) $('fps-label').textContent = `${Math.round(frameCount * 1000 / (now - fpsT0))} fps`;
-        frameCount = 0;
-        fpsT0 = now;
+    if (now - fpsT0 > 1000) { $('fps-label').textContent = `${Math.round(frameCount * 1000 / (now - fpsT0))} fps`; frameCount = 0; fpsT0 = now; }
+    $('confidence-bar').style.width = `${Math.round((state.confidence || 0) * 100)}%`;
+    $('confidence-bar').className = `h-full rounded-full ${state.valid ? 'bg-emerald-500' : 'bg-rose-500'}`;
+    $('phase-badge').textContent = state.valid ? (PHASE_LABEL[state.phase] || state.phase) : 'Paused, adjust your position';
+    if (state.valid && state.phase !== lastPhase) {
+        lastPhase = state.phase;
+        document.querySelectorAll('#phase-steps [data-phase]').forEach(n => n.classList.toggle('text-indigo-700', n.dataset.phase === state.phase));
     }
-    if ($('confidence-bar')) $('confidence-bar').style.width = `${Math.round((state.confidence || 0) * 100)}%`;
-    if ($('phase-badge')) $('phase-badge').textContent = state.valid ? (PHASE_LABEL[state.phase] || state.phase) : 'Adjust position';
-
-    if ($('feedback-box') && state.message) {
-        const msg = state.message;
-        const text = typeof msg === 'object' && msg !== null ? msg.text : msg;
-        const level = typeof msg === 'object' && msg !== null ? msg.level : 'info';
-        const box = $('feedback-box');
-        box.textContent = text;
-        if (level === 'error') {
-            box.className = 'mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-900 flex items-center gap-2';
-        } else if (level === 'warn') {
-            box.className = 'mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900 flex items-center gap-2';
-        } else if (level === 'good') {
-            box.className = 'mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-900 flex items-center gap-2';
-        } else {
-            box.className = 'mt-3 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-900 flex items-center gap-2';
-        }
-    }
-
-    const v = state.metrics?.[current.cfg.primaryMetric];
-    if (typeof v === 'number' && $('angle-readout')) {
+    if (state.message) setFeedback(state.message.text, state.message.level);
+    $('accuracy-percent').textContent = state.valid ? Math.round(state.formScore) : 0;
+    if (state.valid && state.metrics) {
+        const v = state.metrics[current.cfg.primaryMetric];
         $('angle-readout').textContent = `${METRIC_LABEL[current.cfg.primaryMetric] || current.cfg.primaryMetric} ${Math.round(v)}°, target ${current.cfg.targetValue}°`;
+        $('rom-fill').style.height = `${Math.max(0, Math.min(1, state.progress)) * 100}%`;
     }
-    const fill = Math.min(1, Math.max(0, state.progress || 0));
-    if ($('rom-fill')) $('rom-fill').style.height = `${fill * 100}%`;
+}
+
+const FEEDBACK_STYLE = {
+    error: 'bg-rose-50 border-rose-200 text-rose-900', warn: 'bg-amber-50 border-amber-200 text-amber-900',
+    good: 'bg-emerald-50 border-emerald-200 text-emerald-900', info: 'bg-indigo-50 border-indigo-200 text-indigo-900',
+};
+let lastFeedback = '';
+function setFeedback(text, level = 'info') {
+    const key = level + text;
+    if (key === lastFeedback) return;             // avoid DOM churn at 30 fps
+    lastFeedback = key;
+    const box = $('feedback-box');
+    box.className = `mt-3 p-3 rounded-2xl border text-xs font-semibold flex items-center gap-2 ${FEEDBACK_STYLE[level] || FEEDBACK_STYLE.info}`;
+    box.setAttribute('role', 'status');
+    box.textContent = text;
 }
 
 function handleRep(rep) {
     if (!current || current.finishing) return;
-    if ($('current-set')) $('current-set').textContent = current.engine.currentSet;
-    if ($('current-reps')) $('current-reps').textContent = current.engine.repsInSet;
-    updateScoreUI(rep.quality);
-    updateProgressUI();
+    const e = current.engine;
+    $('current-set').textContent = e.currentSet;
+    $('current-reps').textContent = e.repsInSet;
+    $('progress-bar').style.width = `${Math.min(100, 100 * e.validReps / (current.rx.sets * current.rx.reps))}%`;
+    const partial = e.reps.filter(r => r.label === 'incomplete').length;
+    $('incomplete-note').textContent = partial ? `${partial} partial ${partial === 1 ? 'rep' : 'reps'} not counted` : '';
 
     const log = $('rep-log');
-    if (log) {
-        const isFirst = log.children.length === 1 && log.children[0].tagName === 'P';
-        if (isFirst) log.replaceChildren();
-        log.prepend(el('div', { class: 'p-2 rounded-xl glass-chip flex items-center justify-between text-xs mb-1.5' },
-            el('span', { class: 'font-semibold text-slate-800' }, `Rep ${current.engine.validReps}`),
-            el('span', { class: `font-bold ${rep.quality >= 80 ? 'text-teal-600' : rep.quality >= 60 ? 'text-amber-600' : 'text-rose-600'}` }, `Quality ${Math.round(rep.quality)}/100`),
-            el('span', { class: 'text-[10px] text-slate-500' }, `${(rep.durationMs / 1000).toFixed(1)}s`)
-        ));
-    }
-    const flash = $('rep-flash');
-    if (flash) {
-        flash.textContent = current.engine.repsInSet;
+    if (log.firstElementChild?.tagName === 'P') log.replaceChildren();
+    const tone = rep.label === 'correct' ? 'text-teal-600' : rep.label === 'incorrect' ? 'text-amber-600' : 'text-slate-500';
+    const label = { correct: 'Good form', incorrect: 'Needs correction', incomplete: 'Partial, not counted' }[rep.label];
+    log.prepend(el('div', { class: 'p-2 rounded-xl glass-chip text-xs mb-1.5' },
+        el('div', { class: 'flex items-center justify-between' },
+            el('span', { class: 'font-semibold text-slate-800' }, `Rep ${rep.index}`),
+            el('span', { class: `font-bold ${tone}` }, `${label}, ${Math.round(rep.quality)}/100`),
+            el('span', { class: 'text-[10px] text-slate-500' }, `${(rep.durationMs / 1000).toFixed(1)} s`)),
+        rep.messages[0] ? el('p', { class: 'text-[10px] text-slate-500 mt-0.5' }, rep.messages[0]) : null,
+        rep.ml?.confident ? el('p', { class: 'text-[10px] text-indigo-700 mt-0.5' }, `AI model: ${rep.ml.quality} (${Math.round(rep.ml.qualityProb * 100)}%)`) : null));
+    if (rep.ml?.exerciseMismatch) toast(`This movement does not look like ${current.cfg.name}. Check the instructions.`);
+
+    if (rep.label !== 'incomplete') {
+        const flash = $('rep-flash');
+        flash.textContent = e.repsInSet;
         show(flash, true);
-        setTimeout(() => show(flash, false), 700);
+        setTimeout(() => show(flash, false), 500);
     }
 }
 
-function handleEngineEvent(e) {
-    if (e.type === 'set_complete') {
-        toast(`Set ${e.set} completed! Take a short rest.`, 'success');
-        if ($('current-set')) $('current-set').textContent = current.engine.currentSet;
-        if ($('current-reps')) $('current-reps').textContent = 0;
-    } else if (e.type === 'session_complete') {
-        toast('Prescribed sets completed!', 'success');
-        finishSession('completed');
-    } else if (e.type === 'rep_aborted') {
-        if ($('incomplete-note')) {
-            $('incomplete-note').textContent = 'Repetition reset — return to start';
-            setTimeout(() => { if ($('incomplete-note')) $('incomplete-note').textContent = ''; }, 2500);
-        }
-    }
+function handleEngineEvent(ev) {
+    if (ev.type === 'set_complete') toast(`Set ${ev.set} complete. Rest for a moment, then continue.`, 'success');
+    else if (ev.type === 'rep_aborted') setFeedback('Tracking was lost, so that repetition was not counted', 'warn');
+    else if (ev.type === 'session_complete') finishSession('completed');
 }
 
 $('voice-toggle')?.addEventListener('change', e => {
-    if (current) current.engine.voiceEnabled = e.target.checked;
+    current?.engine?.setVoice(e.target.checked);
+    if (!isDemo) updateOwnProfile(user.uid, { voiceEnabled: e.target.checked }).catch(() => {});
 });
 
 $('back-to-prescriptions')?.addEventListener('click', () => {
-    if (confirm('End this rehabilitation session early?')) finishSession('stopped');
+    if (!current) return backToDashboard();
+    if (!current.engine.reps.length) { stopCamera(); current = null; return backToDashboard(); }
+    if (confirm('End this session now? Completed repetitions are saved, but the exercise stays on your list.')) finishSession('stopped');
 });
 
-$('emergency-stop-btn')?.addEventListener('click', () => {
-    if (current) current.engine.emergencyStop = true;
-    finishSession('stopped', true);
-});
+$('emergency-stop-btn')?.addEventListener('click', () => { if (current) finishSession('stopped', { emergency: true }); });
 
-async function finishSession(status, emergency = false) {
-    if (!current || current.finishing) return;
+async function finishSession(status, { emergency = false } = {}) {
+    if (!current || current.finishing) return;            // duplicate-completion guard
     current.finishing = true;
     stopCamera();
-
-    const record = current.engine.buildRecord({
-        id: current.sessionId,
-        status,
-        prescription: current.rx,
-        startedAt: current.startedAt,
-        endedAt: new Date()
-    });
+    const { engine, rx, sessionId, startedAt } = current;
+    const record = engine.buildRecord({ id: sessionId, status, prescription: rx, startedAt, endedAt: new Date() });
     if (emergency) record.emergencyStop = true;
-    lastSaved = { record, pointsEarned: 0 };
 
-    if (!isDemoMode) {
-        try {
-            const res = await saveSession(profile, record, current.rx);
-            lastSaved.pointsEarned = res.pointsEarned || 0;
-            if (res.pointsEarned) {
-                profile.points = (profile.points || 0) + res.pointsEarned;
-                updatePointsUI(profile.points);
-            }
-        } catch (err) {
-            console.error('Session save failed:', err);
-        }
+    let pointsEarned = 0;
+    if (isDemo) {
+        pointsEarned = status === 'completed' ? 10 : 0;
+        profile.points += pointsEarned; updatePointsUI(profile.points);
+        sessions.unshift({ ...record, feedback: null });
     } else {
-        lastSaved.pointsEarned = 10;
-        DEMO_SESSIONS.unshift(record);
+        try {
+            ({ pointsEarned } = await saveWithRetry(record, rx));
+            if (pointsEarned) { profile.points = (profile.points || 0) + pointsEarned; profile.lastRewardedPrescription = rx.id; updatePointsUI(profile.points); }
+        } catch (e) {
+            console.error('Session save failed, queued for retry:', e);
+            queuePending(record, rx);
+            toast('Saved on this device. It will upload when you are back online.', 'info', 5000);
+        }
+        if (emergency) raiseAlert(user.uid, 'emergency_stop', `Patient pressed STOP during ${engine.cfg.name}`, sessionId).catch(console.error);
     }
-
+    lastSaved = { record, pointsEarned, emergency };
     show('exercise-session-view', false);
-    showSessionReport(record, emergency);
+    showReport(record, pointsEarned, emergency);
 }
 
-function showSessionReport(rec, emergency) {
-    if ($('report-title')) $('report-title').textContent = emergency ? 'Session Stopped' : (rec.status === 'completed' ? 'Session Complete!' : 'Session Saved');
-    if ($('report-sub')) $('report-sub').textContent = `${rec.exercise}: ${rec.validReps} of ${rec.targetSets * rec.targetReps} reps completed`;
-    const body = $('report-body');
-    if (body) {
-        body.replaceChildren(
-            el('div', { class: 'p-3 rounded-2xl glass-chip grid grid-cols-2 gap-2 text-center' },
-                el('div', {}, el('span', { class: 'text-slate-400 block text-[10px] uppercase font-bold' }, 'Average Quality'), el('span', { class: 'text-xl font-bold text-teal-600' }, `${rec.summary?.avgQuality ?? 85}/100`)),
-                el('div', {}, el('span', { class: 'text-slate-400 block text-[10px] uppercase font-bold' }, 'Points Awarded'), el('span', { class: 'text-xl font-bold text-amber-500' }, '+10 pts'))
-            ),
-            emergency ? el('p', { class: 'text-xs text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200' }, 'Emergency pain stop logged. Your physiotherapist has been alerted.') : null
-        );
+async function saveWithRetry(record, rx, attempts = 3) {
+    let err;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const fresh = await getProfile(user.uid);           // points rule needs the stored value
+            if (fresh) Object.assign(profile, fresh);
+            return await saveSession(profile, record, rx);
+        } catch (e) {
+            err = e;
+            if (e.code === 'permission-denied') {
+                // e.g. prescription edited/cancelled meanwhile: save the session on its own.
+                try { return await saveSession(profile, record, null); }
+                catch (e2) {
+                    if (e2.code === 'permission-denied') return { pointsEarned: 0, alreadySaved: true };   // same id already stored
+                    err = e2;
+                }
+            }
+            await new Promise(r => setTimeout(r, 800 * (i + 1)));
+        }
     }
+    throw err;
+}
+
+function queuePending(record, rx) {
+    try {
+        const q = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+        q.push({ record: { ...record, startedAt: record.startedAt.toISOString(), endedAt: record.endedAt.toISOString() }, rx });
+        localStorage.setItem(PENDING_KEY, JSON.stringify(q.slice(-10)));
+    } catch { /* storage unavailable */ }
+}
+
+async function flushPendingSessions() {
+    let q = [];
+    try { q = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return; }
+    if (!q.length) return;
+    const left = [];
+    for (const item of q) {
+        const rec = { ...item.record, startedAt: new Date(item.record.startedAt), endedAt: new Date(item.record.endedAt) };
+        try { await saveSession(profile, rec, item.rx); }
+        catch (e) { if (e.code !== 'permission-denied') left.push(item); }
+    }
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(left)); } catch { /* ignore */ }
+    if (q.length !== left.length) toast(`Uploaded ${q.length - left.length} saved session(s)`, 'success');
+}
+
+// ------------------------------------------------------------------ report + feedback
+function statTile(label, value, tone = 'text-slate-900') {
+    return el('div', {}, el('span', { class: 'text-slate-400 block text-[10px] uppercase font-bold' }, label), el('span', { class: `text-xl font-bold ${tone}` }, value));
+}
+
+function showReport(rec, points, emergency) {
+    const s = rec.summary;
+    $('report-title').textContent = emergency ? 'Session stopped' : rec.status === 'completed' ? 'Session complete' : 'Session saved';
+    $('report-sub').textContent = `${rec.exercise}: ${rec.validReps} of ${rec.targetSets * rec.targetReps} repetitions`;
+    const parts = [];
+    if (emergency) parts.push(el('p', { class: 'text-xs text-rose-800 bg-rose-50 p-2.5 rounded-xl border border-rose-200' },
+        isDemo ? 'In the real app your physiotherapist is alerted immediately.' :
+            'Your physiotherapist has been alerted. Rest and do not continue this exercise until you have spoken to them. For severe pain, chest pain or difficulty breathing, call 112.'));
+    parts.push(el('div', { class: 'p-3 rounded-2xl glass-chip grid grid-cols-2 gap-3 text-center' },
+        statTile('Movement quality', s.avgQuality ? `${Math.round(s.avgQuality)}/100` : '–', 'text-teal-600'),
+        statTile('Good-form reps', `${s.correctReps} of ${s.totalReps}`),
+        statTile('Consistency', `${Math.round(s.consistency)}%`),
+        statTile('Points earned', points ? `+${points}` : '0', 'text-amber-500')));
+    const rom = Object.entries(s.rom || {});
+    if (rom.length) parts.push(el('div', { class: 'p-3 rounded-2xl glass-chip' },
+        el('p', { class: 'text-[10px] uppercase font-bold text-slate-400 mb-1' }, 'Range of motion'),
+        ...rom.map(([k, v]) => el('p', { class: 'flex justify-between' }, el('span', {}, METRIC_LABEL[k] || k), el('span', { class: 'font-semibold' }, `best ${v.bestRange}°, average ${v.meanRange}°`)))));
+    const errs = Object.entries(s.errorCounts || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (errs.length) parts.push(el('div', { class: 'p-3 rounded-2xl glass-chip' },
+        el('p', { class: 'text-[10px] uppercase font-bold text-slate-400 mb-1' }, 'Focus on next time'),
+        ...errs.map(([id, n]) => el('p', {}, `• ${messageFor(id)} (${n} ${n === 1 ? 'rep' : 'reps'})`))));
+    if (s.performanceDecline) parts.push(el('p', { class: 'text-[11px] text-slate-500' }, 'Your movement quality dropped towards the end. Take enough rest between sets.'));
+    $('report-body').replaceChildren(...parts);
     show('report-modal', true);
+    $('report-continue').focus();
+}
+
+function messageFor(id) {
+    return current?.cfg?.rules.find(r => r.id === id)?.message
+        || { too_fast: 'Move more slowly', too_slow: 'Keep a steady pace', short_hold: 'Hold the end position a little longer', incomplete_rom: 'Reach the full range' }[id] || id;
 }
 
 $('report-continue')?.addEventListener('click', () => {
     show('report-modal', false);
+    setPain(0); $('feedback-notes').value = '';
+    selectedDifficulty = null;
+    document.querySelectorAll('.difficulty-btn').forEach(b => { b.classList.remove('bg-indigo-600', 'text-white'); b.setAttribute('aria-pressed', 'false'); });
     show('feedback-modal', true);
 });
-
-$('close-report-btn')?.addEventListener('click', () => {
-    show('report-modal', false);
-    show('prescription-list-view', true);
-});
-
-$('return-dashboard-btn')?.addEventListener('click', () => {
-    show('report-modal', false);
-    show('prescription-list-view', true);
-});
+// Closing the report without feedback still returns to the dashboard.
+['close-report-btn', 'return-dashboard-btn'].forEach(id => $(id)?.addEventListener('click', () => { show('report-modal', false); closeSessionFlow(); }));
 
 function buildPainScale() {
     const scale = $('pain-scale');
-    if (!scale) return;
-    scale.replaceChildren();
-    for (let i = 0; i <= 10; i++) {
-        scale.appendChild(el('button', {
-            type: 'button',
-            class: `p-2 rounded-xl glass-chip text-xs font-bold transition hover:bg-white active:scale-95 ${i === 0 ? 'bg-indigo-600 text-white' : 'text-slate-800'}`,
-            onclick: () => setPain(i)
-        }, String(i)));
-    }
+    scale.replaceChildren(...Array.from({ length: 11 }, (_, i) => el('button', {
+        type: 'button', 'aria-label': `Pain ${i}`, 'aria-pressed': 'false', dataset: { pain: i },
+        class: 'p-2 rounded-xl glass-chip text-xs font-bold transition text-slate-800', onclick: () => setPain(i),
+    }, String(i))));
+    setPain(0);
 }
-
 function setPain(v) {
     selectedPain = v;
-    if ($('pain-value')) $('pain-value').textContent = v;
+    $('pain-value').textContent = v;
+    document.querySelectorAll('#pain-scale button').forEach(b => {
+        const on = +b.dataset.pain === v;
+        b.setAttribute('aria-pressed', String(on));
+        b.classList.toggle('text-white', on);
+        b.classList.toggle(v >= 7 ? 'bg-rose-600' : 'bg-indigo-600', on);
+        if (!on) b.classList.remove('bg-rose-600', 'bg-indigo-600');
+    });
     show('pain-warning', v >= 7);
 }
 
-document.querySelectorAll('.difficulty-btn').forEach(b => {
-    b.addEventListener('click', () => {
-        document.querySelectorAll('.difficulty-btn').forEach(x => x.classList.remove('bg-indigo-600', 'text-white'));
-        b.classList.add('bg-indigo-600', 'text-white');
-        selectedDifficulty = b.dataset.difficulty;
-    });
-});
+document.querySelectorAll('.difficulty-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.difficulty-btn').forEach(x => { x.classList.remove('bg-indigo-600', 'text-white'); x.setAttribute('aria-pressed', 'false'); });
+    b.classList.add('bg-indigo-600', 'text-white'); b.setAttribute('aria-pressed', 'true');
+    selectedDifficulty = b.dataset.difficulty;
+}));
 
 $('submit-feedback-btn')?.addEventListener('click', async () => {
-    show('feedback-modal', false);
-    show('prescription-list-view', true);
-    toast('Feedback recorded', 'success');
-    await loadAnalytics();
+    if (!selectedDifficulty) { toast('Choose how difficult the exercise felt', 'error'); return; }
+    const record = lastSaved?.record;
+    const feedback = { pain: selectedPain, difficulty: selectedDifficulty, notes: $('feedback-notes').value.trim() };
+    if (record && isDemo) {
+        const s = sessions.find(x => x.id === record.id); if (s) s.feedback = feedback;
+    } else if (record) {
+        // Pain escalation relative to the patient's own baseline for this exercise.
+        const base = twin?.exercises?.[record.exerciseId]?.baseline?.pain;
+        const flags = { highPain: selectedPain >= 7, painIncrease: Number.isFinite(base) && selectedPain - base >= 3 };
+        try {
+            await addSessionFeedback(user.uid, record.id, feedback, flags);
+            if (flags.highPain) await raiseAlert(user.uid, 'pain', `Pain ${selectedPain}/10 reported after ${record.exercise}`, record.id);
+            else if (flags.painIncrease) await raiseAlert(user.uid, 'pain_increase', `Pain ${selectedPain}/10 after ${record.exercise} (baseline ${base})`, record.id);
+        } catch (e) {
+            console.error('Feedback save failed:', e);
+            toast('Feedback could not be saved. Try again with a stable connection.', 'error');
+            return;
+        }
+    }
+    toast('Feedback saved', 'success');
+    closeSessionFlow();
 });
+$('skip-feedback-btn')?.addEventListener('click', closeSessionFlow);
 
-$('skip-feedback-btn')?.addEventListener('click', () => {
+function closeSessionFlow() {
     show('feedback-modal', false);
-    show('prescription-list-view', true);
-});
-
-// ------------------------------------------------------------------ UI Helpers
-function updateScoreUI(score) {
-    if ($('accuracy-percent')) $('accuracy-percent').textContent = Math.round(score);
-    if ($('stat-avg-accuracy')) $('stat-avg-accuracy').textContent = Math.round(score);
+    current = null; lastSaved = null;
+    backToDashboard();
 }
 
-function updateProgressUI() {
-    if (!current) return;
-    const total = current.rx.sets * current.rx.reps;
-    if ($('progress-bar')) $('progress-bar').style.width = `${Math.min(100, 100 * current.engine.validReps / total)}%`;
+async function backToDashboard() {
+    show('exercise-session-view', false); show('prescription-list-view', true);
+    await Promise.all([loadPrescriptions(), loadAnalytics()]);
 }
 
 function updatePointsUI(points) {
-    if ($('user-points')) $('user-points').textContent = points;
-    if ($('user-currency')) $('user-currency').textContent = (points / 100).toFixed(2);
+    $('user-points').textContent = points;
+    $('user-currency').textContent = (points / 100).toFixed(2);
 }
 
-// ------------------------------------------------------------------ Analytics / Twin
+// ------------------------------------------------------------------ analytics / digital twin
 async function loadAnalytics() {
-    if (isDemoMode) {
-        sessions = DEMO_SESSIONS;
-    } else {
-        try { sessions = await getSessions(user.uid, 50); }
-        catch { sessions = DEMO_SESSIONS; }
+    if (isDemo) { if (!sessions.length) sessions = demoSessions(); }
+    else {
+        try { sessions = await getSessions(user.uid, 100); }
+        catch (e) { console.error('sessions', e); sessions = []; }
     }
-
     twin = buildTwin(sessions);
     const completed = sessions.filter(s => s.status === 'completed');
-    if ($('stat-total-exercises')) $('stat-total-exercises').textContent = completed.length || 3;
-    if ($('stat-adherence')) $('stat-adherence').textContent = twin.activeDaysLast14 || 4;
-    if ($('stat-streak')) $('stat-streak').textContent = 4;
-    if ($('stat-avg-accuracy')) $('stat-avg-accuracy').textContent = 88;
+    $('stat-total-exercises').textContent = completed.length;
 
-    // Weekly Chart
-    const weeklyCanvas = $('weekly-chart');
-    if (weeklyCanvas && window.Chart) {
-        barChart(weeklyCanvas, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], [1, 2, 0, 1, 2, 1, 1], 'Sessions');
-    }
+    // Movement quality over the last 10 sessions
+    const q = sessions.slice(0, 10).map(s => s.summary?.avgQuality).filter(v => v > 0);
+    const avgQ = q.length ? Math.round(q.reduce((a, b) => a + b, 0) / q.length) : null;
+    $('stat-avg-accuracy').textContent = avgQ ?? '–';
+    $('stat-gauge').setAttribute('stroke-dasharray', `${avgQ ?? 0}, 100`);
+    const [badgeText, badgeCls, dotCls] = avgQ === null ? ['No sessions yet', 'bg-slate-50 text-slate-600 border-slate-200', 'bg-slate-300']
+        : avgQ >= 80 ? ['Good form', 'bg-emerald-50 text-emerald-700 border-emerald-200', 'bg-emerald-500']
+            : avgQ >= 60 ? ['Improving', 'bg-amber-50 text-amber-700 border-amber-200', 'bg-amber-500']
+                : ['Needs work', 'bg-rose-50 text-rose-700 border-rose-200', 'bg-rose-500'];
+    $('stat-quality-badge').className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold mt-1 ${badgeCls}`;
+    $('stat-quality-badge').textContent = badgeText;
+    $('stat-quality-dot').className = `w-2 h-2 rounded-full ${dotCls}`;
 
-    // Trend Exercise Select & Chart
+    // Streak (consecutive days ending today or yesterday) and active days this week
+    const days = new Set(sessions.map(s => toDate(s.startedAt)?.toDateString()).filter(Boolean));
+    let streak = 0; const d = new Date();
+    if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1);
+    while (days.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1); }
+    $('stat-streak').textContent = streak;
+    const week = [];
+    for (let i = 6; i >= 0; i--) { const x = new Date(); x.setDate(x.getDate() - i); week.push(x); }
+    const active7 = week.filter(x => days.has(x.toDateString())).length;
+    $('stat-adherence').textContent = Math.min(active7, 5);
+    $('stat-week-bar').style.width = `${Math.min(100, active7 / 5 * 100)}%`;
+
+    // Programme day chip (since first session)
+    const first = sessions.map(s => toDate(s.startedAt)).filter(Boolean).sort((a, b) => a - b)[0];
+    if (first) { $('programme-day').textContent = `Day ${Math.floor((Date.now() - first) / DAY) + 1}`; show('programme-day', true); }
+
+    renderWeekly(week);
     const sel = $('trend-exercise');
-    if (sel) {
-        const exIds = Object.keys(twin.exercises);
-        sel.replaceChildren(...(exIds.length ? exIds.map(id => el('option', { value: id }, twin.exercises[id].name)) : [el('option', { value: 'shoulder' }, 'Shoulder Abduction')]));
-    }
+    const ids = Object.keys(twin.exercises);
+    const prev = sel.value;
+    sel.replaceChildren(...(ids.length ? ids.map(id => el('option', { value: id }, twin.exercises[id].name)) : [el('option', { value: '' }, 'No sessions yet')]));
+    if (ids.includes(prev)) sel.value = prev;
     renderTrend();
 }
 
-function renderTrend() {
-    const canvas = $('trend-chart');
+const CHART_TICKS = { font: { size: 9, family: '"Plus Jakarta Sans"' }, color: '#64748b' };
+function chartFor(canvas, config) {
     if (!canvas || !window.Chart) return;
-    const existing = Chart.getChart(canvas);
-    if (existing) existing.destroy();
-
-    new Chart(canvas, {
-        type: 'line',
-        data: {
-            labels: ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Today'],
-            datasets: [
-                { label: 'Mobility Range (°)', data: [65, 78, 85, 92, 105, 112, 120], borderColor: '#4f46e5', tension: 0.4, borderWidth: 2.5 },
-                { label: 'Form Quality', data: [70, 75, 79, 82, 85, 87, 90], borderColor: '#0d9488', tension: 0.4, borderWidth: 2 }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { ticks: { font: { size: 9 }, color: '#64748b' } },
-                y: { ticks: { font: { size: 9 }, color: '#64748b' } }
-            }
-        }
-    });
-
-    if ($('trend-summary')) $('trend-summary').textContent = "Range of motion improved by +12° and form quality up 8 points compared to baseline.";
+    Chart.getChart(canvas)?.destroy();
+    new Chart(canvas, config);
 }
 
-// ------------------------------------------------------------------ Navigation & Dock
-function setupNavigation() {
-    const pills = [
-        { id: "pill-overview", target: null },
-        { id: "pill-exercises", target: "section-exercises" },
-        { id: "pill-recovery", target: "section-recovery" },
-        { id: "pill-guidance", target: "section-guidelines" }
-    ];
-
-    pills.forEach(p => {
-        $(p.id)?.addEventListener("click", () => {
-            pills.forEach(x => {
-                if ($(x.id)) $(x.id).className = `cat-pill px-3.5 py-1.5 rounded-full text-xs font-medium shrink-0 transition ${x.id === p.id ? 'bg-white text-indigo-900 shadow-sm border border-white font-semibold' : 'text-slate-600 glass-chip hover:bg-white/40'}`;
-            });
-            if (p.target && $(p.target)) {
-                $(p.target).scrollIntoView({ behavior: 'smooth' });
-            } else {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-        });
+function renderWeekly(week) {
+    const counts = week.map(x => sessions.filter(s => toDate(s.startedAt)?.toDateString() === x.toDateString()).length);
+    chartFor($('weekly-chart'), {
+        type: 'bar',
+        data: { labels: week.map(x => x.toLocaleDateString('en', { weekday: 'short' })), datasets: [{ data: counts, backgroundColor: 'rgba(79, 70, 229, 0.75)', borderRadius: 6, maxBarThickness: 26 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 300 }, plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false }, ticks: CHART_TICKS }, y: { beginAtZero: true, ticks: { ...CHART_TICKS, precision: 0 }, grid: { color: 'rgba(255,255,255,0.5)' } } } },
     });
+}
 
-    // Bottom Navigation Dock
+$('trend-exercise')?.addEventListener('change', renderTrend);
+function renderTrend() {
+    const ex = twin.exercises[$('trend-exercise').value];
+    if (!ex) {
+        Chart.getChart($('trend-chart'))?.destroy();
+        $('trend-summary').textContent = 'Complete a session to start tracking your recovery.';
+        return;
+    }
+    const labels = ex.timeline.map(t => new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    chartFor($('trend-chart'), {
+        type: 'line',
+        data: { labels, datasets: [
+            { label: 'Range of motion (°)', data: ex.timeline.map(t => t.rom), borderColor: '#4f46e5', backgroundColor: '#4f46e5', tension: 0.35, borderWidth: 2.5, spanGaps: true, pointRadius: 2 },
+            { label: 'Movement quality', data: ex.timeline.map(t => t.quality), borderColor: '#0d9488', backgroundColor: '#0d9488', tension: 0.35, borderWidth: 2, spanGaps: true, pointRadius: 2 },
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 300 }, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, font: { size: 9 } } } },
+            scales: { x: { grid: { display: false }, ticks: CHART_TICKS }, y: { beginAtZero: true, ticks: CHART_TICKS, grid: { color: 'rgba(255,255,255,0.5)' } } } },
+    });
+    const c = ex.change;
+    const fmt = (v, u) => v === null ? 'not available yet' : v === 0 ? 'unchanged' : `${v > 0 ? 'up' : 'down'} ${Math.abs(v)}${u}`;
+    $('trend-summary').textContent = ex.baselineReady
+        ? `Compared with your first three sessions: range of motion ${fmt(c.rom, '°')}, movement quality ${fmt(c.quality, ' points')}.`
+        : `Your baseline is still forming (${ex.sessions} of 3 sessions).`;
+    $('stat-trend-caption').textContent = ex.baselineReady && c.rom !== null
+        ? `${ex.name}: range of motion ${fmt(c.rom, '°')} since baseline` : 'Average of your last 10 sessions';
+}
+
+// ------------------------------------------------------------------ chat (Firestore, scoped to this patient)
+function startChatListener() {
+    if (chatUnsub || !profile.doctorId) return;
+    chatUnsub = subscribeToChat(user.uid, msgs => {
+        renderMessages(msgs);
+        const fromDoctor = msgs.filter(m => m.senderRole === 'doctor').length;
+        show('chat-unread-dot', fromDoctor > chatSeen && $('chat-modal').classList.contains('hidden'));
+    }, e => console.warn('chat', e));
+}
+
+function renderMessages(msgs) {
+    const box = $('chat-messages');
+    box.replaceChildren();
+    if (!msgs.length) {
+        box.appendChild(el('p', { class: 'text-center text-xs text-slate-500 py-6' }, `No messages yet. Ask ${doctorName} a question or tell them how your exercises are going.`));
+        return;
+    }
+    for (const m of msgs) {
+        const mine = m.senderId === user.uid;
+        box.appendChild(el('div', { class: `p-2.5 rounded-2xl max-w-[85%] text-xs ${mine ? 'ml-auto bg-indigo-600 text-white font-medium shadow-sm' : 'mr-auto glass-chip text-slate-800'}` },
+            el('p', { class: 'font-semibold text-[10px] opacity-75 mb-0.5' }, mine ? 'You' : (m.senderName || 'Physiotherapist')),
+            el('p', { class: 'whitespace-pre-wrap break-words' }, m.text),
+            el('p', { class: 'text-[9px] opacity-60 mt-0.5 text-right' }, m.createdAt ? fmtDateTime(m.createdAt) : 'Sending…')));
+    }
+    box.scrollTop = box.scrollHeight;
+    chatSeen = msgs.filter(m => m.senderRole === 'doctor').length;
+}
+
+let demoChat = [{ senderId: 'demo-doctor', senderRole: 'doctor', senderName: 'Demo physiotherapist', text: 'Welcome! Message me here if anything feels painful.', createdAt: new Date(Date.now() - 3600e3) }];
+function openChat() {
+    show('chat-modal', true);
+    show('chat-unread-dot', false);
+    if (isDemo) renderMessages(demoChat);
+    else if (!profile.doctorId) renderMessages([]);
+    $('chat-input').focus();
+}
+
+async function sendChatMessage() {
+    const text = $('chat-input').value.trim();
+    if (!text) return;
+    if (isDemo) { demoChat = [...demoChat, { senderId: user.uid, senderRole: 'patient', text, createdAt: new Date() }]; renderMessages(demoChat); $('chat-input').value = ''; return; }
+    if (!profile.doctorId) { toast('Messages are available once you are linked to a physiotherapist', 'error'); return; }
+    try { await sendMessage(user.uid, profile, text); $('chat-input').value = ''; }
+    catch (e) { console.error('Chat error:', e); toast(`Message not sent: ${e.message}`, 'error'); }
+}
+
+// ------------------------------------------------------------------ navigation
+function wireNavigation() {
+    const pills = { 'pill-overview': null, 'pill-exercises': 'section-exercises', 'pill-pose': 'start', 'pill-recovery': 'section-recovery', 'pill-guidance': 'section-guidelines' };
+    const setActive = (id) => Object.keys(pills).forEach(pid => {
+        const b = $(pid); if (!b) return;
+        const on = pid === id;
+        b.className = `cat-pill px-3.5 py-1.5 rounded-full text-xs shrink-0 transition ${on ? 'bg-white text-indigo-900 shadow-sm border border-white font-semibold' : 'font-medium text-slate-600 glass-chip hover:bg-white/40'}`;
+        b.setAttribute('aria-pressed', String(on));
+    });
+    Object.entries(pills).forEach(([id, target]) => $(id)?.addEventListener('click', () => {
+        if (target === 'start') { startFirstExercise(); return; }
+        setActive(id);
+        if (target) $(target)?.scrollIntoView({ behavior: 'smooth' }); else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
     $('dock-home')?.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
     $('dock-routines')?.addEventListener('click', () => $('section-exercises')?.scrollIntoView({ behavior: 'smooth' }));
     $('dock-analytics')?.addEventListener('click', () => $('section-recovery')?.scrollIntoView({ behavior: 'smooth' }));
-    $('dock-therapist')?.addEventListener('click', () => show('chat-modal', true));
-    $('chat-toggle-btn')?.addEventListener('click', () => show('chat-modal', true));
+    $('dock-camera-fab')?.addEventListener('click', startFirstExercise);
+    $('dock-therapist')?.addEventListener('click', openChat);
+    $('chat-toggle-btn')?.addEventListener('click', openChat);
     $('close-chat-btn')?.addEventListener('click', () => show('chat-modal', false));
-
-    // Camera FAB: Quick start first exercise
-    $('dock-camera-fab')?.addEventListener('click', () => {
-        const first = DEMO_PRESCRIPTIONS[0];
-        const cfg = resolveExercise(first.exerciseId);
-        showDemo(first, cfg);
-    });
-
-    // Chat send
     $('send-msg-btn')?.addEventListener('click', sendChatMessage);
     $('chat-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendChatMessage(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { show('chat-modal', false); } });
 }
 
-function sendChatMessage() {
-    const text = $('chat-input')?.value.trim();
-    if (!text) return;
-    const box = $('chat-messages');
-    if (box) {
-        box.appendChild(el('div', { class: 'p-2.5 rounded-2xl max-w-[85%] text-xs ml-auto bg-indigo-600 text-white font-medium shadow-sm' },
-            el('p', { class: 'font-semibold text-[10px] opacity-75 mb-0.5' }, 'You'),
-            el('p', {}, text)
-        ));
-        box.scrollTop = box.scrollHeight;
-    }
-    if ($('chat-input')) $('chat-input').value = '';
-}
-
-window.addEventListener('beforeunload', stopCamera);
+window.addEventListener('pagehide', stopCamera);

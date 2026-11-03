@@ -6,49 +6,15 @@
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
     <title>MediTask - Patient Recovery Dashboard</title>
     <!-- Tailwind CSS v3 with Plugins -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="./css/tw-patient-dashboard.css">
     <!-- Google Fonts: Plus Jakarta Sans -->
     <link href="https://fonts.googleapis.com" rel="preconnect" />
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#f0f5ff',
-                            100: '#e5edff',
-                            400: '#818cf8',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                        },
-                        lumis: {
-                            blue: '#4a6fa5',
-                            lavender: '#9da7c9',
-                            peach: '#f4c4b8',
-                            surface: 'rgba(255, 255, 255, 0.45)',
-                            glass: 'rgba(255, 255, 255, 0.65)',
-                            border: 'rgba(255, 255, 255, 0.75)',
-                        }
-                    },
-                    boxShadow: {
-                        'glass': '0 8px 32px 0 rgba(74, 111, 165, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)',
-                        'glass-active': '0 12px 36px 0 rgba(79, 70, 229, 0.18), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)',
-                        'dock': '0 16px 40px rgba(50, 65, 110, 0.18), inset 0 1px 2px rgba(255, 255, 255, 0.8)',
-                    }
-                }
-            }
-        }
-    </script>
     <style data-purpose="custom-glass-effects">
         /* Dynamic Mesh Gradient mirroring Lumis' periwinkle dawn aesthetic */
         body {
@@ -101,6 +67,10 @@
             -webkit-backface-visibility: hidden;
         }
 
+        /* During a live session, heavy blur is switched off so the GPU stays free for pose tracking. */
+        body.session-live .glass-panel, body.session-live .glass-chip { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(255, 255, 255, 0.86); }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+
         .backdrop-enter {
             background: rgba(15, 23, 42, 0.6);
             backdrop-filter: blur(8px);
@@ -149,14 +119,12 @@
                 <!-- Notification / Chat -->
                 <button id="chat-toggle-btn" aria-label="Messages" class="relative w-9 h-9 glass-chip rounded-full flex items-center justify-center text-slate-700 active:scale-95 transition-transform" title="Messages">
                     <i class="w-4 h-4" data-lucide="message-square"></i>
-                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white"></span>
+                    <span id="chat-unread-dot" class="hidden absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white"></span>
                 </button>
 
                 <!-- User Avatar -->
                 <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-sky-300 p-0.5 shadow-sm">
-                    <div id="user-avatar" class="w-full h-full rounded-full bg-white/80 backdrop-blur flex items-center justify-center font-bold text-xs text-indigo-700">
-                        AQ
-                    </div>
+                    <div id="user-avatar" class="w-full h-full rounded-full bg-white/80 backdrop-blur flex items-center justify-center font-bold text-xs text-indigo-700"></div>
                 </div>
 
                 <!-- Sign Out -->
@@ -181,28 +149,17 @@
             <!-- Greeting Hero -->
             <section data-purpose="hero-greeting">
                 <div class="flex items-baseline justify-between mb-1">
-                    <h1 id="welcome-line" class="text-2xl font-bold tracking-tight text-slate-900">
-                        Good morning, <span id="user-name" class="text-indigo-900 font-extrabold">aq</span>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-900">
+                        <span id="welcome-line">Welcome</span>, <span id="user-name" class="text-indigo-900 font-extrabold"></span>
                     </h1>
-                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/40 border border-white/60 text-indigo-800">
-                        Day 14 Phase
-                    </span>
+                    <span id="programme-day" class="hidden text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/40 border border-white/60 text-indigo-800"></span>
                 </div>
                 <p id="physio-line" class="text-sm text-slate-600 leading-snug">
-                    Your biomechanical indicators look <span class="font-semibold text-slate-900">Promising</span>. Prescribed physical therapy is loaded.
+                    Loading your programme…
                 </p>
 
                 <!-- Invitation / Link Status Section -->
-                <div id="link-section" class="mt-3.5 glass-panel rounded-2xl p-3.5 shadow-glass flex items-start space-x-3 border-amber-200/50 hidden" data-purpose="system-notice">
-                    <div class="w-8 h-8 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
-                        <i class="w-4 h-4" data-lucide="shield-alert"></i>
-                    </div>
-                    <div class="flex-1 text-xs leading-relaxed text-slate-700">
-                        <p class="font-semibold text-slate-900 mb-0.5">Physiotherapist link pending</p>
-                        Ask therapist to accept request for real-time kinematic sync.
-                    </div>
-                    <button id="invite-therapist-btn" class="text-[11px] font-bold text-indigo-700 underline self-center pr-1">Invite</button>
-                </div>
+                <div id="link-section" class="mt-3.5 space-y-2 hidden" data-purpose="system-notice" aria-live="polite"></div>
             </section>
 
             <!-- Core Metrics Grid -->
@@ -210,28 +167,26 @@
                 <!-- Mobility Index (Dial) -->
                 <div class="glass-panel rounded-3xl p-4 shadow-glass flex flex-col justify-between relative overflow-hidden group">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-slate-600 tracking-wide uppercase">Mobility Index</span>
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span class="text-xs font-bold text-slate-600 tracking-wide uppercase">Movement Quality</span>
+                        <span id="stat-quality-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
                     </div>
                     <div class="flex items-center justify-between my-1">
                         <div>
                             <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
-                                <span id="stat-avg-accuracy">88</span><span class="text-sm font-semibold text-slate-500">/100</span>
+                                <span id="stat-avg-accuracy">–</span><span class="text-sm font-semibold text-slate-500">/100</span>
                             </div>
-                            <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold mt-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Excellent
-                            </div>
+                            <div id="stat-quality-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200 text-[10px] font-bold mt-1">No sessions yet</div>
                         </div>
                         <!-- Gauge Ring Graphic -->
                         <div class="relative w-14 h-14 flex items-center justify-center">
                             <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                 <path class="text-white/60" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
-                                <path class="text-indigo-600" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="88, 100" stroke-linecap="round" stroke-width="3.5"></path>
+                                <path id="stat-gauge" class="text-indigo-600" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="0, 100" stroke-linecap="round" stroke-width="3.5"></path>
                             </svg>
                             <i class="w-4 h-4 text-indigo-600 absolute" data-lucide="zap"></i>
                         </div>
                     </div>
-                    <p class="text-[11px] text-slate-500 mt-2 font-medium">Kinematic range up +12% this week</p>
+                    <p id="stat-trend-caption" class="text-[11px] text-slate-500 mt-2 font-medium">Average of your last 10 sessions</p>
                 </div>
 
                 <!-- Streak & Active Sessions -->
@@ -242,18 +197,18 @@
                             <i class="w-4 h-4 text-orange-500" data-lucide="flame"></i>
                         </div>
                         <div class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
-                            <span id="stat-streak">4</span> <span class="text-xs font-semibold text-slate-500">days</span>
+                            <span id="stat-streak">0</span> <span class="text-xs font-semibold text-slate-500">days</span>
                         </div>
-                        <span class="text-[11px] text-slate-500 block"><span id="stat-total-exercises">3</span> sessions logged</span>
+                        <span class="text-[11px] text-slate-500 block"><span id="stat-total-exercises">0</span> sessions logged</span>
                     </div>
                     <!-- Weekly Goal Bar -->
                     <div class="pt-3 border-t border-white/50">
                         <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1.5">
-                            <span>Weekly Target</span>
-                            <span><span id="stat-adherence">4</span>/5 days</span>
+                            <span>Active days this week</span>
+                            <span><span id="stat-adherence">0</span>/5 days</span>
                         </div>
                         <div class="w-full bg-white/50 h-2 rounded-full overflow-hidden p-0.5">
-                            <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full w-[80%]"></div>
+                            <div id="stat-week-bar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all" style="width:0%"></div>
                         </div>
                     </div>
                 </div>
@@ -264,10 +219,10 @@
                 <div class="flex items-center justify-between mb-3 px-1">
                     <div>
                         <h2 class="text-base font-bold text-slate-900 tracking-tight">Prescribed Exercises</h2>
-                        <p class="text-xs text-slate-500">Scheduled by AI rehabilitation model</p>
+                        <p class="text-xs text-slate-500">Prescribed by your physiotherapist</p>
                     </div>
                     <span id="prescription-loading" class="text-xs font-semibold text-indigo-700 bg-white/70 px-2.5 py-1 rounded-full shadow-sm">
-                        3 Modules
+                        Loading…
                     </span>
                 </div>
 
@@ -305,8 +260,8 @@
             <section id="section-recovery" class="glass-panel rounded-3xl p-4 shadow-glass" data-purpose="recovery-chart">
                 <div class="flex items-center justify-between mb-2">
                     <div>
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Recovery Velocity</span>
-                        <h3 class="text-sm font-bold text-slate-900">7-Day Biomechanical Trend</h3>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Recovery Trend</span>
+                        <h3 class="text-sm font-bold text-slate-900">Range of motion and quality per session</h3>
                     </div>
                     <div class="flex items-center space-x-2">
                         <select id="trend-exercise" class="text-[11px] font-semibold text-slate-700 glass-chip px-2.5 py-1 rounded-full outline-none">
@@ -323,7 +278,7 @@
                 <!-- Sessions per day weekly bar chart -->
                 <div class="mt-4 pt-3 border-t border-white/50">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-slate-600">Weekly Sessions Volume</span>
+                        <span class="text-xs font-bold text-slate-600">Sessions in the last 7 days</span>
                     </div>
                     <div class="h-24 w-full">
                         <canvas id="weekly-chart" class="w-full h-full"></canvas>
@@ -362,12 +317,10 @@
                     <span id="phase-badge" class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900/80 text-white backdrop-blur border border-white/20">
                         Rest
                     </span>
-                    <span id="ml-badge" class="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-indigo-900/80 text-indigo-200 backdrop-blur border border-indigo-400/30">
-                        AI Form Analysis
+                    <span id="ml-badge" class="absolute top-3 right-12 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-indigo-900/80 text-indigo-200 backdrop-blur border border-indigo-400/30">
+                        Rule-based analysis
                     </span>
-                    <div id="rep-flash" class="hidden absolute inset-0 flex items-center justify-center bg-teal-500/30 text-white text-6xl font-black">
-                        1
-                    </div>
+                    <div id="rep-flash" class="hidden absolute inset-0 flex items-center justify-center bg-teal-500/30 text-white text-6xl font-black pointer-events-none"></div>
 
                     <!-- Range of motion vertical bar -->
                     <div class="absolute right-3 bottom-3 top-12 w-3 rounded-full bg-white/20 overflow-hidden flex flex-col justify-end p-0.5">
@@ -376,11 +329,11 @@
                 </div>
 
                 <!-- Phase indicators -->
-                <div id="phase-steps" class="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2 px-1">
-                    <span>Rest</span>
-                    <span>Outward</span>
-                    <span>Hold</span>
-                    <span>Return</span>
+                <div id="phase-steps" class="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2 px-1">
+                    <span data-phase="rest">Rest</span>
+                    <span data-phase="outward">Moving</span>
+                    <span data-phase="hold">Hold</span>
+                    <span data-phase="return">Return</span>
                 </div>
 
                 <!-- Live Guidance & Feedback banner -->
@@ -404,15 +357,15 @@
                 <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/60 text-center">
                     <div class="glass-chip rounded-2xl p-2.5">
                         <span class="text-[10px] text-slate-500 uppercase font-bold block">Set</span>
-                        <span class="text-lg font-black text-slate-900"><span id="current-set">1</span> <span class="text-xs text-slate-500 font-normal">/ <span id="total-sets">3</span></span></span>
+                        <span class="text-lg font-black text-slate-900"><span id="current-set">1</span> <span class="text-xs text-slate-500 font-normal">/ <span id="total-sets">–</span></span></span>
                     </div>
                     <div class="glass-chip rounded-2xl p-2.5">
                         <span class="text-[10px] text-slate-500 uppercase font-bold block">Reps</span>
-                        <span class="text-lg font-black text-indigo-600"><span id="current-reps">0</span> <span class="text-xs text-slate-500 font-normal">/ <span id="target-reps">10</span></span></span>
+                        <span class="text-lg font-black text-indigo-600"><span id="current-reps">0</span> <span class="text-xs text-slate-500 font-normal">/ <span id="target-reps">–</span></span></span>
                     </div>
                     <div class="glass-chip rounded-2xl p-2.5">
                         <span class="text-[10px] text-slate-500 uppercase font-bold block">Form Score</span>
-                        <span class="text-lg font-black text-emerald-600"><span id="accuracy-percent">0</span>%</span>
+                        <span class="text-lg font-black text-emerald-600"><span id="accuracy-percent">0</span></span>
                     </div>
                 </div>
 
@@ -518,7 +471,7 @@
             <div class="flex items-center justify-between border-b border-slate-200/60 pb-3">
                 <div>
                     <h3 id="report-title" class="text-base font-bold text-slate-900">Session Complete!</h3>
-                    <p id="report-sub" class="text-xs text-slate-500">Shoulder Abduction • 10 Repetitions</p>
+                    <p id="report-sub" class="text-xs text-slate-500"></p>
                 </div>
                 <button type="button" id="close-report-btn" class="w-8 h-8 rounded-full glass-chip flex items-center justify-center text-slate-700 hover:text-slate-900">✕</button>
             </div>
@@ -594,7 +547,7 @@
         <div class="flex items-center justify-between border-b border-slate-200/60 pb-3">
             <div>
                 <h3 class="text-sm font-bold text-slate-900">Physiotherapist Chat</h3>
-                <p class="text-xs text-indigo-600 font-semibold">Dr. R. Reynolds, MD</p>
+                <p id="chat-doctor-name" class="text-xs text-indigo-600 font-semibold">Your physiotherapist</p>
             </div>
             <button id="close-chat-btn" class="w-8 h-8 rounded-full glass-chip flex items-center justify-center text-slate-700 hover:text-slate-900">✕</button>
         </div>
@@ -610,7 +563,6 @@
     </aside>
 
     <!-- Dependencies & Application Modules -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
     <script type="module" src="./js/patient-app.js"></script>
 

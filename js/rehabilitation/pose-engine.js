@@ -120,8 +120,8 @@ export class RehabSession {
                 ml = {
                     exercise: pred.exercise.id, exerciseProb: round(pred.exercise.prob, 3),
                     quality: pred.quality.label, qualityProb: round(pred.quality.prob, 3),
-                    confident: pred.quality.prob >= 0.6,
-                    exerciseMismatch: pred.exercise.prob >= 0.7 && pred.exercise.id !== this.cfg.id,
+                    confident: pred.quality.prob >= 0.6 && (this.classifier.qualityReliable?.(this.cfg.id) ?? true),
+                    exerciseMismatch: pred.exercise.prob >= 0.7 && pred.exercise.id !== (this.classifier.modelClassFor?.(this.cfg.id) ?? this.cfg.id),
                 };
             } catch (e) { console.warn('ML inference failed', e); }
         }

@@ -94,6 +94,13 @@ def main(argv=None):
     for key, r in results.items():
         q = r["test"]["quality"]["per_class"]
         lines.append(f"- {key}: " + ", ".join(f"{k} {v['recall']:.2f} (n={v['support']})" for k, v in q.items()))
+    # per-exercise quality accuracy on the test set (best model vs rules where applicable)
+    best_r = best[2]["test"].get("quality_by_exercise", {})
+    if best_r:
+        lines += ["", f"Quality accuracy by exercise, test set ({best[0]}):", "",
+                  "| Exercise | Test reps | Accuracy | Macro-F1 |", "|---|---|---|---|"]
+        for ex, m in sorted(best_r.items()):
+            lines.append(f"| {ex} | {m['n']} | {fmt(m['accuracy'])} | {fmt(m['macro_f1'])} |")
     lines += ["", f"Environment: Python {platform.python_version()}, {platform.platform()}",
               "Latency: neural models = reference forward pass (NumPy, same algorithm as the browser code) per repetition; DTW = pure-Python per test sequence. In-browser latency is logged per session (summary.avgModelLatencyMs)."]
     (REPORTS_DIR / f"results{a.tag}.md").write_text("\n".join(l for l in lines if l is not None) + "\n")

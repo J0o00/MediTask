@@ -68,7 +68,9 @@ def run(arch="gru", features="hybrid", name=None, data_dir=DATA_DIR / "processed
                 xa.append(f)
                 ex = classes["exercises"][ye[i]]
                 pm = prim_cache.setdefault(ex, primary_metric_for(ex))
-                sig = np.array([compute_metrics(q)[pm] for q in qo]) if pm else primary_signal(f, None)
+                sig = np.array([compute_metrics(q)[pm] for q in qo]) if pm else None
+                if sig is None or np.ptp(sig) < 10:
+                    sig = primary_signal(f, None)
                 pa.append(phase_labels(sig))
             Xtr.append(np.stack(xa).astype(np.float32)); yetr.append(ye[tr]); yqtr.append(yq[tr]); yptr.append(np.stack(pa))
     Xtr, yetr, yqtr, yptr = map(np.concatenate, (Xtr, yetr, yqtr, yptr))
@@ -104,6 +106,10 @@ def run(arch="gru", features="hybrid", name=None, data_dir=DATA_DIR / "processed
             "quality": classification_metrics(yq[ii], pred["quality"].argmax(1), QUALITY_LABELS),
             "phase": classification_metrics(yp[ii].reshape(-1), pred["phase"].argmax(-1).reshape(-1), PHASE_LABELS),
         }
+        qp = pred["quality"].argmax(1)
+        res[split]["quality_by_exercise"] = {
+            ex: classification_metrics(yq[ii][ye[ii] == k], qp[ye[ii] == k], QUALITY_LABELS)
+            for k, ex in enumerate(classes["exercises"]) if (ye[ii] == k).any()}
     for head, labels in (("exercise", classes["exercises"]), ("quality", QUALITY_LABELS)):
         plot_confusion(res["test"][head]["confusion_matrix"], labels, f"{name} - {head} (test)", out / f"cm_{head}.png")
 

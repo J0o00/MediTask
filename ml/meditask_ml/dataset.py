@@ -39,7 +39,11 @@ def featurize(q: np.ndarray, vis: np.ndarray, exercise: str):
     rq, rv = resample_frames(q, vis, SEQ_LEN)
     X = build_feature_sequence(rq, rv)
     pm = primary_metric_for(exercise)
-    sig = np.array([compute_metrics(f)[pm] for f in rq]) if pm else primary_signal(X, None)
+    sig = np.array([compute_metrics(f)[pm] for f in rq]) if pm else None
+    # Fall back to the dominant joint-angle component when the named metric barely moves
+    # (e.g. a left-leg repetition of an exercise whose app metric is the right hip).
+    if sig is None or np.ptp(sig) < 10:
+        sig = primary_signal(X, None)
     return X, rq, phase_labels(sig)
 
 

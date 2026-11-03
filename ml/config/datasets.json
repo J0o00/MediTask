@@ -1,9 +1,36 @@
 {
   "_comment": "Dataset sources for `python -m meditask_ml.dataset`. Paths are relative to ml/. Disable a source by setting enabled=false.",
   "sources": [
-    { "name": "kimore",          "loader": "kimore",          "root": "data/raw/kimore",          "enabled": true, "options": { "fps": 30 } },
-    { "name": "ui_prmd",         "loader": "ui_prmd",         "root": "data/raw/ui_prmd",         "enabled": true, "options": { "fps": 30 } },
-    { "name": "rehab24_6",       "loader": "rehab24_6",       "root": "data/raw/rehab24_6",       "enabled": true, "options": { "manifest": "manifest.csv" } },
-    { "name": "meditask_custom", "loader": "meditask_custom", "root": "data/raw/meditask_custom", "enabled": true }
+    {
+      "name": "kimore",
+      "loader": "kimore",
+      "root": "data/raw/kimore",
+      "enabled": true,
+      "options": {
+        "fps": 30
+      }
+    },
+    {
+      "name": "ui_prmd",
+      "loader": "ui_prmd",
+      "root": "data/raw/ui_prmd",
+      "enabled": true,
+      "options": {
+        "fps": 30
+      }
+    },
+    {
+      "name": "rehab24_6",
+      "loader": "rehab24_6",
+      "root": "data/raw/rehab24_6",
+      "enabled": true,
+      "options": {}
+    },
+    {
+      "name": "meditask_custom",
+      "loader": "meditask_custom",
+      "root": "data/raw/meditask_custom",
+      "enabled": true
+    }
   ]
 }

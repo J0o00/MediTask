@@ -51,9 +51,22 @@ No data yet? `python -m meditask_ml.dataset --synthetic --out data/processed_syn
 | `data/raw/meditask_custom` | `collect.html` exports | `*.json`, format `meditask-sequences-v1` |
 | any video | your recordings | `scripts/extract_pose.py` → `.npy` + `manifest.csv` → add a `manifest` source |
 
-The public-dataset loaders were written from the published descriptions without the files at hand. **Before the
-first real run, open one file of each dataset and check the constants marked `VERIFY`** (column layout, joint order,
-KIMORE score scale, REHAB24-6 exercise codes). The loaders print how many sequences/subjects they found per source.
+### How the shipped model was trained (November 2026)
+* **UI-PRMD** (PDDL licence), Kinect positions plus angles, from a GitHub mirror of the official release.
+  * The Kinect positions are relative to each joint's parent. `uiprmd_forward_kinematics()` rebuilds world
+    coordinates from the angle files (Rz·Ry·Rx), following the dataset authors' reference code.
+  * Shoulder abduction (m07) is right-arm only, so it is mapped to the `arm_abduction` class.
+* **REHAB24-6** (CC0), from the standardised CSVs (`rehab246_*_positions_standardized.csv` + `Segmentation.csv`).
+  * The CSVs give a single hip joint, so the left and right hips are approximated at ±0.25 × shoulder width.
+  * Repetitions flagged `mocap_erroneous` are excluded.
+* **KIMORE** is not included. The only reachable copy has joint angles but not the positions this pipeline needs.
+* Command: `python -m meditask_ml.dataset` (sources in `config/datasets.json`), then
+  `python -m meditask_ml.run_experiments --epochs 80 --augment 1`, then
+  `python -m meditask_ml.export_web --model models/gru_coords`.
+* The raw and processed data are **not** in the project zip (370 MB). Download them again into `data/raw/` to retrain.
+* `config/label_taxonomy.json → app_exercise_to_model_class` decides which app exercises use the model.
+  The app shows the model's quality verdict only where its test accuracy for that exercise was at least 65%
+  (`quality_by_exercise` in the exported manifest).
 
 ## Keeping JS and Python in sync
 Any change to features, metrics, normalisation, phase labels or DTW must be made in both languages. After editing

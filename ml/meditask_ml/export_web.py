@@ -78,6 +78,11 @@ def export(model_dir: Path, out_dir: Path = WEB_MODEL_DIR, basename: str = "medi
         "metrics": {"test_quality_macro_f1": test.get("quality", {}).get("macro_f1"),
                     "test_exercise_macro_f1": test.get("exercise", {}).get("macro_f1")},
         "weights_bytes": pk.offset * 4,
+        # App exercise id -> model class. The app only shows the model's verdict for exercises
+        # that real training data covered (null = rule-based only).
+        "app_exercise_to_model_class": {k: v for k, v in _taxonomy().get("app_exercise_to_model_class", {}).items()
+                                        if v is None or v in pre["exercises"]},
+        "quality_by_exercise": {k: v.get("accuracy") for k, v in test.get("quality_by_exercise", {}).items()},
     }
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -85,6 +90,11 @@ def export(model_dir: Path, out_dir: Path = WEB_MODEL_DIR, basename: str = "medi
     (out_dir / f"{basename}.bin").write_bytes(pk.blob())
     print(f"exported {model_dir.name} -> {out_dir}/{basename}.(json|bin)  [{pk.offset * 4 / 1024:.0f} KiB]")
     return out_dir / f"{basename}.json"
+
+
+def _taxonomy():
+    from .config import taxonomy
+    return taxonomy()
 
 
 # ------------------------------------------------------------- NumPy reference forward

@@ -1,2 +1,2 @@
-window.Chart = class { constructor(_c, cfg) { (window.__charts ||= []).push(cfg); } destroy() {} };
+window.Chart = class { constructor(c, cfg) { (window.__charts ||= []).push(cfg); (window.__chartMap ||= new Map()).set(c, this); this.c = c; } destroy() { window.__chartMap.delete(this.c); } static getChart(c) { return window.__chartMap?.get(c); } };
 window.jspdf = { jsPDF: class { constructor() { window.__pdf = []; } setFontSize() {} setTextColor() {} setDrawColor() {} line() {} addPage() {} splitTextToSize(t) { return [t]; } text(t) { window.__pdf.push(String(t)); } save(n) { window.__pdfSaved = n; } } };

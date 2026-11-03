@@ -23,7 +23,11 @@ async function fetchProfile(user, retries = 2) {
 
 /**
  * Resolve once the signed-in user is confirmed to have `role`.
- * Redirects away (or rejects if allowDemo is true) otherwise.
+ *  - Signed out: rejects with code 'signed-out' when allowDemo is true (the page then shows its
+ *    clearly-labelled demo), otherwise redirects to the sign-in page.
+ *  - Signed in with a different role: redirects to that role's dashboard (never resolves).
+ *  - Profile unreadable: redirects to sign-in with an error instead of inventing a profile,
+ *    so a real account never runs with guessed permissions.
  * @returns {Promise<{user: import('firebase/auth').User, profile: object}>}
  */
 export function requireRole(role, { allowDemo = true } = {}) {
@@ -31,29 +35,19 @@ export function requireRole(role, { allowDemo = true } = {}) {
         const stop = onAuthStateChanged(auth, async (user) => {
             stop();
             if (!user) {
-                if (allowDemo) {
-                    reject(new Error("Not logged in"));
-                    return;
-                }
+                if (allowDemo) { reject(Object.assign(new Error('Not signed in'), { code: 'signed-out' })); return; }
                 window.location.replace('./login.html?err=notLoggedIn');
                 return;
             }
             try {
                 const profile = await fetchProfile(user);
-                if (!profile) {
-                    // Fallback profile if user document does not exist yet
-                    resolve({ user, profile: { uid: user.uid, email: user.email, role, displayName: user.displayName || user.email.split('@')[0] } });
-                    return;
-                }
+                if (!profile) { window.location.replace('./login.html?err=noProfile'); return; }
                 const actual = String(profile.role || '').trim().toLowerCase();
-                if (actual !== role && actual !== 'doctor') {
-                    window.location.replace(DASHBOARD[actual] || './index.html');
-                    return;
-                }
+                if (actual !== role) { window.location.replace(DASHBOARD[actual] || './index.html'); return; }
                 resolve({ user, profile });
             } catch (e) {
                 console.error('Auth check failed:', e);
-                resolve({ user, profile: { uid: user.uid, email: user.email, role, displayName: user.displayName || user.email.split('@')[0] } });
+                window.location.replace('./login.html?err=authCheck');
             }
         });
     });

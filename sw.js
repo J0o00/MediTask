@@ -1,10 +1,12 @@
 // MediTask service worker.
 // Network-first for app code (so updates reach patients immediately),
 // cache fallback for offline use. Firebase / CDN traffic is never cached here.
-const CACHE_NAME = 'meditask-v3';
+const CACHE_NAME = 'meditask-v4';
 const APP_SHELL = [
     './', './index.html', './login.html', './signup.html', './patient-dashboard.html', './doctor-dashboard.html',
-    './css/app.css', './manifest.json',
+    './css/app.css', './manifest.json', './404.html',
+    './css/tw-index.css', './css/tw-login.css', './css/tw-signup.css', './css/tw-404.css',
+    './css/tw-patient-dashboard.css', './css/tw-doctor-dashboard.css',
     './js/config.js', './js/patient-app.js', './js/doctor-app.js',
     './js/services/auth.js', './js/services/db.js',
     './js/rehabilitation/skeleton.js', './js/rehabilitation/angle-calculator.js', './js/rehabilitation/movement-filter.js',
