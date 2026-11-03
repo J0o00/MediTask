@@ -31,7 +31,7 @@ export function requireRole(role, { allowDemo = true } = {}) {
         const stop = onAuthStateChanged(auth, async (user) => {
             stop();
             if (!user) {
-                if (allowDemo && role === 'doctor') {
+                if (allowDemo) {
                     reject(new Error("Not logged in"));
                     return;
                 }

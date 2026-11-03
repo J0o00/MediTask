@@ -2,273 +2,616 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0E5A52">
-    <meta name="description" content="MediTask - guided home rehabilitation with real-time movement feedback">
-    <link rel="manifest" href="./manifest.json">
-    <title>My rehabilitation - MediTask</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/app.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E5A52'/%3E%3Cpath d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <title>MediTask - Patient Recovery Dashboard</title>
+    <!-- Tailwind CSS v3 with Plugins -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f5ff',
+                            100: '#e5edff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                        },
+                        lumis: {
+                            blue: '#4a6fa5',
+                            lavender: '#9da7c9',
+                            peach: '#f4c4b8',
+                            surface: 'rgba(255, 255, 255, 0.45)',
+                            glass: 'rgba(255, 255, 255, 0.65)',
+                            border: 'rgba(255, 255, 255, 0.75)',
+                        }
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(74, 111, 165, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)',
+                        'glass-active': '0 12px 36px 0 rgba(79, 70, 229, 0.18), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9)',
+                        'dock': '0 16px 40px rgba(50, 65, 110, 0.18), inset 0 1px 2px rgba(255, 255, 255, 0.8)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style data-purpose="custom-glass-effects">
+        /* Dynamic Mesh Gradient mirroring Lumis' periwinkle dawn aesthetic */
+        body {
+            background: radial-gradient(at 10% 15%, #b5c7ec 0px, transparent 55%),
+                radial-gradient(at 90% 25%, #f7cfc0 0px, transparent 50%),
+                radial-gradient(at 20% 75%, #cedaf4 0px, transparent 60%),
+                radial-gradient(at 85% 85%, #dfc3d6 0px, transparent 55%),
+                linear-gradient(160deg, #6c88bc 0%, #9cb2db 30%, #d4b5b8 70%, #97add6 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .pt-safe {
+            padding-top: env(safe-area-inset-top, 24px);
+        }
+
+        .pb-safe {
+            padding-bottom: calc(env(safe-area-inset-bottom, 34px) + 72px);
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.52);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.78);
+        }
+
+        .glass-chip {
+            background: rgba(255, 255, 255, 0.38);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Mirror webcam and canvas for natural user feedback */
+        .mirror {
+            transform: scaleX(-1);
+        }
+
+        .backdrop-enter {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+        }
+    </style>
 </head>
 
-<body>
-    <header class="topbar">
-        <div class="topbar-inner">
-            <a class="brand" href="./patient-dashboard.html" aria-label="MediTask home">
-                <span class="brand-mark"><span data-icon="logo"></span></span>
-                <span class="brand-name">MediTask</span>
-            </a>
-            <div class="topbar-actions">
-                <div id="rewards-card" class="points hidden" title="Earned by completing prescribed exercises">
-                    <span data-icon="award"></span>
-                    <span class="num"><b id="user-points">0</b><span class="hide-sm"> points <span class="muted">(₹<span id="user-currency">0.00</span>)</span></span></span>
-                </div>
-                <button id="chat-toggle-btn" class="btn btn-secondary btn-sm" type="button"><span data-icon="chat"></span><span class="hide-sm">Messages</span></button>
-                <div class="user-chip">
-                    <span id="user-avatar" class="avatar" aria-hidden="true"></span>
-                    <span id="user-name" class="small strong hide-sm"></span>
-                </div>
-                <button id="logout-btn" class="btn btn-ghost btn-sm" type="button"><span data-icon="logout"></span><span class="hide-sm">Sign out</span></button>
-            </div>
+<body class="text-slate-800 font-sans selection:bg-indigo-300 selection:text-slate-900 pb-safe">
+
+    <!-- Container Frame -->
+    <div class="max-w-md md:max-w-2xl lg:max-w-4xl mx-auto relative px-4 pt-safe">
+
+        <!-- Demo Mode Indicator Bar -->
+        <div id="demo-banner" class="hidden mb-2 py-1.5 px-3.5 rounded-full glass-chip flex items-center justify-between text-xs text-indigo-900 font-medium">
+            <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Patient Demo Mode</span>
+            </span>
+            <a href="./login.html" class="underline text-indigo-950 font-bold hover:text-indigo-700">Sign in with Account</a>
         </div>
-    </header>
 
-    <div id="loading-view" class="loading" role="status">
-        <div><div class="spinner"></div>Loading your programme…</div>
-    </div>
-
-    <main id="main-content" class="page hidden">
-
-        <!-- ===================== Home ===================== -->
-        <div id="prescription-list-view" class="stack-lg">
-            <div class="page-head">
+        <!-- TopBar Header -->
+        <header class="flex items-center justify-between py-3 mb-2" data-purpose="app-header">
+            <!-- App Identity -->
+            <a href="./index.html" class="flex items-center space-x-2.5 hover:opacity-90 transition">
+                <div class="w-9 h-9 rounded-2xl bg-white/70 backdrop-blur-md border border-white flex items-center justify-center shadow-sm">
+                    <i class="w-5 h-5 text-indigo-600 stroke-[2.2]" data-lucide="activity"></i>
+                </div>
                 <div>
-                    <h1 id="welcome-line">Your rehabilitation</h1>
-                    <p id="physio-line">Complete the exercises your physiotherapist has prescribed. MediTask checks your movement as you go.</p>
+                    <span class="font-extrabold text-lg tracking-tight text-slate-800 drop-shadow-sm flex items-center gap-1">
+                        MediTask
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                    </span>
+                    <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block -mt-1">Telemetry</span>
                 </div>
-            </div>
+            </a>
 
-            <section id="link-section" class="stack hidden" aria-live="polite"></section>
-
-            <div class="grid cols-main align-start">
-                <section class="panel" aria-labelledby="plan-title">
-                    <div class="panel-head">
-                        <h2 id="plan-title">Today's exercises</h2>
-                        <span id="prescription-loading" class="small muted">Loading…</span>
-                    </div>
-                    <ul id="prescription-list" class="list"></ul>
-                </section>
-
-                <aside class="panel">
-                    <div class="panel-head"><h2>Before you start</h2></div>
-                    <div class="panel-body stack small">
-                        <div class="row-top"><span data-icon="camera"></span><p>Place your device about 2 metres away so your whole body is in view, in good light.</p></div>
-                        <div class="row-top"><span data-icon="activity"></span><p>Move slowly and with control. A repetition counts when you reach the prescribed range.</p></div>
-                        <div class="row-top"><span data-icon="alert"></span><p>Stop if anything causes pain, dizziness or breathlessness, and message your physiotherapist. In an emergency call 112.</p></div>
-                    </div>
-                </aside>
-            </div>
-
-            <section aria-labelledby="progress-title" class="stack">
-                <div class="section-title"><h2 id="progress-title">Your progress</h2></div>
-                <div class="strip">
-                    <div class="strip-item"><div class="strip-label">Sessions completed</div><div id="stat-total-exercises" class="strip-value">0</div></div>
-                    <div class="strip-item"><div class="strip-label">Day streak</div><div class="strip-value"><span id="stat-streak">0</span><small>days</small></div></div>
-                    <div class="strip-item"><div class="strip-label">Active days, last 14</div><div class="strip-value"><span id="stat-adherence">0</span><small>/ 14</small></div></div>
-                    <div class="strip-item"><div class="strip-label">Average movement quality</div><div class="strip-value"><span id="stat-avg-accuracy">–</span><small>/ 100</small></div></div>
+            <!-- Stats & Profile -->
+            <div class="flex items-center space-x-2">
+                <!-- Rewards / Points Pill -->
+                <div id="rewards-card" class="glass-chip px-3 py-1.5 rounded-full flex items-center space-x-1.5 shadow-sm text-xs font-semibold text-slate-700">
+                    <i class="w-3.5 h-3.5 text-amber-500" data-lucide="award"></i>
+                    <span><b id="user-points">0</b> <span class="text-slate-400 font-normal">pts (₹<span id="user-currency">0.00</span>)</span></span>
                 </div>
 
-                <div class="grid cols-2">
-                    <div class="panel">
-                        <div class="panel-head"><h3>Sessions this week</h3></div>
-                        <div class="panel-body"><div class="chart"><canvas id="weekly-chart" aria-label="Sessions per day, last 7 days"></canvas></div></div>
+                <!-- Notification / Chat -->
+                <button id="chat-toggle-btn" aria-label="Messages" class="relative w-9 h-9 glass-chip rounded-full flex items-center justify-center text-slate-700 active:scale-95 transition-transform" title="Messages">
+                    <i class="w-4 h-4" data-lucide="message-square"></i>
+                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white"></span>
+                </button>
+
+                <!-- User Avatar -->
+                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-sky-300 p-0.5 shadow-sm">
+                    <div id="user-avatar" class="w-full h-full rounded-full bg-white/80 backdrop-blur flex items-center justify-center font-bold text-xs text-indigo-700">
+                        AQ
                     </div>
-                    <div class="panel">
-                        <div class="panel-head">
-                            <h3>Recovery trend</h3>
-                            <label class="sr-only" for="trend-exercise">Exercise</label>
-                            <select id="trend-exercise" class="select select-sm"></select>
+                </div>
+
+                <!-- Sign Out -->
+                <button id="logout-btn" aria-label="Sign out" class="w-9 h-9 glass-chip rounded-full flex items-center justify-center text-rose-500 hover:text-rose-600 active:scale-95 transition" title="Sign out">
+                    <i class="w-4 h-4" data-lucide="log-out"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Category Pills Bar -->
+        <nav class="flex items-center space-x-2 overflow-x-auto no-scrollbar py-2 mb-3" data-purpose="category-pills">
+            <button id="pill-overview" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold bg-white text-indigo-900 shadow-sm border border-white shrink-0">Overview</button>
+            <button id="pill-exercises" class="cat-pill px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-600 glass-chip shrink-0 hover:bg-white/40">Exercises</button>
+            <button id="pill-pose" class="cat-pill px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-600 glass-chip shrink-0 hover:bg-white/40">Pose AI</button>
+            <button id="pill-recovery" class="cat-pill px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-600 glass-chip shrink-0 hover:bg-white/40">Recovery</button>
+            <button id="pill-guidance" class="cat-pill px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-600 glass-chip shrink-0 hover:bg-white/40">Guidelines</button>
+        </nav>
+
+        <!-- MAIN VIEW: Prescriptions & Overview -->
+        <div id="prescription-list-view" class="space-y-4">
+
+            <!-- Greeting Hero -->
+            <section data-purpose="hero-greeting">
+                <div class="flex items-baseline justify-between mb-1">
+                    <h1 id="welcome-line" class="text-2xl font-bold tracking-tight text-slate-900">
+                        Good morning, <span id="user-name" class="text-indigo-900 font-extrabold">aq</span>
+                    </h1>
+                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/40 border border-white/60 text-indigo-800">
+                        Day 14 Phase
+                    </span>
+                </div>
+                <p id="physio-line" class="text-sm text-slate-600 leading-snug">
+                    Your biomechanical indicators look <span class="font-semibold text-slate-900">Promising</span>. Prescribed physical therapy is loaded.
+                </p>
+
+                <!-- Invitation / Link Status Section -->
+                <div id="link-section" class="mt-3.5 glass-panel rounded-2xl p-3.5 shadow-glass flex items-start space-x-3 border-amber-200/50 hidden" data-purpose="system-notice">
+                    <div class="w-8 h-8 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
+                        <i class="w-4 h-4" data-lucide="shield-alert"></i>
+                    </div>
+                    <div class="flex-1 text-xs leading-relaxed text-slate-700">
+                        <p class="font-semibold text-slate-900 mb-0.5">Physiotherapist link pending</p>
+                        Ask therapist to accept request for real-time kinematic sync.
+                    </div>
+                    <button id="invite-therapist-btn" class="text-[11px] font-bold text-indigo-700 underline self-center pr-1">Invite</button>
+                </div>
+            </section>
+
+            <!-- Core Metrics Grid -->
+            <section class="grid grid-cols-2 gap-3" data-purpose="wellness-metrics">
+                <!-- Mobility Index (Dial) -->
+                <div class="glass-panel rounded-3xl p-4 shadow-glass flex flex-col justify-between relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-600 tracking-wide uppercase">Mobility Index</span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    </div>
+                    <div class="flex items-center justify-between my-1">
+                        <div>
+                            <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
+                                <span id="stat-avg-accuracy">88</span><span class="text-sm font-semibold text-slate-500">/100</span>
+                            </div>
+                            <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold mt-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Excellent
+                            </div>
                         </div>
-                        <div class="panel-body">
-                            <div class="chart"><canvas id="trend-chart" aria-label="Range of motion, quality and pain over sessions"></canvas></div>
-                            <p id="trend-summary" class="small muted mt-3"></p>
+                        <!-- Gauge Ring Graphic -->
+                        <div class="relative w-14 h-14 flex items-center justify-center">
+                            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                <path class="text-white/60" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+                                <path class="text-indigo-600" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="88, 100" stroke-linecap="round" stroke-width="3.5"></path>
+                            </svg>
+                            <i class="w-4 h-4 text-indigo-600 absolute" data-lucide="zap"></i>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-2 font-medium">Kinematic range up +12% this week</p>
+                </div>
+
+                <!-- Streak & Active Sessions -->
+                <div class="glass-panel rounded-3xl p-4 shadow-glass flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">
+                            <span>Streak</span>
+                            <i class="w-4 h-4 text-orange-500" data-lucide="flame"></i>
+                        </div>
+                        <div class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
+                            <span id="stat-streak">4</span> <span class="text-xs font-semibold text-slate-500">days</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 block"><span id="stat-total-exercises">3</span> sessions logged</span>
+                    </div>
+                    <!-- Weekly Goal Bar -->
+                    <div class="pt-3 border-t border-white/50">
+                        <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1.5">
+                            <span>Weekly Target</span>
+                            <span><span id="stat-adherence">4</span>/5 days</span>
+                        </div>
+                        <div class="w-full bg-white/50 h-2 rounded-full overflow-hidden p-0.5">
+                            <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full w-[80%]"></div>
                         </div>
                     </div>
                 </div>
             </section>
+
+            <!-- Prescribed Exercises Section -->
+            <section id="section-exercises" data-purpose="todays-routine">
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 tracking-tight">Prescribed Exercises</h2>
+                        <p class="text-xs text-slate-500">Scheduled by AI rehabilitation model</p>
+                    </div>
+                    <span id="prescription-loading" class="text-xs font-semibold text-indigo-700 bg-white/70 px-2.5 py-1 rounded-full shadow-sm">
+                        3 Modules
+                    </span>
+                </div>
+
+                <!-- Dynamic Prescriptions List -->
+                <div id="prescription-list" class="space-y-3">
+                    <!-- Populated dynamically by patient-app.js -->
+                </div>
+            </section>
+
+            <!-- PreFlight Guidance Checklist -->
+            <section id="section-guidelines" class="glass-panel rounded-3xl p-4 shadow-glass" data-purpose="session-guidelines">
+                <div class="flex items-center space-x-2 mb-3">
+                    <div class="p-1 rounded-lg bg-indigo-500 text-white">
+                        <i class="w-3.5 h-3.5" data-lucide="info"></i>
+                    </div>
+                    <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Before you start checklist</h3>
+                </div>
+                <div class="space-y-2.5">
+                    <div class="flex items-center space-x-3 p-2 rounded-2xl bg-white/40 border border-white/60">
+                        <i class="w-4 h-4 text-indigo-600 shrink-0" data-lucide="video"></i>
+                        <span class="text-xs text-slate-700 font-medium">Place camera <strong>2 meters away</strong> with good room lighting.</span>
+                    </div>
+                    <div class="flex items-center space-x-3 p-2 rounded-2xl bg-white/40 border border-white/60">
+                        <i class="w-4 h-4 text-indigo-600 shrink-0" data-lucide="gauge"></i>
+                        <span class="text-xs text-slate-700 font-medium">Move smoothly. AI counts reps only at calibrated angles.</span>
+                    </div>
+                    <div class="flex items-center space-x-3 p-2 rounded-2xl bg-rose-50/70 border border-rose-200/60">
+                        <i class="w-4 h-4 text-rose-600 shrink-0" data-lucide="alert-triangle"></i>
+                        <span class="text-xs text-rose-800 font-medium">Halt immediately if sharp pain occurs. Call 112 in emergency.</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recovery Trend Telemetry -->
+            <section id="section-recovery" class="glass-panel rounded-3xl p-4 shadow-glass" data-purpose="recovery-chart">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Recovery Velocity</span>
+                        <h3 class="text-sm font-bold text-slate-900">7-Day Biomechanical Trend</h3>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select id="trend-exercise" class="text-[11px] font-semibold text-slate-700 glass-chip px-2.5 py-1 rounded-full outline-none">
+                            <option value="">Exercise Trend</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="relative h-28 w-full mt-3">
+                    <canvas id="trend-chart" class="w-full h-full"></canvas>
+                </div>
+                <p id="trend-summary" class="text-xs text-slate-500 mt-2 italic"></p>
+
+                <!-- Sessions per day weekly bar chart -->
+                <div class="mt-4 pt-3 border-t border-white/50">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-600">Weekly Sessions Volume</span>
+                    </div>
+                    <div class="h-24 w-full">
+                        <canvas id="weekly-chart" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+            </section>
+
         </div>
 
-        <!-- ===================== Live session ===================== -->
-        <div id="exercise-session-view" class="hidden">
-            <div class="page-head">
+        <!-- LIVE EXERCISE SESSION VIEW (Camera + MediaPipe Pose) -->
+        <div id="exercise-session-view" class="hidden space-y-4">
+            <!-- Header bar -->
+            <div class="flex items-center justify-between glass-panel rounded-2xl p-3 shadow-sm">
                 <div>
-                    <h1 id="current-exercise-title">Exercise</h1>
-                    <p id="session-sub">Follow the instruction under the video.</p>
+                    <h2 id="current-exercise-title" class="text-base font-bold text-slate-900">Exercise</h2>
+                    <p id="session-sub" class="text-xs text-slate-600">Follow the instructions under the video.</p>
                 </div>
-                <div class="row wrap">
-                    <label class="check check-inline small"><input id="voice-toggle" type="checkbox"> Spoken instructions</label>
-                    <button id="back-to-prescriptions" class="btn btn-secondary" type="button"><span data-icon="arrowLeft"></span>End session</button>
-                </div>
-            </div>
-
-            <div class="session-grid">
-                <div>
-                    <div class="stage">
-                        <div class="stage-view">
-                            <div class="video-frame">
-                                <video id="webcam" class="mirror" autoplay playsinline muted></video>
-                                <canvas id="pose-canvas" class="mirror"></canvas>
-                                <span id="phase-badge" class="video-tag left">Rest</span>
-                                <span id="ml-badge" class="video-tag right">Rule-based analysis</span>
-                                <div id="rep-flash" class="rep-flash hidden" aria-hidden="true"></div>
-                            </div>
-                            <div class="rom-meter" aria-label="Range of motion towards the prescribed target">
-                                <div class="rom-track"><div id="rom-fill" class="rom-fill"></div></div>
-                                <div class="rom-target" title="Prescribed target"></div>
-                                <span class="rom-label">ROM</span>
-                            </div>
-                        </div>
-                        <div id="phase-steps" class="phase-track"></div>
-                    </div>
-
-                    <div id="feedback-box" class="feedback-bar info" role="status" aria-live="polite">Starting camera…</div>
-                    <div class="confidence">
-                        <span>Tracking confidence</span>
-                        <div id="confidence-wrap" class="bar"><span id="confidence-bar"></span></div>
-                        <span id="fps-label" class="num">– fps</span>
-                    </div>
-                    <button id="emergency-stop-btn" class="btn btn-danger btn-lg btn-block stop-btn" type="button">
-                        <span data-icon="stop"></span>Stop now, I feel pain or discomfort
+                <div class="flex items-center space-x-2">
+                    <label class="flex items-center gap-1.5 text-xs font-medium text-slate-700 cursor-pointer">
+                        <input id="voice-toggle" type="checkbox" class="rounded text-indigo-600 focus:ring-0">
+                        <span>Voice</span>
+                    </label>
+                    <button id="back-to-prescriptions" class="py-1.5 px-3 rounded-xl bg-white/70 hover:bg-white text-xs font-semibold text-slate-800 transition">
+                        End Session
                     </button>
                 </div>
+            </div>
 
-                <aside class="panel">
-                    <div class="counters">
-                        <div class="counter"><div class="strip-label">Set</div><div class="counter-value"><span id="current-set">1</span> <span class="of">/ <span id="total-sets">–</span></span></div></div>
-                        <div class="counter"><div class="strip-label">Repetitions</div><div class="counter-value"><span id="current-reps">0</span> <span class="of">/ <span id="target-reps">–</span></span></div></div>
+            <!-- Video & Pose Canvas Card -->
+            <div class="glass-panel rounded-3xl p-3 shadow-glass relative overflow-hidden">
+                <div class="relative rounded-2xl overflow-hidden bg-slate-950 aspect-[4/3] flex items-center justify-center">
+                    <video id="webcam" class="mirror absolute inset-0 w-full h-full object-cover" autoplay playsinline muted></video>
+                    <canvas id="pose-canvas" class="mirror absolute inset-0 w-full h-full object-cover"></canvas>
+
+                    <!-- Overlay badges -->
+                    <span id="phase-badge" class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900/80 text-white backdrop-blur border border-white/20">
+                        Rest
+                    </span>
+                    <span id="ml-badge" class="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-indigo-900/80 text-indigo-200 backdrop-blur border border-indigo-400/30">
+                        AI Form Analysis
+                    </span>
+                    <div id="rep-flash" class="hidden absolute inset-0 flex items-center justify-center bg-teal-500/30 text-white text-6xl font-black">
+                        1
                     </div>
-                    <div class="panel-body stack">
-                        <div class="bar lg" aria-label="Session progress"><span id="progress-bar"></span></div>
-                        <p id="incomplete-note" class="tiny muted"></p>
-                        <div class="score">
-                            <div class="ring" aria-label="Live form score">
-                                <svg viewBox="0 0 84 84"><circle class="track" cx="42" cy="42" r="38"/><circle id="accuracy-ring" class="value" cx="42" cy="42" r="38"/></svg>
-                                <div class="ring-label"><div><b id="accuracy-percent">0</b><small>form</small></div></div>
-                            </div>
-                            <div class="grow">
-                                <p id="angle-readout" class="strong num">–</p>
-                                <p class="tiny muted mt-1">Live joint angle and prescribed target</p>
-                            </div>
+
+                    <!-- Range of motion vertical bar -->
+                    <div class="absolute right-3 bottom-3 top-12 w-3 rounded-full bg-white/20 overflow-hidden flex flex-col justify-end p-0.5">
+                        <div id="rom-fill" class="bg-gradient-to-t from-teal-400 to-emerald-400 rounded-full w-full transition-all duration-150" style="height: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Phase indicators -->
+                <div id="phase-steps" class="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2 px-1">
+                    <span>Rest</span>
+                    <span>Outward</span>
+                    <span>Hold</span>
+                    <span>Return</span>
+                </div>
+
+                <!-- Live Guidance & Feedback banner -->
+                <div id="feedback-box" class="mt-3 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-900 flex items-center gap-2">
+                    <i class="w-4 h-4 text-indigo-600 animate-spin" data-lucide="loader"></i>
+                    <span>Initializing camera and computer vision...</span>
+                </div>
+
+                <!-- Tracking Confidence & FPS -->
+                <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 px-1">
+                    <div class="flex items-center gap-2">
+                        <span>Confidence</span>
+                        <div id="confidence-wrap" class="w-20 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                            <div id="confidence-bar" class="bg-emerald-500 h-full rounded-full" style="width: 0%"></div>
                         </div>
                     </div>
-                    <div class="panel-head ruled"><h3>Repetitions</h3></div>
-                    <div id="rep-log" class="rep-log"><p class="empty small">Each repetition and its quality appears here.</p></div>
-                </aside>
+                    <span id="fps-label" class="font-mono text-[10px]">– fps</span>
+                </div>
+
+                <!-- Counters & Form Dial -->
+                <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/60 text-center">
+                    <div class="glass-chip rounded-2xl p-2.5">
+                        <span class="text-[10px] text-slate-500 uppercase font-bold block">Set</span>
+                        <span class="text-lg font-black text-slate-900"><span id="current-set">1</span> <span class="text-xs text-slate-500 font-normal">/ <span id="total-sets">3</span></span></span>
+                    </div>
+                    <div class="glass-chip rounded-2xl p-2.5">
+                        <span class="text-[10px] text-slate-500 uppercase font-bold block">Reps</span>
+                        <span class="text-lg font-black text-indigo-600"><span id="current-reps">0</span> <span class="text-xs text-slate-500 font-normal">/ <span id="target-reps">10</span></span></span>
+                    </div>
+                    <div class="glass-chip rounded-2xl p-2.5">
+                        <span class="text-[10px] text-slate-500 uppercase font-bold block">Form Score</span>
+                        <span class="text-lg font-black text-emerald-600"><span id="accuracy-percent">0</span>%</span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar & Joint Angle Readout -->
+                <div class="mt-3">
+                    <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-teal-400 h-full rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+                    <div class="flex items-center justify-between mt-1 text-[11px] text-slate-600">
+                        <span id="angle-readout" class="font-semibold text-slate-800">–</span>
+                        <span id="incomplete-note" class="text-amber-700 italic"></span>
+                    </div>
+                </div>
+
+                <!-- Emergency Pain Stop Button -->
+                <button id="emergency-stop-btn" class="w-full mt-3.5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md active:scale-98 transition flex items-center justify-center gap-2">
+                    <i class="w-4 h-4" data-lucide="octagon-alert"></i>
+                    <span>Stop session, I feel pain or discomfort</span>
+                </button>
+            </div>
+
+            <!-- Repetition Log Card -->
+            <div class="glass-panel rounded-3xl p-4 shadow-glass">
+                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Live Repetition Telemetry</h3>
+                <div id="rep-log" class="space-y-1.5 text-xs text-slate-700 max-h-36 overflow-y-auto no-scrollbar">
+                    <p class="text-slate-400 text-xs italic">Completed reps and kinematic evaluations will appear here.</p>
+                </div>
             </div>
         </div>
-    </main>
 
-    <!-- Chat -->
-    <aside id="chat-modal" class="drawer hidden" aria-label="Messages with your physiotherapist">
-        <div class="drawer-head">
-            <h2 class="grow">Messages</h2>
-            <button id="close-chat-btn" class="icon-btn" type="button" aria-label="Close messages"><span data-icon="x"></span></button>
+    </div>
+
+    <!-- Bottom Navigation Dock -->
+    <nav class="fixed bottom-4 left-4 right-4 max-w-md md:max-w-md mx-auto z-40" data-purpose="dock-navigation">
+        <div class="glass-panel rounded-full px-5 py-2.5 shadow-dock flex items-center justify-around border-white/80">
+            <!-- Home tab (active) -->
+            <button id="dock-home" aria-label="Home Dashboard" class="flex flex-col items-center text-indigo-700 relative py-1">
+                <div class="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center">
+                    <i class="w-4 h-4" data-lucide="layout-grid"></i>
+                </div>
+                <span class="text-[9px] font-bold mt-0.5 tracking-tight">Today</span>
+            </button>
+
+            <!-- Routine tab -->
+            <button id="dock-routines" aria-label="Exercises" class="flex flex-col items-center text-slate-500 hover:text-indigo-600 py-1 transition-colors">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center">
+                    <i class="w-4 h-4" data-lucide="dumbbell"></i>
+                </div>
+                <span class="text-[9px] font-semibold mt-0.5 tracking-tight">Routines</span>
+            </button>
+
+            <!-- Central Quick Start AI Camera FAB -->
+            <button id="dock-camera-fab" aria-label="Live Camera" class="w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-slate-900 to-indigo-900 text-white shadow-xl flex items-center justify-center border-2 border-white active:scale-95 transition-transform">
+                <i class="w-5 h-5 text-indigo-200" data-lucide="aperture"></i>
+            </button>
+
+            <!-- Progress Analytics tab -->
+            <button id="dock-analytics" aria-label="Analytics" class="flex flex-col items-center text-slate-500 hover:text-indigo-600 py-1 transition-colors">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center">
+                    <i class="w-4 h-4" data-lucide="line-chart"></i>
+                </div>
+                <span class="text-[9px] font-semibold mt-0.5 tracking-tight">Analytics</span>
+            </button>
+
+            <!-- Therapist tab -->
+            <button id="dock-therapist" aria-label="Physio Chat" class="flex flex-col items-center text-slate-500 hover:text-indigo-600 py-1 transition-colors">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center">
+                    <i class="w-4 h-4" data-lucide="user-check"></i>
+                </div>
+                <span class="text-[9px] font-semibold mt-0.5 tracking-tight">Therapist</span>
+            </button>
         </div>
-        <div id="chat-messages" class="drawer-body"></div>
-        <div class="drawer-foot">
-            <label class="sr-only" for="chat-input">Message</label>
-            <input type="text" id="chat-input" class="input" maxlength="2000" placeholder="Write a message">
-            <button id="send-msg-btn" class="btn btn-primary" type="button" aria-label="Send"><span data-icon="send"></span></button>
+    </nav>
+
+    <!-- MODAL: Exercise Instructions Demo -->
+    <div id="demo-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center space-x-3 border-b border-slate-200/60 pb-3">
+                <div id="demo-animation" class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
+                    <i class="w-5 h-5" data-lucide="play-circle"></i>
+                </div>
+                <div>
+                    <h3 id="demo-title" class="text-base font-bold text-slate-900">Exercise</h3>
+                    <p id="demo-dose" class="text-xs text-slate-500">3 sets of 10 reps</p>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <p class="text-xs font-semibold text-slate-700">Instructions:</p>
+                <ol id="demo-instructions" class="space-y-1.5 text-xs text-slate-600 list-decimal list-inside"></ol>
+                <p id="demo-notes" class="text-xs text-indigo-700 bg-indigo-50 p-2.5 rounded-xl border border-indigo-200 hidden"></p>
+                <p class="text-[11px] text-slate-500 italic">Stand about 2 meters from camera with exercising limb in view.</p>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="cancel-demo-btn" class="flex-1 py-2.5 rounded-2xl bg-white/70 hover:bg-white text-xs font-semibold text-slate-700">Cancel</button>
+                <button type="button" id="start-exercise-btn" class="flex-1 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">Start Exercise</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Session Completion Report -->
+    <div id="report-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div class="border-b border-slate-200/60 pb-3">
+                <h3 id="report-title" class="text-base font-bold text-slate-900">Session Complete!</h3>
+                <p id="report-sub" class="text-xs text-slate-500">Shoulder Abduction • 10 Repetitions</p>
+            </div>
+            <div id="report-body" class="space-y-3 text-xs text-slate-700">
+                <!-- Injected report summary -->
+            </div>
+            <button id="report-continue" class="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">
+                Continue to Feedback
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: Post-Session Pain & Difficulty Feedback -->
+    <div id="feedback-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div class="border-b border-slate-200/60 pb-2">
+                <h3 class="text-base font-bold text-slate-900">How did that feel?</h3>
+                <p class="text-xs text-slate-500">Your physiotherapist reviews this telemetry.</p>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Pain Rating during Exercise (0 none, 10 worst)</label>
+                    <div id="pain-scale" class="grid grid-cols-11 gap-1 text-center text-xs font-semibold">
+                        <!-- 0 to 10 scale buttons -->
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1">Selected: <b id="pain-value" class="text-indigo-600 font-bold">0</b></p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Perceived Difficulty</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="difficulty-btn py-1.5 rounded-xl glass-chip text-xs font-semibold text-slate-700 hover:bg-white/80 active:bg-indigo-600 active:text-white" data-difficulty="easy">Easy</button>
+                        <button type="button" class="difficulty-btn py-1.5 rounded-xl glass-chip text-xs font-semibold text-slate-700 hover:bg-white/80 active:bg-indigo-600 active:text-white" data-difficulty="medium">Moderate</button>
+                        <button type="button" class="difficulty-btn py-1.5 rounded-xl glass-chip text-xs font-semibold text-slate-700 hover:bg-white/80 active:bg-indigo-600 active:text-white" data-difficulty="hard">Hard</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Notes for Therapist</label>
+                    <textarea id="feedback-notes" rows="2" maxlength="1000" class="w-full py-2 px-3 rounded-xl glass-chip text-xs text-slate-800 outline-none border-0" placeholder="Optional notes..."></textarea>
+                </div>
+                <p id="pain-warning" class="text-xs text-rose-700 bg-rose-50 p-2 rounded-xl border border-rose-200 hidden">
+                    High pain reported. Your therapist will be alerted immediately.
+                </p>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="skip-feedback-btn" class="flex-1 py-2 rounded-2xl bg-white/70 hover:bg-white text-xs font-semibold text-slate-700">Skip</button>
+                <button type="button" id="submit-feedback-btn" class="flex-1 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">Save Feedback</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Consent -->
+    <div id="consent-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-enter hidden">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <h3 class="text-base font-bold text-slate-900 border-b border-slate-200/60 pb-2">Before your first session</h3>
+            <div class="space-y-2 text-xs text-slate-700">
+                <p>• MediTask uses your camera to track body movement locally. <strong>Video never leaves this device.</strong></p>
+                <p>• Only joint angles, rep counts, and quality scores are shared with your physiotherapist.</p>
+                <p>• MediTask supports clinical care and does not diagnose conditions.</p>
+                <label class="flex items-center gap-2 pt-2 font-semibold text-slate-900 cursor-pointer">
+                    <input id="consent-camera" type="checkbox" class="rounded text-indigo-600">
+                    <span>I agree to camera-based rehabilitation tracking</span>
+                </label>
+            </div>
+            <button id="consent-accept" class="w-full py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-40 transition" disabled>
+                Continue
+            </button>
+        </div>
+    </div>
+
+    <!-- DRAWER: Therapist Messages -->
+    <aside id="chat-modal" class="fixed inset-y-0 right-0 max-w-sm w-full z-50 glass-panel shadow-2xl flex flex-col p-4 border-l border-white/60 hidden">
+        <div class="flex items-center justify-between border-b border-slate-200/60 pb-3">
+            <div>
+                <h3 class="text-sm font-bold text-slate-900">Physiotherapist Chat</h3>
+                <p class="text-xs text-indigo-600 font-semibold">Dr. R. Reynolds, MD</p>
+            </div>
+            <button id="close-chat-btn" class="w-8 h-8 rounded-full glass-chip flex items-center justify-center text-slate-700 hover:text-slate-900">✕</button>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto no-scrollbar py-3 space-y-2 text-xs">
+            <!-- Messages rendered here -->
+        </div>
+        <div class="pt-2 flex gap-2">
+            <input type="text" id="chat-input" maxlength="2000" class="flex-1 py-2 px-3 rounded-xl glass-chip text-xs text-slate-900 outline-none border-0" placeholder="Type a message...">
+            <button id="send-msg-btn" class="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center">
+                <i class="w-4 h-4" data-lucide="send"></i>
+            </button>
         </div>
     </aside>
 
-    <!-- Consent -->
-    <div id="consent-modal" class="backdrop hidden">
-        <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="consent-title">
-            <div class="modal-head"><h2 id="consent-title">Before your first session</h2></div>
-            <div class="modal-body small">
-                <div class="row-top"><span data-icon="camera"></span><p>MediTask uses your camera to track body movement. <b>Video is processed on this device only and is never uploaded or stored.</b></p></div>
-                <div class="row-top"><span data-icon="clipboard"></span><p>Only movement measurements (joint angles, repetitions, quality scores) and the pain and difficulty you report are saved and shared with your physiotherapist.</p></div>
-                <div class="row-top"><span data-icon="users"></span><p>MediTask supports your physiotherapist. It does not diagnose conditions or change your treatment.</p></div>
-                <div class="row-top"><span data-icon="alert"></span><p>Stop immediately if an exercise causes pain, dizziness or breathlessness. In an emergency call 112.</p></div>
-                <label class="check"><input id="consent-camera" type="checkbox"> I understand and agree to camera-based movement tracking.</label>
-            </div>
-            <div class="modal-foot"><button id="consent-accept" class="btn btn-primary" type="button" disabled>Continue</button></div>
-        </div>
-    </div>
-
-    <!-- Exercise instructions -->
-    <div id="demo-modal" class="backdrop hidden">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="demo-title">
-            <div class="modal-head row">
-                <span id="demo-animation" class="ex-icon"></span>
-                <div><h2 id="demo-title">Exercise</h2><p id="demo-dose" class="small muted"></p></div>
-            </div>
-            <div class="modal-body">
-                <ol id="demo-instructions" class="steps small"></ol>
-                <p id="demo-notes" class="banner info hidden"></p>
-                <p class="tiny muted">Stand about 2 metres from the camera with the exercising limb clearly visible.</p>
-            </div>
-            <div class="modal-foot">
-                <button id="cancel-demo-btn" class="btn btn-ghost" type="button">Cancel</button>
-                <button id="start-exercise-btn" class="btn btn-primary" type="button"><span data-icon="play"></span>Start exercise</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Session report -->
-    <div id="report-modal" class="backdrop hidden">
-        <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="report-title">
-            <div class="modal-head"><h2 id="report-title">Session report</h2><p id="report-sub"></p></div>
-            <div id="report-body" class="modal-body"></div>
-            <div class="modal-foot"><button id="report-continue" class="btn btn-primary" type="button">Continue</button></div>
-        </div>
-    </div>
-
-    <!-- Pain / difficulty -->
-    <div id="feedback-modal" class="backdrop hidden">
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fb-title">
-            <div class="modal-head"><h2 id="fb-title">How did that feel?</h2><p>Your physiotherapist sees this with your session results.</p></div>
-            <div class="modal-body">
-                <div class="field">
-                    <span class="label" id="pain-label">Pain during the exercise (0 none, 10 worst)</span>
-                    <div id="pain-scale" class="scale" role="group" aria-labelledby="pain-label"></div>
-                    <p class="hint">Selected: <b id="pain-value">0</b></p>
-                </div>
-                <div class="field">
-                    <span class="label" id="diff-label">Difficulty</span>
-                    <div class="segmented" role="group" aria-labelledby="diff-label">
-                        <button type="button" class="difficulty-btn" data-difficulty="easy" aria-pressed="false">Easy</button>
-                        <button type="button" class="difficulty-btn" data-difficulty="medium" aria-pressed="false">Moderate</button>
-                        <button type="button" class="difficulty-btn" data-difficulty="hard" aria-pressed="false">Hard</button>
-                    </div>
-                </div>
-                <div class="field">
-                    <label for="feedback-notes">Notes (optional)</label>
-                    <textarea id="feedback-notes" class="textarea" rows="2" maxlength="1000" placeholder="Anything your physiotherapist should know"></textarea>
-                </div>
-                <p id="pain-warning" class="banner warning hidden">Pain of 7 or more is flagged to your physiotherapist. If it is severe or does not settle, contact them directly.</p>
-            </div>
-            <div class="modal-foot">
-                <button id="skip-feedback-btn" class="btn btn-ghost" type="button">Skip</button>
-                <button id="submit-feedback-btn" class="btn btn-primary" type="button">Save feedback</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pinned CDN versions -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Dependencies & Application Modules -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
     <script type="module" src="./js/patient-app.js"></script>
+
+    <!-- Initialize Lucide icons on DOM load -->
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err)));
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) lucide.createIcons();
+        });
     </script>
 </body>
 
