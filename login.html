@@ -2,120 +2,316 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0E5A52">
-    <title>Sign in - MediTask</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./css/app.css">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E5A52'/%3E%3Cpath d='M16 26s-9-5.6-9-12.8A5.2 5.2 0 0 1 16 9.8a5.2 5.2 0 0 1 9 3.4C25 20.4 16 26 16 26z' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport" />
+    <title>Sign In - MediTask Biometric Telemetry</title>
+    <!-- Google Fonts & Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#faf8ff",
+                        "surface-dim": "#d1d9f6",
+                        "surface-bright": "#faf8ff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f2f3ff",
+                        "surface-container": "#eaedff",
+                        "surface-container-high": "#e1e7ff",
+                        "surface-container-highest": "#d9e2ff",
+                        "on-surface": "#121b30",
+                        "on-surface-variant": "#444651",
+                        "outline": "#747782",
+                        "outline-variant": "#c4c6d3",
+                        "primary": "#3152a0",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#4c6bba",
+                        "on-primary-container": "#f0f1ff",
+                        "primary-fixed": "#dae2ff",
+                        "primary-fixed-dim": "#b2c5ff",
+                        "secondary": "#94455b",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#fe9cb5",
+                        "on-secondary-container": "#7a3046",
+                        "secondary-fixed": "#ffd9e0",
+                        "tertiary": "#00623e",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#007e50",
+                        "tertiary-fixed": "#62fdb2",
+                        "tertiary-fixed-dim": "#3ee098",
+                        "on-tertiary-fixed": "#002111"
+                    },
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            overscroll-behavior: none;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+
+        .pt-safe {
+            padding-top: env(safe-area-inset-top, 20px);
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
 </head>
 
-<body>
-    <div class="auth">
-        <aside class="auth-aside">
-            <a class="brand" href="./index.html"><span class="brand-mark"><span data-icon="logo"></span></span><span class="brand-name">MediTask</span></a>
-            <div>
-                <h2>Home rehabilitation, supervised by your physiotherapist.</h2>
-                <p>Exercise in front of your camera and get guidance on every repetition. Your physiotherapist sees how you are progressing between visits.</p>
-                <ul class="auth-points">
-                    <li><span data-icon="camera"></span><span>Video stays on your device. Only movement measurements are shared.</span></li>
-                    <li><span data-icon="activity"></span><span>Repetitions, range of motion and form checked in real time.</span></li>
-                    <li><span data-icon="users"></span><span>Prescriptions, progress and messages in one place for patient and clinician.</span></li>
-                </ul>
-            </div>
-            <p class="tiny">MediTask supports clinical care. It does not diagnose or replace your physiotherapist.</p>
-        </aside>
-        <main class="auth-main">
-            <form id="login-form" class="auth-card" novalidate>
-                <div>
-                    <h1>Sign in</h1>
-                    <p class="muted mt-1">Welcome back. Use the email your account was created with.</p>
-                </div>
-                <div class="field">
-                    <label for="login-email">Email</label>
-                    <input type="email" id="login-email" class="input" autocomplete="email" required>
-                </div>
-                <div class="field">
-                    <label for="login-password">Password</label>
-                    <input type="password" id="login-password" class="input" autocomplete="current-password" required>
-                </div>
-                <div id="login-error" class="form-error hidden" role="alert"><span id="error-text"></span></div>
-                <button type="submit" id="login-btn" class="btn btn-primary btn-lg btn-block">
-                    <span id="btn-spinner" class="spinner hidden"></span><span id="btn-text">Sign in</span>
-                </button>
-                <div class="row between mt-2">
-                    <p class="small muted">New to MediTask? <a href="./signup.html">Create an account</a></p>
-                    <a href="./doctor-dashboard.html" class="small strong">Clinical Dashboard ›</a>
-                </div>
-            </form>
-        </main>
-    </div>
+<body class="bg-surface font-sans text-on-surface flex flex-col min-h-screen antialiased selection:bg-primary-fixed">
+    <main class="flex-1 flex flex-col relative w-full pt-safe pb-safe bg-surface">
+        <div class="flex flex-col w-full max-w-md md:max-w-xl mx-auto relative overflow-hidden px-4 sm:px-6 py-4">
 
+            <!-- Luminous Aurora Background Elements -->
+            <div class="absolute -top-32 -left-20 w-96 h-96 rounded-full bg-primary-fixed-dim/35 blur-3xl pointer-events-none -z-10"></div>
+            <div class="absolute top-1/4 -right-28 w-80 h-96 rounded-full bg-secondary-container/40 blur-3xl pointer-events-none -z-10"></div>
+            <div class="absolute bottom-10 left-1/3 w-80 h-80 rounded-full bg-tertiary-fixed/30 blur-3xl pointer-events-none -z-10"></div>
+
+            <!-- Top Brand Navigation -->
+            <header class="flex items-center justify-between py-2">
+                <a href="./index.html" class="flex items-center gap-2.5">
+                    <div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-surface-container-lowest/80 shadow-sm backdrop-blur-md">
+                        <span class="material-symbols-outlined text-primary text-xl">vital_signs</span>
+                        <span class="absolute top-1.5 right-1.5 flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary-fixed-dim opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-base font-bold text-on-surface tracking-tight block leading-none">MediTask</span>
+                        <span class="text-[10px] font-semibold text-outline tracking-wider uppercase block mt-0.5">Clinical Telemetry</span>
+                    </div>
+                </a>
+
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest/85 backdrop-blur-md shadow-sm">
+                    <span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim"></span>
+                    <span class="text-[11px] text-on-surface-variant font-medium">Vision Sensor Ready</span>
+                </div>
+            </header>
+
+            <!-- Hero Statement -->
+            <section class="mt-3 mb-4">
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container/70 backdrop-blur-md mb-2 shadow-xs">
+                    <span class="material-symbols-outlined text-primary text-xs">verified_user</span>
+                    <span class="text-[10px] text-primary font-bold tracking-wide uppercase">Encrypted Bio-Link</span>
+                </div>
+
+                <h1 class="text-2xl font-bold text-on-surface tracking-tight">
+                    Home rehabilitation, <span class="bg-gradient-to-r from-primary via-primary-container to-secondary bg-clip-text text-transparent">supervised by your physiotherapist.</span>
+                </h1>
+
+                <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed">
+                    Exercise in front of your camera and get guidance on every repetition. Your physiotherapist sees your kinematics and progress in real time.
+                </p>
+            </section>
+
+            <!-- Privacy & Kinematic Trust Badges -->
+            <section class="grid grid-cols-1 gap-2 mb-4">
+                <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-lowest/70 backdrop-blur-md shadow-xs border border-white/60">
+                    <div class="flex items-center justify-center w-8 h-8 rounded-full bg-surface-container text-primary shrink-0">
+                        <span class="material-symbols-outlined text-base">videocam_off</span>
+                    </div>
+                    <div class="min-w-0 text-xs">
+                        <p class="font-bold text-on-surface">On-Device Privacy Engine</p>
+                        <p class="text-[11px] text-on-surface-variant truncate">Video stays on your device. Only movement coordinates are shared.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-lowest/70 backdrop-blur-md shadow-xs border border-white/60">
+                    <div class="flex items-center justify-center w-8 h-8 rounded-full bg-surface-container text-tertiary shrink-0">
+                        <span class="material-symbols-outlined text-base">motion_sensor_active</span>
+                    </div>
+                    <div class="min-w-0 text-xs">
+                        <p class="font-bold text-on-surface">Real-Time Biomechanics</p>
+                        <p class="text-[11px] text-on-surface-variant truncate">Repetitions, range of motion, and joint angles tracked live.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Luminous Authentication Glass Card -->
+            <section class="relative rounded-2xl bg-surface-container-lowest/90 backdrop-blur-xl shadow-xl p-5 mb-4 border border-white">
+                <div class="relative z-10 flex flex-col gap-4">
+                    <!-- Role Toggle Perspective -->
+                    <div>
+                        <label class="text-[11px] text-on-surface-variant uppercase tracking-wider block font-bold mb-1.5">Portal Perspective</label>
+                        <div class="grid grid-cols-2 p-1 rounded-full bg-surface-container-low" id="roleToggleGroup">
+                            <button id="patientRoleBtn" type="button" class="py-1.5 rounded-full text-xs font-semibold transition-all bg-surface-container-lowest text-on-surface shadow-sm text-center">
+                                Patient
+                            </button>
+                            <button id="clinicianRoleBtn" type="button" class="py-1.5 rounded-full text-xs font-semibold transition-all text-on-surface-variant text-center hover:text-on-surface">
+                                Physiotherapist
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sign In Form -->
+                    <form id="login-form" class="flex flex-col gap-3">
+                        <!-- Identity Field -->
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs font-semibold text-on-surface" for="login-email">
+                                <span id="identifierLabel">Email Address</span>
+                            </label>
+                            <div class="relative flex items-center">
+                                <span class="material-symbols-outlined absolute left-3 text-outline text-base">badge</span>
+                                <input id="login-email" type="email" placeholder="patient@example.com" class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-lowest text-on-surface placeholder:text-outline-variant text-xs focus:outline-none focus:ring-2 focus:ring-primary shadow-xs border border-slate-200" required />
+                            </div>
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-semibold text-on-surface" for="login-password">Password</label>
+                            </div>
+                            <div class="relative flex items-center">
+                                <span class="material-symbols-outlined absolute left-3 text-outline text-base">lock</span>
+                                <input id="login-password" type="password" placeholder="••••••••••••" class="w-full pl-9 pr-10 py-2.5 rounded-xl bg-surface-container-lowest text-on-surface placeholder:text-outline-variant text-xs focus:outline-none focus:ring-2 focus:ring-primary shadow-xs border border-slate-200" required />
+                                <button type="button" id="togglePasswordBtn" class="absolute right-3 text-outline hover:text-on-surface">
+                                    <span class="material-symbols-outlined text-base" id="eyeIcon">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Error Box -->
+                        <div id="login-error" class="hidden text-xs text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                            <span id="error-text"></span>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" id="login-btn" class="w-full mt-1 py-3 px-6 rounded-full bg-primary hover:bg-primary-container text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition">
+                            <span id="btn-text">Sign In to Rehabilitation Hub</span>
+                            <span class="material-symbols-outlined text-base">arrow_forward</span>
+                        </button>
+                    </form>
+
+                    <!-- Divider -->
+                    <div class="relative flex items-center justify-center my-1">
+                        <div class="w-full h-px bg-surface-container-high"></div>
+                        <span class="absolute bg-surface-container-lowest px-3 text-[10px] uppercase font-bold text-outline">Quick Clinical Access</span>
+                    </div>
+
+                    <!-- One-Click Demo Mode Buttons -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <a href="./patient-dashboard.html" class="py-2 px-3 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface text-[11px] font-semibold flex items-center justify-center gap-1.5 transition text-center shadow-xs">
+                            <span class="material-symbols-outlined text-primary text-sm">person</span>
+                            <span>Patient View</span>
+                        </a>
+                        <a href="./doctor-dashboard.html" class="py-2 px-3 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface text-[11px] font-semibold flex items-center justify-center gap-1.5 transition text-center shadow-xs">
+                            <span class="material-symbols-outlined text-tertiary text-sm">medical_services</span>
+                            <span>Physio View</span>
+                        </a>
+                    </div>
+
+                    <!-- Sign Up Switcher -->
+                    <div class="text-center pt-1 text-xs text-on-surface-variant">
+                        Don't have an account yet?
+                        <a href="./signup.html" class="font-bold text-primary hover:underline ml-1">Create an account</a>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Firebase Authentication Controller -->
     <script type="module">
-        import { hydrateIcons } from "./js/ui/icons.js";
-        hydrateIcons();
-        import { auth, db, login, checkAuthAndRedirect } from "./js/services/auth.js";
+        import { login, checkAuthAndRedirect, auth, db } from "./js/services/auth.js";
         import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // Signed-in users go straight to their dashboard.
+        // Signed-in users go straight to their dashboard
         checkAuthAndRedirect();
 
         const $ = (id) => document.getElementById(id);
         const showError = (m) => { $('error-text').textContent = m; $('login-error').classList.remove('hidden'); };
         const hideError = () => $('login-error').classList.add('hidden');
 
-        // Check URL parameters for messages
+        // Check URL parameters for errors
         const params = new URLSearchParams(window.location.search);
         if (params.get('err') === 'notLoggedIn') {
-            showError('Please sign in to access your dashboard.');
+            showError('Please sign in to access your rehabilitation dashboard.');
         }
 
-        function setLoading(on) {
-            $('login-btn').disabled = on;
-            $('btn-text').textContent = on ? 'Signing in…' : 'Sign in';
-            $('btn-spinner').classList.toggle('hidden', !on);
-        }
+        // Perspective role toggle
+        let currentPerspective = 'patient';
+        $('patientRoleBtn')?.addEventListener('click', () => {
+            currentPerspective = 'patient';
+            $('patientRoleBtn').className = "py-1.5 rounded-full text-xs font-semibold transition-all bg-surface-container-lowest text-on-surface shadow-sm text-center";
+            $('clinicianRoleBtn').className = "py-1.5 rounded-full text-xs font-semibold transition-all text-on-surface-variant text-center hover:text-on-surface";
+            $('login-email').placeholder = "patient@example.com";
+            $('btn-text').textContent = "Sign In as Patient";
+        });
+        $('clinicianRoleBtn')?.addEventListener('click', () => {
+            currentPerspective = 'doctor';
+            $('clinicianRoleBtn').className = "py-1.5 rounded-full text-xs font-semibold transition-all bg-surface-container-lowest text-on-surface shadow-sm text-center";
+            $('patientRoleBtn').className = "py-1.5 rounded-full text-xs font-semibold transition-all text-on-surface-variant text-center hover:text-on-surface";
+            $('login-email').placeholder = "doctor@example.com";
+            $('btn-text').textContent = "Sign In as Physiotherapist";
+        });
 
-        $('login-form').addEventListener('submit', async (e) => {
+        // Password visibility toggle
+        let showPass = false;
+        $('togglePasswordBtn')?.addEventListener('click', () => {
+            showPass = !showPass;
+            $('login-password').type = showPass ? 'text' : 'password';
+            $('eyeIcon').textContent = showPass ? 'visibility_off' : 'visibility';
+        });
+
+        // Form Submit
+        $('login-form')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
-            const email = $('login-email').value.trim(), password = $('login-password').value;
+            const email = $('login-email').value.trim();
+            const password = $('login-password').value;
             if (!email || !password) { showError('Enter your email and password.'); return; }
-            setLoading(true);
+
+            $('login-btn').disabled = true;
+            $('btn-text').textContent = 'Authenticating…';
+
             try {
                 const cred = await login(email, password);
                 $('btn-text').textContent = 'Opening your dashboard…';
                 try {
                     const snap = await getDoc(doc(db, "users", cred.user.uid));
-                    const role = snap.exists() ? String(snap.data().role || '').toLowerCase() : '';
+                    const role = snap.exists() ? String(snap.data().role || '').toLowerCase() : currentPerspective;
                     if (role === 'doctor') {
                         window.location.replace('./doctor-dashboard.html');
-                        return;
                     } else {
                         window.location.replace('./patient-dashboard.html');
-                        return;
                     }
                 } catch {
-                    window.location.replace('./patient-dashboard.html');
+                    window.location.replace(currentPerspective === 'doctor' ? './doctor-dashboard.html' : './patient-dashboard.html');
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                setLoading(false);
+                $('login-btn').disabled = false;
+                $('btn-text').textContent = currentPerspective === 'doctor' ? 'Sign In as Physiotherapist' : 'Sign In as Patient';
                 const messages = {
-                    'auth/user-not-found': 'No account uses this email.',
-                    'auth/wrong-password': 'The password is incorrect.',
+                    'auth/user-not-found': 'No account registered with this email.',
+                    'auth/wrong-password': 'The password you entered is incorrect.',
                     'auth/invalid-credential': 'The email or password is incorrect.',
-                    'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
-                    'auth/network-request-failed': 'No connection. Check your internet and try again.',
+                    'auth/too-many-requests': 'Too many attempts. Please wait a few moments and try again.',
+                    'auth/network-request-failed': 'Network error. Please check your internet connection.',
                 };
                 showError(messages[error.code] || 'The email or password is incorrect.');
             }
         });
-        $('login-email').addEventListener('input', hideError);
-        $('login-password').addEventListener('input', hideError);
+
+        $('login-email')?.addEventListener('input', hideError);
+        $('login-password')?.addEventListener('input', hideError);
     </script>
 </body>
 
