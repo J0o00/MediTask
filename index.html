@@ -62,12 +62,12 @@
             </header>
 
             <!-- Interactive Segmented Navigation -->
-            <nav class="relative z-10 p-1 rounded-full bg-surface-container/70 backdrop-blur-md flex items-center justify-between shadow-xs">
-                <button id="nav-overview" class="flex-1 py-1.5 rounded-full bg-surface-container-lowest text-on-surface text-xs font-semibold shadow-sm transition-all text-center">Overview</button>
-                <button id="nav-features" class="flex-1 py-1.5 rounded-full text-on-surface-variant text-xs font-medium transition-all text-center hover:text-on-surface">Features</button>
-                <a href="./doctor-dashboard.html" class="flex-1 py-1.5 rounded-full text-on-surface-variant text-xs font-medium transition-all text-center hover:text-primary">Clinical Hub</a>
-                <a href="./patient-dashboard.html" class="flex-1 py-1.5 rounded-full text-on-surface-variant text-xs font-medium transition-all text-center hover:text-primary">Patient Portal</a>
-                <button id="nav-pricing" class="flex-1 py-1.5 rounded-full text-on-surface-variant text-xs font-medium transition-all text-center hover:text-on-surface">Pricing</button>
+            <nav class="relative z-10 p-1 rounded-full bg-surface-container/70 backdrop-blur-md flex items-center justify-between shadow-xs overflow-x-auto no-scrollbar gap-1">
+                <button id="nav-overview" class="flex-1 min-w-[68px] sm:min-w-0 py-1.5 px-2 rounded-full bg-surface-container-lowest text-on-surface text-[11px] sm:text-xs font-semibold shadow-sm transition-all text-center whitespace-nowrap">Overview</button>
+                <button id="nav-features" class="flex-1 min-w-[68px] sm:min-w-0 py-1.5 px-2 rounded-full text-on-surface-variant text-[11px] sm:text-xs font-medium transition-all text-center hover:text-on-surface whitespace-nowrap">Features</button>
+                <a href="./doctor-dashboard.html" class="flex-1 min-w-[80px] sm:min-w-0 py-1.5 px-2 rounded-full text-on-surface-variant text-[11px] sm:text-xs font-medium transition-all text-center hover:text-primary whitespace-nowrap">Clinical Hub</a>
+                <a href="./patient-dashboard.html" class="flex-1 min-w-[80px] sm:min-w-0 py-1.5 px-2 rounded-full text-on-surface-variant text-[11px] sm:text-xs font-medium transition-all text-center hover:text-primary whitespace-nowrap">Patient Portal</a>
+                <button id="nav-pricing" class="flex-1 min-w-[60px] sm:min-w-0 py-1.5 px-2 rounded-full text-on-surface-variant text-[11px] sm:text-xs font-medium transition-all text-center hover:text-on-surface whitespace-nowrap">Pricing</button>
             </nav>
 
             <!-- Hero Content Section -->
@@ -109,41 +109,44 @@
             <section id="section-telemetry" class="relative z-10 rounded-2xl p-4 sm:p-5 bg-surface-container-lowest/85 backdrop-blur-2xl shadow-xl flex flex-col gap-4 overflow-hidden border border-white">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full bg-tertiary-container/15 flex items-center justify-center text-tertiary">
+                        <div class="w-8 h-8 rounded-full bg-tertiary-container/15 flex items-center justify-center text-tertiary shrink-0">
                             <span class="material-symbols-outlined text-base">sensors</span>
                         </div>
                         <div>
-                            <h2 class="text-sm font-bold text-on-surface">Kinematic Pose Telemetry</h2>
-                            <p class="text-[11px] text-on-surface-variant">Live Spatial Landmark Sync</p>
+                            <h2 class="text-xs sm:text-sm font-bold text-on-surface">Kinematic Pose Telemetry</h2>
+                            <p class="text-[10px] sm:text-[11px] text-on-surface-variant">Live Spatial Landmark Sync</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed/30 text-on-tertiary-fixed">
+                    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed/30 text-on-tertiary-fixed shrink-0">
                         <span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
-                        <span class="text-[11px] font-semibold">Active Sensor</span>
+                        <span class="text-[10px] sm:text-[11px] font-semibold">Active Sensor</span>
                     </div>
                 </div>
 
                 <!-- Centerpiece Visual + Waveform -->
-                <div class="relative w-full h-52 sm:h-64 rounded-xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-lowest to-surface-variant/50 overflow-hidden flex items-center justify-center border border-white/60">
-                    <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-                        <span class="material-symbols-outlined text-6xl text-primary/40 mb-2">accessibility_new</span>
-                        <span class="text-sm font-bold text-slate-800">MediaPipe Computer Vision Skeleton</span>
-                        <span class="text-xs text-slate-500 max-w-xs mt-1">Tracks 33 3D anatomical joints locally in browser at 60 FPS</span>
+                <div class="relative w-full min-h-[240px] sm:h-64 rounded-xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-lowest to-surface-variant/50 overflow-hidden flex flex-col justify-between p-3 sm:p-4 border border-white/60">
+                    <!-- Top Telemetry Row: Knee Flexion + Joint Symmetry -->
+                    <div class="relative z-10 flex flex-wrap items-center justify-between gap-2 w-full">
+                        <div class="px-2.5 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-sm flex items-center gap-1.5 border border-white/70">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="text-[10px] sm:text-xs font-bold text-on-surface">Knee Flexion: 138°</span>
+                        </div>
+
+                        <div class="px-2.5 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-md flex items-center gap-1.5 border border-white/70">
+                            <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                            <span class="text-[10px] sm:text-xs font-bold text-on-surface">Joint Symmetry: 0.8° Dev</span>
+                        </div>
                     </div>
 
-                    <!-- Floated Telemetry Pills -->
-                    <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-md flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span class="text-xs font-bold text-on-surface">Knee Flexion: 138°</span>
-                    </div>
-
-                    <div class="absolute bottom-3 right-3 px-3 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-md flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-teal-400"></span>
-                        <span class="text-xs font-bold text-on-surface">Joint Symmetry: 0.8° Dev</span>
+                    <!-- Center Graphic & Description -->
+                    <div class="relative z-10 flex flex-col items-center justify-center text-center my-auto py-3">
+                        <span class="material-symbols-outlined text-4xl sm:text-6xl text-primary/40 mb-1.5 sm:mb-2">accessibility_new</span>
+                        <span class="text-xs sm:text-sm font-bold text-slate-800">MediaPipe Computer Vision Skeleton</span>
+                        <span class="text-[10px] sm:text-xs text-slate-500 max-w-xs mt-1 leading-snug">Tracks 33 3D anatomical joints locally in browser at 60 FPS</span>
                     </div>
 
                     <!-- Sine Wave Overlay -->
-                    <div class="absolute inset-x-0 bottom-0 h-16 pointer-events-none opacity-40">
+                    <div class="absolute inset-x-0 bottom-0 h-16 pointer-events-none opacity-30">
                         <svg viewBox="0 0 400 60" preserveAspectRatio="none" class="w-full h-full text-primary fill-none stroke-current">
                             <path d="M0,45 Q50,20 100,35 T200,15 T300,40 T400,22" stroke-width="3" stroke-linecap="round"></path>
                         </svg>
@@ -151,21 +154,21 @@
                 </div>
 
                 <!-- Triple Diagnostic Metrics Grid -->
-                <div class="grid grid-cols-3 gap-2 text-center">
-                    <div class="p-2.5 rounded-xl bg-surface-container/60 backdrop-blur-sm flex flex-col">
-                        <span class="text-[11px] text-on-surface-variant">Precision</span>
-                        <span class="text-base sm:text-lg text-primary font-bold">98.4%</span>
-                        <span class="text-[10px] text-tertiary font-semibold">Sub-millimeter</span>
+                <div class="grid grid-cols-3 gap-1.5 sm:gap-2.5 text-center">
+                    <div class="py-2.5 px-1 sm:p-2.5 rounded-xl bg-surface-container/60 backdrop-blur-sm flex flex-col justify-center">
+                        <span class="text-[10px] sm:text-[11px] text-on-surface-variant font-medium truncate">Precision</span>
+                        <span class="text-sm sm:text-lg text-primary font-bold tracking-tight">98.4%</span>
+                        <span class="text-[9px] sm:text-[10px] text-tertiary font-semibold truncate">Sub-millimeter</span>
                     </div>
-                    <div class="p-2.5 rounded-xl bg-surface-container/60 backdrop-blur-sm flex flex-col">
-                        <span class="text-[11px] text-on-surface-variant">Vision Latency</span>
-                        <span class="text-base sm:text-lg text-on-surface font-bold">&lt;15 ms</span>
-                        <span class="text-[10px] text-on-surface-variant font-medium">Real-Time</span>
+                    <div class="py-2.5 px-1 sm:p-2.5 rounded-xl bg-surface-container/60 backdrop-blur-sm flex flex-col justify-center">
+                        <span class="text-[10px] sm:text-[11px] text-on-surface-variant font-medium truncate">Vision Latency</span>
+                        <span class="text-sm sm:text-lg text-on-surface font-bold tracking-tight">&lt;15 ms</span>
+                        <span class="text-[9px] sm:text-[10px] text-on-surface-variant font-medium truncate">Real-Time</span>
                     </div>
-                    <div class="p-2.5 rounded-xl bg-surface-container/60 backdrop-blur-sm flex flex-col">
-                        <span class="text-[11px] text-on-surface-variant">Privacy</span>
-                        <span class="text-base sm:text-lg text-secondary font-bold">100%</span>
-                        <span class="text-[10px] text-on-surface-variant font-medium">On-Device</span>
+                    <div class="py-2.5 px-1 sm:p-2.5 rounded-xl bg-surface-container/60 backdrop-blur-sm flex flex-col justify-center">
+                        <span class="text-[10px] sm:text-[11px] text-on-surface-variant font-medium truncate">Privacy</span>
+                        <span class="text-sm sm:text-lg text-secondary font-bold tracking-tight">100%</span>
+                        <span class="text-[9px] sm:text-[10px] text-on-surface-variant font-medium truncate">On-Device</span>
                     </div>
                 </div>
             </section>

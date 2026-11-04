@@ -66,7 +66,7 @@
         }
 
         .safe-bottom {
-            padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 72px);
+            padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 84px);
         }
 
         /* Smooth scroll behavior */
@@ -107,7 +107,7 @@
     <!-- END: Ambient Background Glow Lights -->
 
     <!-- BEGIN: Main Mobile Container -->
-    <main class="relative z-10 max-w-md md:max-w-xl mx-auto min-h-screen flex flex-col px-4 safe-top safe-bottom">
+    <main class="relative z-10 max-w-md md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto min-h-screen flex flex-col px-4 sm:px-6 lg:px-8 safe-top safe-bottom">
 
         <!-- Demo Mode Indicator Bar -->
         <div id="demo-banner" class="hidden mb-2.5 py-1.5 px-3.5 rounded-2xl lumis-glass flex items-center justify-between text-xs text-charcoal font-medium border border-stone-200">
@@ -185,150 +185,153 @@
             <!-- BEGIN: Hero Clinician Banner -->
             <section class="mb-1" data-purpose="hero-title-section">
                 <p class="text-xs uppercase tracking-widest text-slate-light font-semibold mb-1">Rehabilitation Overview</p>
-                <h2 class="text-2xl font-normal tracking-tight text-charcoal leading-tight">
+                <h2 class="text-2xl sm:text-3xl font-normal tracking-tight text-charcoal leading-tight">
                     <span id="hero-line">Your patients</span> <br />
                     <span id="hero-status" class="font-serif italic font-normal text-charcoal">at a glance</span>
                 </h2>
             </section>
             <!-- END: Hero Clinician Banner -->
 
-            <!-- BEGIN: Featured Active Patient Telemetry Card -->
-            <section class="lumis-glass rounded-3xl p-4 relative overflow-hidden" data-purpose="primary-patient-card">
-                <!-- Glow subtle ambient warm light inside card -->
-                <div class="absolute -right-8 -top-8 w-36 h-36 bg-amber-100/40 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="lg:grid lg:grid-cols-12 lg:gap-6 items-start space-y-4 lg:space-y-0">
+                <!-- Patient Queue / Fast Clinical Triage Column (Left on Desktop, Bottom on Mobile) -->
+                <div class="lg:col-span-5 space-y-4 order-2 lg:order-1">
+                    <section class="mb-2" data-purpose="patient-queue-section">
+                        <div class="flex items-center justify-between mb-2 px-1">
+                            <h3 class="text-sm font-semibold text-charcoal tracking-tight">Active Clinical Roster</h3>
+                            <span id="patient-count" class="text-xs text-slate-light font-normal">4 under monitoring</span>
+                        </div>
 
-                <!-- Card Top: Patient Info & Status Badge -->
-                <div class="flex items-start justify-between relative z-10 mb-3">
-                    <div class="flex items-center space-x-3">
-                        <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center font-medium text-charcoal shadow-inner">–</div>
-                        <div>
-                            <div class="flex items-center space-x-1.5">
-                                <h3 id="pt-name" class="text-base font-semibold text-charcoal tracking-tight">No patient selected</h3>
-                                <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-stone-300"></span>
+                        <div class="mb-2">
+                            <input id="patient-search" type="search" class="w-full py-2 px-3.5 rounded-xl lumis-glass text-xs text-charcoal placeholder-stone-400 border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="Search patients by name or condition...">
+                        </div>
+
+                        <!-- Compact Frosted Patient Cards List -->
+                        <div id="patient-list" class="space-y-2">
+                            <!-- Populated dynamically by doctor-app.js -->
+                        </div>
+                    </section>
+
+                    <!-- Quick Prescription & AI Protocol Bar -->
+                    <section class="lumis-glass rounded-3xl p-3.5 flex items-center justify-between border border-stone-200" data-purpose="quick-prescription-module">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-700 shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+                                </svg>
                             </div>
-                            <p id="pt-meta" class="text-xs text-slate-light">Add or invite a patient to begin</p>
+                            <div>
+                                <p class="text-xs font-semibold text-charcoal">Prescribe Routine</p>
+                                <p class="text-[10px] text-slate-light">Update biomechanical resistance plan</p>
+                            </div>
                         </div>
-                    </div>
-                    <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-stone-50 text-stone-600 border border-stone-200 flex items-center space-x-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
-                        <span id="pt-status-text">–</span>
-                    </span>
+                        <button id="open-prescribe-modal-btn" class="px-3 py-1.5 rounded-full lumis-glass text-xs font-medium text-charcoal hover:bg-white active:scale-95 transition flex items-center space-x-1 border border-stone-200 shrink-0">
+                            <span>Assign</span>
+                            <svg class="w-3.5 h-3.5 text-stone-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+                            </svg>
+                        </button>
+                    </section>
                 </div>
 
-                <!-- Clinical alerts for the selected patient -->
-                <div id="alerts-box" class="space-y-2 mb-3 relative z-10 hidden" aria-live="polite"></div>
+                <!-- Featured Active Patient Telemetry Card (Right on Desktop, Top on Mobile) -->
+                <div class="lg:col-span-7 space-y-4 order-1 lg:order-2">
+                    <section class="lumis-glass rounded-3xl p-4 sm:p-5 relative overflow-hidden" data-purpose="primary-patient-card">
+                        <!-- Glow subtle ambient warm light inside card -->
+                        <div class="absolute -right-8 -top-8 w-36 h-36 bg-amber-100/40 rounded-full blur-2xl pointer-events-none"></div>
 
-                <!-- Quick Metrics Grid (Score & Bio telemetry) -->
-                <div class="grid grid-cols-2 gap-2.5 mb-3.5 relative z-10">
-                    <!-- AI Pose Accuracy Metric Card -->
-                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-normal text-slate-light">Movement Quality</span>
-                            <span id="pt-accuracy-delta" class="text-[10px] text-stone-500 font-semibold"></span>
+                        <!-- Card Top: Patient Info & Status Badge -->
+                        <div class="flex items-start justify-between relative z-10 mb-3">
+                            <div class="flex items-center space-x-3">
+                                <div id="pt-avatar" class="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center font-medium text-charcoal shadow-inner shrink-0">–</div>
+                                <div>
+                                    <div class="flex items-center space-x-1.5">
+                                        <h3 id="pt-name" class="text-base font-semibold text-charcoal tracking-tight">No patient selected</h3>
+                                        <span id="pt-status-dot" class="w-2 h-2 rounded-full bg-stone-300"></span>
+                                    </div>
+                                    <p id="pt-meta" class="text-xs text-slate-light">Add or invite a patient to begin</p>
+                                </div>
+                            </div>
+                            <span id="pt-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-stone-50 text-stone-600 border border-stone-200 flex items-center space-x-1 shrink-0">
+                                <span class="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
+                                <span id="pt-status-text">–</span>
+                            </span>
                         </div>
-                        <div class="mt-2 flex items-baseline space-x-1">
-                            <span id="pt-accuracy-val" class="text-2xl font-light text-charcoal tracking-tight">–</span>
-                            <span class="text-xs text-stone-400">/100</span>
+
+                        <!-- Clinical alerts for the selected patient -->
+                        <div id="alerts-box" class="space-y-2 mb-3 relative z-10 hidden" aria-live="polite"></div>
+
+                        <!-- Quick Metrics Grid (Score & Bio telemetry) -->
+                        <div class="grid grid-cols-2 gap-2.5 mb-3.5 relative z-10">
+                            <!-- AI Pose Accuracy Metric Card -->
+                            <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-normal text-slate-light">Movement Quality</span>
+                                    <span id="pt-accuracy-delta" class="text-[10px] text-stone-500 font-semibold"></span>
+                                </div>
+                                <div class="mt-2 flex items-baseline space-x-1">
+                                    <span id="pt-accuracy-val" class="text-2xl font-light text-charcoal tracking-tight">–</span>
+                                    <span class="text-xs text-stone-400">/100</span>
+                                </div>
+                                <!-- Mini progress bar -->
+                                <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
+                                    <div id="pt-accuracy-bar" class="bg-gradient-to-r from-stone-700 to-stone-900 h-full rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Exercise Routine Adherence Card -->
+                            <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-normal text-slate-light">Sessions, last 7 days</span>
+                                    <span id="pt-adherence-pct" class="text-[10px] text-stone-600 font-semibold"></span>
+                                </div>
+                                <div class="mt-2 flex items-baseline space-x-1">
+                                    <span id="pt-completed-val" class="text-2xl font-light text-charcoal tracking-tight">–</span>
+                                    <span id="pt-target-val" class="text-xs text-stone-400"></span>
+                                </div>
+                                <!-- Mini progress bar -->
+                                <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
+                                    <div id="pt-adherence-bar" class="bg-gradient-to-r from-stone-500 to-stone-700 h-full rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                            </div>
                         </div>
-                        <!-- Mini progress bar -->
-                        <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div id="pt-accuracy-bar" class="bg-gradient-to-r from-stone-700 to-stone-900 h-full rounded-full transition-all" style="width: 0%"></div>
+
+                        <!-- Waveform Card: Joint Range of Motion -->
+                        <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10 border border-stone-200/80" data-purpose="telemetry-chart">
+                            <div class="flex items-center justify-between mb-1">
+                                <div>
+                                    <p id="rom-title" class="text-xs font-semibold text-charcoal">Range of Motion</p>
+                                    <p id="twin-baseline-note" class="text-[10px] text-slate-light">Best range per session, webcam pose estimation</p>
+                                </div>
+                                <span id="rom-degrees" class="text-xs font-semibold text-charcoal">–</span>
+                            </div>
+
+                            <!-- Canvas with styled height -->
+                            <div class="h-32 sm:h-36 w-full flex items-center justify-center">
+                                <canvas id="rom-chart" class="w-full h-full"></canvas>
+                            </div>
+
+                            <p id="rom-empty" class="hidden text-[10px] text-stone-500 text-center pt-1">No sessions recorded yet for this patient.</p>
                         </div>
-                    </div>
 
-                    <!-- Exercise Routine Adherence Card -->
-                    <div class="lumis-glass-subtle rounded-2xl p-3 flex flex-col justify-between border border-stone-200/80">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-normal text-slate-light">Sessions, last 7 days</span>
-                            <span id="pt-adherence-pct" class="text-[10px] text-stone-600 font-semibold"></span>
+                        <!-- Action Buttons inside Patient Card -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="open-chat-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">
+                                <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
+                                </svg>
+                                <span>Message</span>
+                            </button>
+                            <button id="review-telemetry-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">
+                                <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round"></path>
+                                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+                                </svg>
+                                <span>Review AI Pose</span>
+                            </button>
                         </div>
-                        <div class="mt-2 flex items-baseline space-x-1">
-                            <span id="pt-completed-val" class="text-2xl font-light text-charcoal tracking-tight">–</span>
-                            <span id="pt-target-val" class="text-xs text-stone-400"></span>
-                        </div>
-                        <!-- Mini progress bar -->
-                        <div class="w-full bg-stone-200/70 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div id="pt-adherence-bar" class="bg-gradient-to-r from-stone-500 to-stone-700 h-full rounded-full transition-all" style="width: 0%"></div>
-                        </div>
-                    </div>
+                    </section>
                 </div>
-
-                <!-- Waveform Card: Joint Range of Motion -->
-                <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10 border border-stone-200/80" data-purpose="telemetry-chart">
-                    <div class="flex items-center justify-between mb-1">
-                        <div>
-                            <p id="rom-title" class="text-xs font-semibold text-charcoal">Range of Motion</p>
-                            <p id="twin-baseline-note" class="text-[10px] text-slate-light">Best range per session, webcam pose estimation</p>
-                        </div>
-                        <span id="rom-degrees" class="text-xs font-semibold text-charcoal">–</span>
-                    </div>
-
-                    <!-- Canvas with styled height -->
-                    <div class="h-28 w-full flex items-center justify-center">
-                        <canvas id="rom-chart" class="w-full h-full"></canvas>
-                    </div>
-
-                    <p id="rom-empty" class="hidden text-[10px] text-stone-500 text-center pt-1">No sessions recorded yet for this patient.</p>
-                </div>
-
-                <!-- Action Buttons inside Patient Card -->
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="open-chat-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">
-                        <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                        <span>Message</span>
-                    </button>
-                    <button id="review-telemetry-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">
-                        <svg class="w-4 h-4 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                        <span>Review AI Pose</span>
-                    </button>
-                </div>
-            </section>
-            <!-- END: Featured Active Patient Telemetry Card -->
-
-            <!-- BEGIN: Patient Queue / Fast Clinical Triage -->
-            <section class="mb-4" data-purpose="patient-queue-section">
-                <div class="flex items-center justify-between mb-2 px-1">
-                    <h3 class="text-sm font-semibold text-charcoal tracking-tight">Active Clinical Roster</h3>
-                    <span id="patient-count" class="text-xs text-slate-light font-normal">4 under monitoring</span>
-                </div>
-
-                <div class="mb-2">
-                    <input id="patient-search" type="search" class="w-full py-2 px-3.5 rounded-xl lumis-glass text-xs text-charcoal placeholder-stone-400 border border-stone-200 focus:ring-1 focus:ring-stone-600 outline-none" placeholder="Search patients by name or condition...">
-                </div>
-
-                <!-- Compact Frosted Patient Cards List -->
-                <div id="patient-list" class="space-y-2">
-                    <!-- Populated dynamically by doctor-app.js -->
-                </div>
-            </section>
-            <!-- END: Patient Queue / Fast Clinical Triage -->
-
-            <!-- BEGIN: Quick Prescription & AI Protocol Bar -->
-            <section class="lumis-glass rounded-3xl p-3.5 mb-2 flex items-center justify-between border border-stone-200" data-purpose="quick-prescription-module">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-700">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold text-charcoal">Prescribe Routine</p>
-                        <p class="text-[10px] text-slate-light">Update biomechanical resistance plan</p>
-                    </div>
-                </div>
-                <button id="open-prescribe-modal-btn" class="px-3 py-1.5 rounded-full lumis-glass text-xs font-medium text-charcoal hover:bg-white active:scale-95 transition flex items-center space-x-1 border border-stone-200">
-                    <span>Assign</span>
-                    <svg class="w-3.5 h-3.5 text-stone-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
-                    </svg>
-                </button>
-            </section>
-            <!-- END: Quick Prescription & AI Protocol Bar -->
+            </div>
         </div>
 
         <!-- TAB VIEW 2: Sessions History -->
@@ -375,7 +378,7 @@
     <!-- END: Main Mobile Container -->
 
     <!-- BEGIN: Bottom Floating Dock Navigation -->
-    <aside aria-label="Bottom Navigation" class="fixed bottom-3 left-0 right-0 max-w-xs mx-auto px-2 z-40">
+    <aside aria-label="Bottom Navigation" class="fixed left-0 right-0 max-w-xs mx-auto px-2 z-40" style="bottom: max(12px, env(safe-area-inset-bottom, 12px));">
         <nav class="lumis-glass rounded-full px-4 py-2.5 flex items-center justify-around shadow-xl border border-stone-200/90">
             <!-- Tab 1: Patients (Active) -->
             <button id="dock-patients" aria-current="page" class="flex flex-col items-center text-charcoal transition-colors" title="Patients">
