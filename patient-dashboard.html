@@ -61,14 +61,13 @@
 
         /* Mirror webcam and canvas for natural user feedback */
         .mirror {
-            transform: scaleX(-1) translateZ(0);
-            -webkit-transform: scaleX(-1) translateZ(0);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
         }
 
         /* During a live session, heavy blur is switched off so the GPU stays free for pose tracking. */
         body.session-live .glass-panel, body.session-live .glass-chip { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(255, 255, 255, 0.86); }
+        body.session-live nav[data-purpose="dock-navigation"] { display: none !important; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
 
         .backdrop-enter {
@@ -310,20 +309,20 @@
             <!-- Video & Pose Canvas Card -->
             <div class="glass-panel rounded-3xl p-3 shadow-glass relative overflow-hidden">
                 <div class="relative rounded-2xl overflow-hidden bg-slate-950 aspect-[4/3] flex items-center justify-center">
-                    <video id="webcam" class="mirror absolute inset-0 w-full h-full object-cover" autoplay playsinline muted></video>
-                    <canvas id="pose-canvas" class="mirror absolute inset-0 w-full h-full object-cover"></canvas>
+                    <video id="webcam" class="mirror absolute inset-0 w-full h-full object-cover z-10" autoplay playsinline muted></video>
+                    <canvas id="pose-canvas" class="mirror absolute inset-0 w-full h-full object-cover z-20 pointer-events-none"></canvas>
 
                     <!-- Overlay badges -->
-                    <span id="phase-badge" class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900/80 text-white backdrop-blur border border-white/20">
+                    <span id="phase-badge" class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900/80 text-white backdrop-blur border border-white/20 z-30">
                         Rest
                     </span>
-                    <span id="ml-badge" class="absolute top-3 right-12 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-indigo-900/80 text-indigo-200 backdrop-blur border border-indigo-400/30">
+                    <span id="ml-badge" class="absolute top-3 right-12 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-indigo-900/80 text-indigo-200 backdrop-blur border border-indigo-400/30 z-30">
                         Rule-based analysis
                     </span>
-                    <div id="rep-flash" class="hidden absolute inset-0 flex items-center justify-center bg-teal-500/30 text-white text-6xl font-black pointer-events-none"></div>
+                    <div id="rep-flash" class="hidden absolute inset-0 flex items-center justify-center bg-teal-500/30 text-white text-6xl font-black pointer-events-none z-30"></div>
 
                     <!-- Range of motion vertical bar -->
-                    <div class="absolute right-3 bottom-3 top-12 w-3 rounded-full bg-white/20 overflow-hidden flex flex-col justify-end p-0.5">
+                    <div class="absolute right-3 bottom-3 top-12 w-3 rounded-full bg-white/20 overflow-hidden flex flex-col justify-end p-0.5 z-30">
                         <div id="rom-fill" class="bg-gradient-to-t from-teal-400 to-emerald-400 rounded-full w-full transition-all duration-150" style="height: 0%"></div>
                     </div>
                 </div>

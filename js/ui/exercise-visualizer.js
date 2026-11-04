@@ -21,11 +21,7 @@ const RULE_JOINTS = {
 };
 
 export function drawPose(ctx, canvas, state, cfg, videoElement = null) {
-    if (videoElement && videoElement.readyState >= 2) {
-        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     const lm = state?.landmarks;
     if (!lm) return;
     const W = canvas.width, H = canvas.height;
@@ -35,13 +31,13 @@ export function drawPose(ctx, canvas, state, cfg, videoElement = null) {
     ctx.lineWidth = 4; ctx.lineCap = 'round';
     for (const [a, b] of CONNECTIONS) {
         const p = lm[a], q = lm[b];
-        if (!p || !q || (p.visibility ?? 1) < 0.5 || (q.visibility ?? 1) < 0.5) continue;
-        ctx.strokeStyle = bad.has(a) && bad.has(b) ? '#ef4444' : 'rgba(255,255,255,0.75)';
+        if (!p || !q || (p.visibility ?? 1) < 0.3 || (q.visibility ?? 1) < 0.3) continue;
+        ctx.strokeStyle = bad.has(a) && bad.has(b) ? '#ef4444' : 'rgba(255,255,255,0.85)';
         ctx.beginPath(); ctx.moveTo(p.x * W, p.y * H); ctx.lineTo(q.x * W, q.y * H); ctx.stroke();
     }
     for (const i of KEY_POINTS) {
         const p = lm[i];
-        if (!p || (p.visibility ?? 1) < 0.5) continue;
+        if (!p || (p.visibility ?? 1) < 0.3) continue;
         ctx.beginPath(); ctx.arc(p.x * W, p.y * H, 7, 0, Math.PI * 2);
         ctx.fillStyle = bad.has(i) ? '#ef4444' : base; ctx.fill();
         ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a'; ctx.stroke();

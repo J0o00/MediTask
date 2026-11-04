@@ -277,10 +277,14 @@ async function startSession(rx, cfg) {
 
 async function startCamera() {
     const video = $('webcam'), canvas = $('pose-canvas');
+    if (!video || !canvas) return;
     if (!window.Pose) { setFeedback('The movement tracker is still loading. Wait a moment and start again.', 'error'); return; }
     setFeedback('Starting camera…', 'info');
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+            audio: false
+        });
     } catch (err) {
         setFeedback(err.name === 'NotAllowedError'
             ? 'Camera access is blocked. Allow camera access for this site in your browser settings, then start again.'
@@ -288,9 +292,19 @@ async function startCamera() {
         return;
     }
     video.srcObject = stream;
-    await new Promise(r => (video.readyState >= 1 ? r() : (video.onloadedmetadata = r)));
+    video.muted = true;
+    video.playsInline = true;
+    video.autoplay = true;
+
+    const syncDims = () => {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+    };
+    if (video.readyState >= 1) syncDims();
+    else video.onloadedmetadata = syncDims;
+
     try { await video.play(); } catch { /* autoplay muted is allowed */ }
-    canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+    syncDims();
 
     if (!pose) {
         pose = new window.Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${f}` });
@@ -379,7 +393,7 @@ function handleFrame(state) {
         lastPhase = state.phase;
         document.querySelectorAll('#phase-steps [data-phase]').forEach(n => n.classList.toggle('text-indigo-700', n.dataset.phase === state.phase));
     }
-    if (state.message) setFeedback(state.message.text, state.message.level);
+    if (state.message) setFeedback(state.message);
     $('accuracy-percent').textContent = state.valid ? Math.round(state.formScore) : 0;
     if (state.valid && state.metrics) {
         const v = state.metrics[current.cfg.primaryMetric];
@@ -394,10 +408,16 @@ const FEEDBACK_STYLE = {
 };
 let lastFeedback = '';
 function setFeedback(text, level = 'info') {
+    if (typeof text === 'object' && text !== null) {
+        level = text.level || level;
+        text = text.text || '';
+    }
+    if (typeof text !== 'string') text = String(text || '');
     const key = level + text;
     if (key === lastFeedback) return;             // avoid DOM churn at 30 fps
     lastFeedback = key;
     const box = $('feedback-box');
+    if (!box) return;
     box.className = `mt-3 p-3 rounded-2xl border text-xs font-semibold flex items-center gap-2 ${FEEDBACK_STYLE[level] || FEEDBACK_STYLE.info}`;
     box.setAttribute('role', 'status');
     box.textContent = text;
@@ -446,8 +466,12 @@ $('voice-toggle')?.addEventListener('change', e => {
 
 $('back-to-prescriptions')?.addEventListener('click', () => {
     if (!current) return backToDashboard();
-    if (!current.engine.reps.length) { stopCamera(); current = null; return backToDashboard(); }
-    if (confirm('End this session now? Completed repetitions are saved, but the exercise stays on your list.')) finishSession('stopped');
+    if (!current.engine || !current.engine.reps.length) {
+        stopCamera();
+        current = null;
+        return backToDashboard();
+    }
+    finishSession('stopped');
 });
 
 $('emergency-stop-btn')?.addEventListener('click', () => { if (current) finishSession('stopped', { emergency: true }); });
@@ -460,25 +484,34 @@ async function finishSession(status, { emergency = false } = {}) {
     const record = engine.buildRecord({ id: sessionId, status, prescription: rx, startedAt, endedAt: new Date() });
     if (emergency) record.emergencyStop = true;
 
+    // Immediately hide the live session view so UI transitions smoothly
+    show('exercise-session-view', false);
+
     let pointsEarned = 0;
     if (isDemo) {
         pointsEarned = status === 'completed' ? 10 : 0;
-        profile.points += pointsEarned; updatePointsUI(profile.points);
+        profile.points = (profile.points || 0) + pointsEarned;
+        updatePointsUI(profile.points);
         sessions.unshift({ ...record, feedback: null });
+        lastSaved = { record, pointsEarned, emergency };
+        showReport(record, pointsEarned, emergency);
     } else {
-        try {
-            ({ pointsEarned } = await saveWithRetry(record, rx));
-            if (pointsEarned) { profile.points = (profile.points || 0) + pointsEarned; profile.lastRewardedPrescription = rx.id; updatePointsUI(profile.points); }
-        } catch (e) {
+        lastSaved = { record, pointsEarned: 0, emergency };
+        showReport(record, 0, emergency);
+        saveWithRetry(record, rx).then(({ pointsEarned: pts }) => {
+            if (pts) {
+                profile.points = (profile.points || 0) + pts;
+                profile.lastRewardedPrescription = rx.id;
+                updatePointsUI(profile.points);
+                if (lastSaved) lastSaved.pointsEarned = pts;
+            }
+        }).catch(e => {
             console.error('Session save failed, queued for retry:', e);
             queuePending(record, rx);
             toast('Saved on this device. It will upload when you are back online.', 'info', 5000);
-        }
+        });
         if (emergency) raiseAlert(user.uid, 'emergency_stop', `Patient pressed STOP during ${engine.cfg.name}`, sessionId).catch(console.error);
     }
-    lastSaved = { record, pointsEarned, emergency };
-    show('exercise-session-view', false);
-    showReport(record, pointsEarned, emergency);
 }
 
 async function saveWithRetry(record, rx, attempts = 3) {
