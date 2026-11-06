@@ -247,7 +247,169 @@
                         </div>
                     </section>
 
-                    <!-- Recovery Trend Telemetry -->
+                    <!-- Kinematic Pose Telemetry Preview Card (Patient) -->
+                    <section id="section-pose-telemetry" class="glass-panel rounded-3xl shadow-glass overflow-hidden" data-purpose="pose-telemetry-preview" style="padding:0;">
+                      <!-- Header bar -->
+                      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1rem 0.6rem;">
+                        <div>
+                          <p style="font-size:0.6rem;color:#6366f1;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin:0 0 0.1rem;">Kinematic Pose Telemetry</p>
+                          <p style="font-size:0.65rem;font-weight:600;color:#1e293b;margin:0;">Live Spatial Landmark Sync</p>
+                        </div>
+                        <span style="display:inline-flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:999px;padding:0.2rem 0.6rem;font-size:0.6rem;font-weight:700;color:#059669;">
+                          <span style="width:5px;height:5px;border-radius:50%;background:#10b981;animation:kpp-pulse 1.4s ease-in-out infinite;display:inline-block;"></span>
+                          Active Sensor
+                        </span>
+                      </div>
+
+                      <!-- Status pills -->
+                      <div style="display:flex;justify-content:space-between;padding:0 1rem 0.5rem;font-size:0.55rem;">
+                        <span style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:999px;padding:0.15rem 0.5rem;color:#4f46e5;font-weight:600;">● Knee Flexion: 138°</span>
+                        <span style="background:white;border:1px solid rgba(0,0,0,0.08);border-radius:999px;padding:0.15rem 0.5rem;color:#475569;font-weight:600;">Joint Symmetry: 0.8° Dev</span>
+                      </div>
+
+                      <!-- Main SVG: light stick-figure skeleton -->
+                      <div style="background:linear-gradient(180deg,#f8faff 0%,#eef2ff 100%);padding:0.5rem 1rem 0;margin:0 0.75rem;border-radius:1rem;border:1px solid rgba(99,102,241,0.1);">
+                        <svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;max-width:260px;margin:0 auto;">
+                          <defs>
+                            <linearGradient id="kpp-bone" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stop-color="#00b4d8"/>
+                              <stop offset="100%" stop-color="#0d9488"/>
+                            </linearGradient>
+                            <filter id="kpp-glow">
+                              <feGaussianBlur stdDeviation="2" result="b"/>
+                              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                          </defs>
+
+                          <!-- Floor ellipse -->
+                          <ellipse cx="100" cy="210" rx="50" ry="6" fill="none" stroke="#06b6d4" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.4">
+                            <animateTransform attributeName="transform" type="rotate" from="0 100 210" to="360 100 210" dur="10s" repeatCount="indefinite"/>
+                          </ellipse>
+                          <ellipse cx="100" cy="210" rx="34" ry="4" fill="none" stroke="#06b6d4" stroke-width="0.5" opacity="0.25"/>
+
+                          <!-- HEAD -->
+                          <circle cx="100" cy="22" r="14" fill="none" stroke="url(#kpp-bone)" stroke-width="2.5" filter="url(#kpp-glow)" opacity="0.9"/>
+                          <!-- Neck -->
+                          <line x1="100" y1="36" x2="100" y2="52" stroke="url(#kpp-bone)" stroke-width="2" opacity="0.7"/>
+                          <!-- Shoulders crossbar -->
+                          <line x1="68" y1="56" x2="132" y2="56" stroke="url(#kpp-bone)" stroke-width="2" opacity="0.8"/>
+                          <!-- Torso -->
+                          <line x1="100" y1="56" x2="100" y2="108" stroke="url(#kpp-bone)" stroke-width="2.5" opacity="0.9"/>
+                          <!-- Hips crossbar -->
+                          <line x1="82" y1="108" x2="118" y2="108" stroke="url(#kpp-bone)" stroke-width="2" opacity="0.8"/>
+
+                          <!-- L upper arm -->
+                          <line x1="68" y1="56" x2="52" y2="90" stroke="url(#kpp-bone)" stroke-width="2" opacity="0.8"/>
+                          <!-- L lower arm -->
+                          <line x1="52" y1="90" x2="40" y2="118" stroke="url(#kpp-bone)" stroke-width="1.8" opacity="0.8"/>
+                          <!-- R upper arm -->
+                          <line x1="132" y1="56" x2="148" y2="90" stroke="url(#kpp-bone)" stroke-width="2" opacity="0.6"/>
+                          <!-- R lower arm -->
+                          <line x1="148" y1="90" x2="160" y2="118" stroke="url(#kpp-bone)" stroke-width="1.8" opacity="0.6"/>
+
+                          <!-- L thigh (active green) -->
+                          <line x1="82" y1="108" x2="78" y2="158" stroke="#22c55e" stroke-width="3" stroke-linecap="round" filter="url(#kpp-glow)" opacity="0.9"/>
+                          <!-- L shin (active green) -->
+                          <line x1="78" y1="158" x2="82" y2="205" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" filter="url(#kpp-glow)" opacity="0.85"/>
+
+                          <!-- R thigh -->
+                          <line x1="118" y1="108" x2="122" y2="158" stroke="url(#kpp-bone)" stroke-width="2.5" opacity="0.65"/>
+                          <!-- R shin -->
+                          <line x1="122" y1="158" x2="118" y2="205" stroke="url(#kpp-bone)" stroke-width="2" opacity="0.65"/>
+
+                          <!-- Joint dots -->
+                          <circle cx="68" cy="56" r="4" fill="white" stroke="url(#kpp-bone)" stroke-width="1.8" opacity="0.9"/>
+                          <circle cx="132" cy="56" r="4" fill="white" stroke="url(#kpp-bone)" stroke-width="1.8" opacity="0.9"/>
+                          <circle cx="52" cy="90" r="3.5" fill="white" stroke="url(#kpp-bone)" stroke-width="1.5" opacity="0.9"/>
+                          <circle cx="148" cy="90" r="3.5" fill="white" stroke="url(#kpp-bone)" stroke-width="1.5" opacity="0.9"/>
+                          <circle cx="40" cy="118" r="3" fill="white" stroke="url(#kpp-bone)" stroke-width="1.5" opacity="0.8"/>
+                          <circle cx="160" cy="118" r="3" fill="white" stroke="url(#kpp-bone)" stroke-width="1.5" opacity="0.8"/>
+                          <circle cx="82" cy="108" r="4" fill="white" stroke="url(#kpp-bone)" stroke-width="1.8" opacity="0.9"/>
+                          <circle cx="118" cy="108" r="4" fill="white" stroke="url(#kpp-bone)" stroke-width="1.8" opacity="0.9"/>
+                          <!-- R knee -->
+                          <circle cx="122" cy="158" r="4" fill="white" stroke="#06b6d4" stroke-width="1.8" opacity="0.8"/>
+                          <!-- R ankle -->
+                          <circle cx="118" cy="205" r="3" fill="white" stroke="#06b6d4" stroke-width="1.5" opacity="0.8"/>
+                          <!-- L ankle -->
+                          <circle cx="82" cy="205" r="3" fill="white" stroke="#22c55e" stroke-width="1.5" opacity="0.9"/>
+
+                          <!-- L knee: active with radar rings -->
+                          <circle cx="78" cy="158" r="8" fill="none" stroke="#22c55e" stroke-width="1" opacity="0.6">
+                            <animate attributeName="r" values="6;16;6" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite"/>
+                          </circle>
+                          <circle cx="78" cy="158" r="12" fill="none" stroke="#22c55e" stroke-width="0.7" opacity="0.35">
+                            <animate attributeName="r" values="10;22;10" dur="2s" begin="0.6s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.35;0;0.35" dur="2s" begin="0.6s" repeatCount="indefinite"/>
+                          </circle>
+                          <!-- Knee solid dot -->
+                          <circle cx="78" cy="158" r="5" fill="#22c55e" opacity="0.95" filter="url(#kpp-glow)">
+                            <animate attributeName="opacity" values="0.95;0.5;0.95" dur="1.4s" repeatCount="indefinite"/>
+                          </circle>
+
+                          <!-- Dashed angle arc -->
+                          <path d="M78 142 A16 16 0 0 1 94 158" fill="none" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="2.5 1.5" opacity="0.75"/>
+
+                          <!-- Callout bubble -->
+                          <line x1="78" y1="158" x2="38" y2="140" stroke="#22c55e" stroke-width="0.8" stroke-dasharray="2.5 1.5" opacity="0.6"/>
+                          <rect x="2" y="123" width="66" height="30" rx="8" fill="white" stroke="#22c55e" stroke-width="1.5" opacity="0.97"/>
+                          <text x="35" y="136" font-family="system-ui,sans-serif" font-size="6.5" fill="#059669" text-anchor="middle" font-weight="600">Knee Flexion</text>
+                          <text x="35" y="148" font-family="system-ui,sans-serif" font-size="10" fill="#16a34a" text-anchor="middle" font-weight="800">138° ROM</text>
+
+                          <!-- Bottom label -->
+                          <text x="100" y="218" font-family="system-ui,monospace" font-size="5.5" fill="#94a3b8" text-anchor="middle" letter-spacing="0.05em">SPATIAL: 33-PTS (X,Y,Z)</text>
+                        </svg>
+
+                        <!-- Waveform strip at bottom of card -->
+                        <svg viewBox="0 0 300 28" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;margin-top:-4px;">
+                          <defs>
+                            <linearGradient id="kpp-wv" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.3"/>
+                              <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          <path d="M0 20 Q15 20 25 16 Q40 12 55 8 Q70 4 80 7 Q90 10 100 14 Q115 18 130 16 Q145 14 160 10 Q175 6 185 8 Q195 10 210 14 Q225 18 240 16 Q255 14 270 12 Q285 10 300 14 L300 28 L0 28 Z"
+                                fill="url(#kpp-wv)"/>
+                          <path d="M0 20 Q15 20 25 16 Q40 12 55 8 Q70 4 80 7 Q90 10 100 14 Q115 18 130 16 Q145 14 160 10 Q175 6 185 8 Q195 10 210 14 Q225 18 240 16 Q255 14 270 12 Q285 10 300 14"
+                                fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+                          <!-- Moving beacon -->
+                          <circle cx="80" cy="7" r="3" fill="#22c55e" opacity="0.9">
+                            <animate attributeName="cx" values="80;160;80" dur="4s" repeatCount="indefinite"/>
+                            <animate attributeName="cy" values="7;10;7" dur="4s" repeatCount="indefinite"/>
+                          </circle>
+                        </svg>
+
+                        <!-- MediaPipe badge -->
+                        <div style="text-align:center;padding:0.3rem 0 0.5rem;">
+                          <span style="font-size:0.5rem;color:#475569;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15);padding:0.15rem 0.6rem;border-radius:999px;font-weight:600;">
+                            ● MediaPipe 33-Point 3D Skeleton · 60 FPS On-Device
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Bottom metrics -->
+                      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;padding:0.75rem 0.75rem 0.9rem;">
+                        <div style="text-align:center;">
+                          <p style="font-size:0.5rem;color:#94a3b8;margin:0 0 0.15rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Precision</p>
+                          <p style="font-size:0.9rem;font-weight:800;color:#4f46e5;margin:0;">98.4%</p>
+                          <p style="font-size:0.45rem;color:#94a3b8;margin:0;">Sub-millimeter</p>
+                        </div>
+                        <div style="text-align:center;border-left:1px solid rgba(0,0,0,0.06);border-right:1px solid rgba(0,0,0,0.06);">
+                          <p style="font-size:0.5rem;color:#94a3b8;margin:0 0 0.15rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Vision Latency</p>
+                          <p style="font-size:0.9rem;font-weight:800;color:#4f46e5;margin:0;">&lt;15ms</p>
+                          <p style="font-size:0.45rem;color:#94a3b8;margin:0;">Real-Time</p>
+                        </div>
+                        <div style="text-align:center;">
+                          <p style="font-size:0.5rem;color:#94a3b8;margin:0 0 0.15rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Privacy</p>
+                          <p style="font-size:0.9rem;font-weight:800;color:#e11d48;margin:0;">100%</p>
+                          <p style="font-size:0.45rem;color:#94a3b8;margin:0;">On-Device</p>
+                        </div>
+                      </div>
+
+                      <style>
+                        @keyframes kpp-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+                      </style>
+                    </section>
                     <section id="section-recovery" class="glass-panel rounded-3xl p-4 shadow-glass" data-purpose="recovery-chart">
                         <div class="flex items-center justify-between mb-2">
                             <div>
