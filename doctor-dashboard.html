@@ -79,6 +79,25 @@
             scrollbar-width: none;
         }
 
+        .modal-bounded {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        @media (min-height: 800px) {
+            .modal-bounded {
+                max-height: 90vh;
+            }
+        }
+        .laptop-roster-scroll {
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
+        }
+        @media (min-width: 1024px) {
+            .laptop-roster-scroll {
+                max-height: 440px;
+            }
+        }
+
         .glow-dot-green {
             box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), 0 0 2px #22c55e;
         }

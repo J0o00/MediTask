@@ -216,6 +216,7 @@
                     'auth/email-already-in-use': 'This email is already registered. Please sign in instead.',
                     'auth/invalid-email': 'Please enter a valid email address.',
                     'auth/weak-password': 'Password should be at least 8 characters.',
+                    'auth/unauthorized-domain': 'This domain is not authorized in Firebase Console. Please add your Vercel domain to Authorized Domains in Firebase Authentication Settings.',
                 };
                 showError(messages[err.code] || err.message.replace('Firebase: ', ''));
             }

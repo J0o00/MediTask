@@ -265,6 +265,7 @@
                     'auth/invalid-credential': 'The email or password is incorrect.',
                     'auth/too-many-requests': 'Too many attempts. Please wait a few moments and try again.',
                     'auth/network-request-failed': 'Network error. Please check your internet connection.',
+                    'auth/unauthorized-domain': 'This domain is not authorized in Firebase Console. Please add your Vercel domain to Authorized Domains in Firebase Authentication Settings.',
                 };
                 showError(messages[error.code] || 'The email or password is incorrect.');
             }
