@@ -188,11 +188,11 @@
         const refDoctorEmail = urlParams.get('doctor') || urlParams.get('doctorEmail');
         const refDoctorName = urlParams.get('doctorName') || refDoctorEmail;
 
-        if (refDoctorEmail) {
+        if (refDoctorEmail || refDoctorId) {
             selectedRole = 'patient';
             $('doctor-invite-name').textContent = refDoctorName ? `Dr. ${refDoctorName}` : 'your physiotherapist';
             $('doctor-invite-card')?.classList.remove('hidden');
-            $('signup-doctor-email').value = refDoctorEmail;
+            if (refDoctorEmail) $('signup-doctor-email').value = refDoctorEmail;
             $('roleToggleSection')?.classList.add('hidden'); // lock to patient since they were invited by clinician
             $('btn-text').textContent = "Join Physiotherapist & Start";
         }
