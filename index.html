@@ -126,31 +126,126 @@
                     </div>
 
                     <!-- Centerpiece Visual + Waveform -->
-                    <div class="relative w-full min-h-[240px] sm:h-64 rounded-xl bg-gradient-to-tr from-surface-container-high/60 via-surface-container-lowest to-surface-variant/50 overflow-hidden flex flex-col justify-between p-3 sm:p-4 border border-white/60">
+                    <div class="relative w-full min-h-[270px] sm:h-72 rounded-xl bg-gradient-to-tr from-slate-50 via-white to-teal-50/40 overflow-hidden flex flex-col justify-between p-3 sm:p-4 border border-white/80 shadow-inner">
                         <!-- Top Telemetry Row: Knee Flexion + Joint Symmetry -->
-                        <div class="relative z-10 flex flex-wrap items-center justify-between gap-2 w-full">
-                            <div class="px-2.5 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-sm flex items-center gap-1.5 border border-white/70">
+                        <div class="relative z-10 flex items-center justify-between gap-1.5 w-full">
+                            <div class="px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-xs flex items-center gap-1.5 border border-slate-200/80">
                                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span class="text-[10px] sm:text-xs font-bold text-on-surface">Knee Flexion: 138°</span>
+                                <span class="text-[10px] sm:text-xs font-bold text-slate-800 whitespace-nowrap">Knee Flexion: 138°</span>
                             </div>
 
-                            <div class="px-2.5 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-md flex items-center gap-1.5 border border-white/70">
-                                <span class="w-2 h-2 rounded-full bg-teal-400"></span>
-                                <span class="text-[10px] sm:text-xs font-bold text-on-surface">Joint Symmetry: 0.8° Dev</span>
+                            <div class="px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-xs flex items-center gap-1.5 border border-slate-200/80">
+                                <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+                                <span class="text-[10px] sm:text-xs font-bold text-slate-800 whitespace-nowrap">Joint Symmetry: 0.8° Dev</span>
                             </div>
                         </div>
 
-                        <!-- Center Graphic & Description -->
-                        <div class="relative z-10 flex flex-col items-center justify-center text-center my-auto py-3">
-                            <span class="material-symbols-outlined text-4xl sm:text-6xl text-primary/40 mb-1.5 sm:mb-2">accessibility_new</span>
-                            <span class="text-xs sm:text-sm font-bold text-slate-800">MediaPipe Computer Vision Skeleton</span>
-                            <span class="text-[10px] sm:text-xs text-slate-500 max-w-xs mt-1 leading-snug">Tracks 33 3D anatomical joints locally in browser at 60 FPS</span>
+                        <!-- Center Kinematic Pose Skeleton Visualization -->
+                        <div class="relative z-10 w-full flex-1 flex flex-col items-center justify-center my-1">
+                            <svg viewBox="0 0 340 185" class="w-full max-w-[280px] sm:max-w-[320px] h-36 sm:h-44 select-none" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <linearGradient id="boneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#0284c7"/>
+                                        <stop offset="50%" stop-color="#0d9488"/>
+                                        <stop offset="100%" stop-color="#10b981"/>
+                                    </linearGradient>
+                                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                                        <feGaussianBlur stdDeviation="2" result="blur" />
+                                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                    </filter>
+                                </defs>
+
+                                <!-- Spatial Ground Grid -->
+                                <ellipse cx="170" cy="172" rx="72" ry="10" fill="none" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>
+                                <ellipse cx="170" cy="172" rx="42" ry="6" fill="none" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="2 3" opacity="0.4"/>
+
+                                <!-- Spatial Coordinate HUD Watermarks -->
+                                <text x="12" y="174" fill="#94a3b8" font-size="8.5" font-family="monospace" letter-spacing="0.5">SPATIAL: 33-PTS (X,Y,Z)</text>
+                                <text x="242" y="174" fill="#94a3b8" font-size="8.5" font-family="monospace" letter-spacing="0.5">60 FPS SYNC</text>
+
+                                <!-- Cranium / Head Landmark -->
+                                <circle cx="170" cy="20" r="10" fill="#0d9488" fill-opacity="0.08" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="170" cy="20" r="3" fill="#0d9488"/>
+
+                                <!-- Clavicle / Neck -->
+                                <line x1="170" y1="30" x2="170" y2="38" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="144" y1="42" x2="196" y2="42" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+
+                                <!-- Left Arm -->
+                                <line x1="144" y1="42" x2="126" y2="66" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="126" y1="66" x2="116" y2="92" stroke="url(#boneGrad)" stroke-width="2.2" stroke-linecap="round"/>
+
+                                <!-- Right Arm -->
+                                <line x1="196" y1="42" x2="214" y2="66" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="214" y1="66" x2="224" y2="92" stroke="url(#boneGrad)" stroke-width="2.2" stroke-linecap="round"/>
+
+                                <!-- Torso / Spine -->
+                                <line x1="170" y1="38" x2="170" y2="84" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+
+                                <!-- Pelvis -->
+                                <line x1="152" y1="84" x2="188" y2="84" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+
+                                <!-- Right Leg (Neutral/Support) -->
+                                <line x1="188" y1="84" x2="190" y2="126" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="190" y1="126" x2="192" y2="168" stroke="url(#boneGrad)" stroke-width="2.5" stroke-linecap="round"/>
+                                <line x1="192" y1="168" x2="202" y2="171" stroke="url(#boneGrad)" stroke-width="2" stroke-linecap="round"/>
+
+                                <!-- Left Leg (Target Exercise Joint: Flexion) -->
+                                <line x1="152" y1="84" x2="132" y2="122" stroke="#10b981" stroke-width="3" stroke-linecap="round" filter="url(#glow)"/>
+                                <line x1="132" y1="122" x2="148" y2="164" stroke="#10b981" stroke-width="3" stroke-linecap="round" filter="url(#glow)"/>
+                                <line x1="148" y1="164" x2="158" y2="168" stroke="url(#boneGrad)" stroke-width="2" stroke-linecap="round"/>
+
+                                <!-- Angle Measurement HUD at Knee Joint -->
+                                <path d="M 140 106 A 20 20 0 0 1 138 140" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2"/>
+                                <!-- Angle Callout Tag -->
+                                <rect x="58" y="112" width="62" height="20" rx="10" fill="#ffffff" fill-opacity="0.95" stroke="#10b981" stroke-width="1.2"/>
+                                <text x="89" y="126" fill="#0f766e" font-size="10" font-weight="700" font-family="'Plus Jakarta Sans', sans-serif" text-anchor="middle">138° ROM</text>
+                                <line x1="120" y1="122" x2="130" y2="122" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2"/>
+
+                                <!-- Target Joint Pulse Reticle -->
+                                <circle cx="132" cy="122" r="8" fill="none" stroke="#10b981" stroke-width="1.5" opacity="0.6">
+                                    <animate attributeName="r" values="6;12;6" dur="2.4s" repeatCount="indefinite"/>
+                                    <animate attributeName="opacity" values="0.8;0.1;0.8" dur="2.4s" repeatCount="indefinite"/>
+                                </circle>
+                                <circle cx="132" cy="122" r="4.5" fill="#10b981"/>
+
+                                <!-- Anatomical Landmarks (Joint Dots) -->
+                                <circle cx="144" cy="42" r="3.2" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="196" cy="42" r="3.2" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="126" cy="66" r="3" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="214" cy="66" r="3" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="116" cy="92" r="2.8" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="224" cy="92" r="2.8" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="152" cy="84" r="3.2" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="188" cy="84" r="3.2" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="190" cy="126" r="3" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="192" cy="168" r="3" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                                <circle cx="148" cy="164" r="3" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+                            </svg>
+
+                            <!-- Subtitle Telemetry Pill -->
+                            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container/70 backdrop-blur-sm border border-white/70 shadow-2xs mt-0.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                <span class="text-[10px] sm:text-[11px] font-semibold text-slate-700">MediaPipe 33-Point 3D Skeleton · 60 FPS On-Device</span>
+                            </div>
                         </div>
 
-                        <!-- Sine Wave Overlay -->
-                        <div class="absolute inset-x-0 bottom-0 h-16 pointer-events-none opacity-30">
-                            <svg viewBox="0 0 400 60" preserveAspectRatio="none" class="w-full h-full text-primary fill-none stroke-current">
-                                <path d="M0,45 Q50,20 100,35 T200,15 T300,40 T400,22" stroke-width="3" stroke-linecap="round"></path>
+                        <!-- Dedicated Kinematic Velocity Waveform (Fitted cleanly at base, no text intersection) -->
+                        <div class="relative w-full h-7 overflow-hidden rounded-b-lg pointer-events-none mt-1">
+                            <svg viewBox="0 0 360 28" preserveAspectRatio="none" class="w-full h-full">
+                                <defs>
+                                    <linearGradient id="waveFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#0d9488" stop-opacity="0.2"/>
+                                        <stop offset="100%" stop-color="#0d9488" stop-opacity="0"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M0,20 Q30,12 60,18 T120,8 T180,22 T240,10 T300,16 T360,12 L360,28 L0,28 Z" fill="url(#waveFill)"/>
+                                <path d="M0,20 Q30,12 60,18 T120,8 T180,22 T240,10 T300,16 T360,12" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+                                <circle cx="240" cy="10" r="3" fill="#10b981"/>
+                                <circle cx="240" cy="10" r="6" fill="none" stroke="#10b981" opacity="0.5">
+                                    <animate attributeName="r" values="3;8;3" dur="1.8s" repeatCount="indefinite"/>
+                                    <animate attributeName="opacity" values="0.7;0;0.7" dur="1.8s" repeatCount="indefinite"/>
+                                </circle>
                             </svg>
                         </div>
                     </div>

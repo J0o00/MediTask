@@ -184,6 +184,7 @@
 
         // Check for Doctor Onboarding Referral in URL parameters
         const urlParams = new URLSearchParams(window.location.search);
+        const refDoctorId = urlParams.get('doctorId');
         const refDoctorEmail = urlParams.get('doctor') || urlParams.get('doctorEmail');
         const refDoctorName = urlParams.get('doctorName') || refDoctorEmail;
 
@@ -250,7 +251,7 @@
                 if (doctorPref) {
                     localStorage.setItem('preferred_doctor_email', doctorPref);
                 }
-                await signUp(email, password, selectedRole, name);
+                await signUp(email, password, selectedRole, name, (selectedRole === 'patient' && refDoctorId) ? refDoctorId : null);
                 window.location.replace(selectedRole === 'doctor' ? './doctor-dashboard.html' : './patient-dashboard.html');
             } catch (err) {
                 console.error('Sign up error:', err);

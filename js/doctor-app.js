@@ -78,6 +78,11 @@ function makeDemo() {
     setupNavigation();
     setupModals();
     await refreshPatients();
+
+    // Auto-refresh roster every 25 seconds to seamlessly detect newly onboarded patients
+    setInterval(async () => {
+        try { await refreshPatients(); } catch (e) { /* ignore background poll errors */ }
+    }, 25000);
 })();
 
 // ------------------------------------------------------------------ data access (real or demo)
@@ -586,6 +591,11 @@ function bindClose(modal, ...ids) { ids.forEach(id => $(id)?.addEventListener('c
 
 function setupModals() {
     $('patient-search').addEventListener('input', renderPatientList);
+    $('refresh-roster-btn')?.addEventListener('click', async () => {
+        toast('Refreshing patient roster...', 'info');
+        await refreshPatients();
+        toast('Roster updated', 'success');
+    });
 
     // Create patient account
     $('add-patient-btn').addEventListener('click', () => { $('add-patient-form').reset(); show('add-patient-error', false); show('add-patient-modal', true); });
@@ -608,12 +618,13 @@ function setupModals() {
         } finally { btn.disabled = false; }
     });
 
-    // Helper to generate unique clinic invite link
+    // Helper to generate unique clinic invite link with Doctor UID
     function getClinicInviteUrl() {
+        const docId = user?.uid || profile?.uid || 'demo-doctor';
         const email = user?.email || profile?.email || 'doctor@example.com';
         const name = profile?.displayName || 'Physiotherapist';
         const base = window.location.href.split('doctor-dashboard.html')[0];
-        return `${base}signup.html?doctor=${encodeURIComponent(email)}&doctorName=${encodeURIComponent(name)}`;
+        return `${base}signup.html?doctorId=${encodeURIComponent(docId)}&doctor=${encodeURIComponent(email)}&doctorName=${encodeURIComponent(name)}`;
     }
 
     function copyClinicUrl() {

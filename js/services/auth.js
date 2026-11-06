@@ -81,7 +81,7 @@ export async function logout() {
 }
 
 /** Self sign-up. Profile shape must satisfy the `users` create rule. */
-export async function signUp(email, password, role, displayName = '') {
+export async function signUp(email, password, role, displayName = '', doctorId = null) {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     const profile = {
         uid: cred.user.uid,
@@ -89,7 +89,7 @@ export async function signUp(email, password, role, displayName = '') {
         role,
         displayName: displayName || cred.user.email.split('@')[0],
         createdAt: serverTimestamp(),
-        doctorId: null,
+        doctorId: (role === 'patient' && doctorId) ? doctorId : null,
         consent: null,
     };
     if (role === 'patient') profile.points = 0;

@@ -76,7 +76,11 @@ service cloud.firestore {
                     && request.resource.data.role in ['patient', 'doctor']
                     && request.resource.data.email == myEmail()
                     && request.resource.data.get('points', 0) == 0
-                    && request.resource.data.get('doctorId', null) == null
+                    && (request.resource.data.get('doctorId', null) == null
+                        || (request.resource.data.role == 'patient'
+                            && request.resource.data.doctorId is string
+                            && exists(userPath(request.resource.data.doctorId))
+                            && get(userPath(request.resource.data.doctorId)).data.role == 'doctor'))
                  // ... or a doctor creating a patient account they will own.
                  || (isDoctor()
                     && request.resource.data.role == 'patient'
