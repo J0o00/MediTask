@@ -107,7 +107,13 @@
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>Patient Demo Mode</span>
             </span>
-            <a href="./login.html" class="underline text-indigo-950 font-bold hover:text-indigo-700">Sign in with Account</a>
+            <div class="flex items-center gap-2">
+                <a href="./signup.html" class="px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-xs text-[11px] flex items-center gap-1">
+                    <i class="w-3 h-3" data-lucide="user-plus"></i>
+                    <span>Sign Up Free</span>
+                </a>
+                <a href="./login.html" class="underline text-indigo-950 font-semibold hover:text-indigo-700 text-[11px]">Sign In</a>
+            </div>
         </div>
 
         <!-- TopBar Header -->
@@ -134,16 +140,22 @@
                     <span><b id="user-points">0</b> <span class="text-slate-400 font-normal">pts (₹<span id="user-currency">0.00</span>)</span></span>
                 </div>
 
+                <!-- Sign Up Button in Header (visible in demo mode / guests) -->
+                <a href="./signup.html" id="header-signup-btn" class="hidden py-1.5 px-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition items-center gap-1.5">
+                    <i class="w-3.5 h-3.5" data-lucide="user-plus"></i>
+                    <span>Sign Up</span>
+                </a>
+
                 <!-- Notification / Chat -->
                 <button id="chat-toggle-btn" aria-label="Messages" class="relative w-9 h-9 glass-chip rounded-full flex items-center justify-center text-slate-700 active:scale-95 transition-transform" title="Messages">
                     <i class="w-4 h-4" data-lucide="message-square"></i>
                     <span id="chat-unread-dot" class="hidden absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white"></span>
                 </button>
 
-                <!-- User Avatar -->
-                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-sky-300 p-0.5 shadow-sm">
+                <!-- User Avatar (links to profile or signup if demo) -->
+                <a href="./signup.html" id="avatar-link" title="Create Account / Profile" class="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-sky-300 p-0.5 shadow-sm hover:scale-105 transition-transform cursor-pointer">
                     <div id="user-avatar" class="w-full h-full rounded-full bg-white/80 backdrop-blur flex items-center justify-center font-bold text-xs text-indigo-700"></div>
-                </div>
+                </a>
 
                 <!-- Sign Out -->
                 <button id="logout-btn" aria-label="Sign out" class="w-9 h-9 glass-chip rounded-full flex items-center justify-center text-rose-500 hover:text-rose-600 active:scale-95 transition" title="Sign out">

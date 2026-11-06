@@ -64,6 +64,11 @@ function makeDemo() {
         user = { uid: 'demo-doctor' };
         profile = { uid: 'demo-doctor', role: 'doctor', displayName: 'Demo physiotherapist', email: 'demo.physio@example.com' };
         show('demo-banner', true);
+        const docSignup = $('doc-signup-btn');
+        if (docSignup) {
+            docSignup.classList.remove('hidden');
+            docSignup.classList.add('flex');
+        }
     }
     const name = profile.displayName || profile.email.split('@')[0];
     $('doctor-line').textContent = name;

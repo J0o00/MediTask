@@ -74,6 +74,12 @@ function activateDemo() {
     profile = { uid: 'demo-patient', email: 'demo.patient@example.com', displayName: 'Demo patient', role: 'patient', points: 20, doctorId: 'demo-doctor', consent: { camera: true } };
     doctorName = 'the demo physiotherapist';
     show('demo-banner', true);
+    const signupBtn = $('header-signup-btn');
+    if (signupBtn) {
+        signupBtn.classList.remove('hidden');
+        signupBtn.classList.add('flex');
+    }
+    if (window.lucide) lucide.createIcons();
 }
 
 function renderHeader() {
