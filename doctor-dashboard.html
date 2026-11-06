@@ -359,6 +359,22 @@
                             <p id="rom-empty" class="hidden text-[10px] text-stone-500 text-center pt-1">No sessions recorded yet for this patient.</p>
                         </div>
 
+                        <!-- Assigned Workouts / Prescriptions for Selected Patient -->
+                        <div class="lumis-glass-subtle rounded-2xl p-3 mb-3 relative z-10 border border-stone-200/80" data-purpose="patient-prescriptions-summary">
+                            <div class="flex items-center justify-between mb-2">
+                                <div>
+                                    <p class="text-xs font-semibold text-charcoal">Assigned Workouts</p>
+                                    <p class="text-[10px] text-slate-light">Active exercise prescriptions</p>
+                                </div>
+                                <button id="card-prescribe-btn" type="button" class="px-2.5 py-1 rounded-full lumis-glass text-[10px] font-semibold text-charcoal hover:bg-white border border-stone-200 active:scale-95 transition flex items-center gap-1">
+                                    <span>+ Assign Routine</span>
+                                </button>
+                            </div>
+                            <div id="patient-card-rx-list" class="space-y-1.5">
+                                <p class="text-[10px] text-stone-500 text-center py-2">No active workouts assigned yet.</p>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons inside Patient Card -->
                         <div class="grid grid-cols-2 gap-2">
                             <button id="open-chat-btn" class="py-2.5 px-3 rounded-xl lumis-glass text-xs font-medium text-charcoal flex items-center justify-center gap-1.5 hover:bg-white active:scale-98 transition border border-stone-200">

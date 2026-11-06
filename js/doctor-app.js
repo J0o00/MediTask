@@ -470,20 +470,47 @@ function sessionCard(s) {
 // ------------------------------------------------------------------ prescriptions
 function renderPrescriptions() {
     const list = $('rx-list');
-    if (!selected.prescriptions.length) { list.replaceChildren(card('No active prescriptions. Use “New routine” to assign one.')); return; }
-    list.replaceChildren(...selected.prescriptions.map(rx => {
-        const done = selected.sessions.filter(s => s.prescriptionId === rx.id && s.status === 'completed').length;
-        const btn = (label, onclick, cls = 'bg-stone-200/80 text-stone-700 hover:bg-stone-300') =>
-            el('button', { type: 'button', class: `px-2.5 py-1 rounded-full text-[10px] font-medium active:scale-95 transition ${cls}`, onclick }, label);
-        return el('div', { class: 'lumis-glass rounded-2xl p-3.5 flex items-center justify-between gap-3 border border-stone-200' },
-            el('div', { class: 'space-y-1 min-w-0' },
-                el('h4', { class: 'text-xs font-semibold text-charcoal' }, rx.exercise),
-                el('p', { class: 'text-[11px] text-slate-light' }, `${rx.sets} sets × ${rx.reps} reps • assigned ${fmtDate(rx.assignedAt)} • completed ${done}×`),
-                rx.notes ? el('p', { class: 'text-[10px] text-stone-600 italic' }, `“${rx.notes}”`) : null),
-            el('div', { class: 'flex flex-col gap-1 shrink-0' },
-                btn('Edit', () => openPrescribe(rx)),
-                btn('Stop', () => stopPrescription(rx), 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100')));
-    }));
+    const cardList = $('patient-card-rx-list');
+
+    if (!selected || !selected.prescriptions.length) {
+        if (list) list.replaceChildren(card('No active prescriptions. Use “New routine” to assign one.'));
+        if (cardList) cardList.replaceChildren(el('p', { class: 'text-[10px] text-stone-500 text-center py-2' }, 'No active workouts assigned yet.'));
+        return;
+    }
+
+    const btn = (label, onclick, cls = 'bg-stone-200/80 text-stone-700 hover:bg-stone-300') =>
+        el('button', { type: 'button', class: `px-2.5 py-1 rounded-full text-[10px] font-medium active:scale-95 transition ${cls}`, onclick }, label);
+
+    // Full view for Protocols tab
+    if (list) {
+        list.replaceChildren(...selected.prescriptions.map(rx => {
+            const done = selected.sessions.filter(s => s.prescriptionId === rx.id && s.status === 'completed').length;
+            return el('div', { class: 'lumis-glass rounded-2xl p-3.5 flex items-center justify-between gap-3 border border-stone-200' },
+                el('div', { class: 'space-y-1 min-w-0' },
+                    el('h4', { class: 'text-xs font-semibold text-charcoal' }, rx.exercise || rx.exerciseName || rx.exerciseId),
+                    el('p', { class: 'text-[11px] text-slate-light' }, `${rx.sets} sets × ${rx.reps} reps • assigned ${fmtDate(rx.assignedAt)} • completed ${done}×`),
+                    rx.notes ? el('p', { class: 'text-[10px] text-stone-600 italic' }, `“${rx.notes}”`) : null),
+                el('div', { class: 'flex flex-col gap-1 shrink-0' },
+                    btn('Edit', () => openPrescribe(rx)),
+                    btn('Stop', () => stopPrescription(rx), 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100')));
+        }));
+    }
+
+    // Compact view inside the main Patient Card (Tab 1)
+    if (cardList) {
+        cardList.replaceChildren(...selected.prescriptions.map(rx => {
+            const exName = rx.exercise || rx.exerciseName || rx.exerciseId;
+            return el('div', { class: 'lumis-glass rounded-xl p-2.5 flex items-center justify-between gap-2 border border-stone-200/70 hover:bg-white/90 transition' },
+                el('div', { class: 'min-w-0' },
+                    el('div', { class: 'flex items-center gap-1.5' },
+                        el('span', { class: 'w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0' }),
+                        el('h4', { class: 'text-xs font-semibold text-charcoal truncate' }, exName)),
+                    el('p', { class: 'text-[10px] text-slate-light mt-0.5' }, `${rx.sets} sets × ${rx.reps} reps${rx.notes ? ` • ${rx.notes}` : ''}`)),
+                el('div', { class: 'flex items-center gap-1 shrink-0' },
+                    btn('Edit', () => openPrescribe(rx), 'px-2 py-0.5 text-[9px] bg-stone-100 text-stone-600 hover:bg-stone-200'),
+                    btn('✕', () => stopPrescription(rx), 'px-1.5 py-0.5 text-[9px] bg-rose-50 text-rose-600 hover:bg-rose-100')));
+        }));
+    }
 }
 
 async function stopPrescription(rx) {
@@ -692,8 +719,9 @@ function setupModals() {
     });
 
     // Prescribe / edit
-    $('open-prescribe-modal-btn').addEventListener('click', () => openPrescribe());
-    $('prescribe-tab-add-btn').addEventListener('click', () => openPrescribe());
+    $('open-prescribe-modal-btn')?.addEventListener('click', () => openPrescribe());
+    $('prescribe-tab-add-btn')?.addEventListener('click', () => openPrescribe());
+    $('card-prescribe-btn')?.addEventListener('click', () => openPrescribe());
     bindClose('prescribe-modal', 'close-prescribe-modal-btn', 'close-prescribe-modal-btn-2');
     $('prescription-form').addEventListener('submit', async (e) => {
         e.preventDefault();

@@ -97,9 +97,16 @@ export async function updatePrescription(patientId, rxId, fields) {
 }
 
 export async function getPrescriptions(patientId, status = 'active') {
-    const q = query(sub(patientId, 'prescriptions'), where("status", "==", status), orderBy("assignedAt", "desc"));
+    // Avoid compound query requiring custom Firestore composite index
+    const q = query(sub(patientId, 'prescriptions'), where("status", "==", status));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+            const ta = a.assignedAt?.toMillis ? a.assignedAt.toMillis() : new Date(a.assignedAt || 0).getTime();
+            const tb = b.assignedAt?.toMillis ? b.assignedAt.toMillis() : new Date(b.assignedAt || 0).getTime();
+            return tb - ta;
+        });
 }
 
 // ------------------------------------------------------------------ sessions
