@@ -112,7 +112,7 @@ async function renderLinkSection() {
     const box = $('link-section');
     box.replaceChildren();
     if (isDemo) {
-        $('physio-line').textContent = 'This is a demo with sample data. Sign in to see your own programme.';
+        $('physio-line').textContent = 'This is a demo with sample data. Sign in to connect with your own physiotherapist.';
         show(box, false);
         return;
     }
@@ -121,22 +121,80 @@ async function renderLinkSection() {
 
     for (const r of requests) {
         const reassign = profile.doctorId && profile.doctorId !== r.doctorId;
-        box.appendChild(el('div', { class: 'glass-panel rounded-2xl p-3.5 shadow-glass flex items-start gap-3' },
-            el('div', { class: 'w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 font-bold text-xs' }, initials(r.doctorName || r.doctorEmail)),
-            el('div', { class: 'flex-1 text-xs leading-relaxed text-slate-700' },
-                el('p', { class: 'font-semibold text-slate-900 mb-0.5' }, `${r.doctorName || r.doctorEmail} has invited you to join their care`),
-                reassign ? 'Accepting replaces your current physiotherapist. They will see your session results and messages.'
-                    : 'Accepting lets them prescribe exercises and see your session results and messages.'),
-            el('div', { class: 'flex flex-col gap-1.5 shrink-0' },
-                el('button', { class: 'px-3 py-1 rounded-xl bg-indigo-600 text-white font-semibold text-xs', type: 'button', onclick: () => respond(r, true) }, 'Accept'),
-                el('button', { class: 'px-3 py-1 rounded-xl glass-chip text-xs text-slate-700', type: 'button', onclick: () => respond(r, false) }, 'Decline'))));
+        box.appendChild(el('div', { class: 'glass-panel rounded-3xl p-4 shadow-glass flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-indigo-200' },
+            el('div', { class: 'flex items-center gap-3' },
+                el('div', { class: 'w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-md' }, initials(r.doctorName || r.doctorEmail)),
+                el('div', { class: 'text-xs leading-relaxed text-slate-700' },
+                    el('p', { class: 'font-bold text-slate-900 text-sm' }, `Dr. ${r.doctorName || r.doctorEmail}`),
+                    el('p', { class: 'text-slate-500 text-[11px]' }, reassign ? 'Invited you to transfer care. Accepting replaces your current doctor.' : 'Invited you to connect for clinical tele-rehabilitation.'))),
+            el('div', { class: 'flex items-center gap-2 w-full sm:w-auto' },
+                el('button', { class: 'flex-1 sm:flex-none px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition', type: 'button', onclick: () => respond(r, true) }, 'Accept Doctor'),
+                el('button', { class: 'px-3 py-2 rounded-2xl glass-chip hover:bg-white text-xs text-slate-600 font-semibold transition', type: 'button', onclick: () => respond(r, false) }, 'Decline'))));
     }
+
     if (!profile.doctorId) {
-        box.appendChild(el('div', { class: 'glass-panel rounded-2xl p-3.5 shadow-glass flex items-start gap-3 border-amber-200/50' },
-            el('div', { class: 'w-8 h-8 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 font-bold' }, '!'),
-            el('div', { class: 'flex-1 text-xs leading-relaxed text-slate-700' },
-                el('p', { class: 'font-semibold text-slate-900 mb-0.5' }, 'Not linked to a physiotherapist yet'),
-                'Ask your physiotherapist to send an invitation to ', el('b', {}, profile.email), '.')));
+        const preferredDr = localStorage.getItem('preferred_doctor_email') || '';
+        const shareMsg = `Hi Doctor, I registered on MediTask for tele-rehabilitation monitoring. My patient email is: ${profile.email}. Please add me to your care roster.`;
+
+        const connectCard = el('div', { class: 'glass-panel rounded-3xl p-4 shadow-glass space-y-3 border-amber-200/80 bg-gradient-to-br from-amber-50/40 via-white/50 to-indigo-50/40' },
+            el('div', { class: 'flex items-start justify-between gap-2' },
+                el('div', { class: 'flex items-center gap-2.5' },
+                    el('div', { class: 'w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base shrink-0 shadow-sm' }, '🩺'),
+                    el('div', {},
+                        el('h3', { class: 'text-xs font-bold text-slate-900 uppercase tracking-wider' }, 'Connect with your Physiotherapist'),
+                        el('p', { class: 'text-[11px] text-slate-500' }, 'Your doctor customizes your movement protocols and tracks your recovery.'))),
+                el('span', { class: 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0' }, 'Action Needed')),
+            
+            el('div', { class: 'p-3 rounded-2xl bg-white/70 border border-white space-y-2' },
+                el('div', { class: 'flex items-center justify-between' },
+                    el('span', { class: 'text-[11px] font-semibold text-slate-700' }, 'Your Patient Email:'),
+                    el('span', { class: 'text-[10px] text-slate-500' }, 'Share with your doctor')),
+                el('div', { class: 'flex items-center gap-2' },
+                    el('input', { type: 'text', readonly: true, value: profile.email, class: 'flex-1 py-1.5 px-3 rounded-xl bg-slate-100 text-xs text-slate-800 font-mono border-0 outline-none select-all' }),
+                    el('button', {
+                        type: 'button',
+                        class: 'px-3 py-1.5 rounded-xl bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs border border-slate-200 transition',
+                        onclick: () => {
+                            navigator.clipboard?.writeText(profile.email);
+                            toast('Patient email copied to clipboard! Share it with your doctor.', 'success');
+                        }
+                    }, 'Copy'),
+                    el('a', {
+                        href: `https://wa.me/?text=${encodeURIComponent(shareMsg)}`,
+                        target: '_blank',
+                        class: 'p-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-xs transition',
+                        title: 'Share via WhatsApp'
+                    }, el('span', { class: 'text-xs px-1 font-bold' }, 'WhatsApp')))),
+
+            el('div', { class: 'pt-1 flex flex-col sm:flex-row items-center gap-2' },
+                el('input', {
+                    id: 'dr-lookup-input',
+                    type: 'email',
+                    placeholder: 'Enter doctor\'s email (e.g. doctor@clinic.com)',
+                    value: preferredDr,
+                    class: 'w-full sm:flex-1 py-2 px-3 rounded-xl bg-white/80 text-xs text-slate-800 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+                }),
+                el('button', {
+                    id: 'dr-lookup-btn',
+                    type: 'button',
+                    class: 'w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition shrink-0',
+                    onclick: async () => {
+                        const drEmail = ($('dr-lookup-input')?.value || '').trim().toLowerCase();
+                        if (!drEmail) { toast('Please enter your doctor\'s email address.', 'error'); return; }
+                        localStorage.setItem('preferred_doctor_email', drEmail);
+                        toast('Checking for incoming invitations from your doctor...', 'info');
+                        await renderLinkSection();
+                        const updatedRequests = await getMyPendingLinkRequests(profile.email);
+                        if (updatedRequests.some(r => r.doctorEmail?.toLowerCase() === drEmail)) {
+                            toast('Invitation found! Click Accept to connect.', 'success');
+                        } else {
+                            toast(`No pending invitation from ${drEmail} yet. Ask your doctor to invite ${profile.email}.`, 'info', 6000);
+                        }
+                    }
+                }, 'Check for Invite'))
+        );
+
+        box.appendChild(connectCard);
         $('physio-line').textContent = 'Once your physiotherapist links your account, your prescribed exercises appear here.';
     } else {
         try {

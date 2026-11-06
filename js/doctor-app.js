@@ -608,12 +608,64 @@ function setupModals() {
         } finally { btn.disabled = false; }
     });
 
+    // Helper to generate unique clinic invite link
+    function getClinicInviteUrl() {
+        const email = user?.email || profile?.email || 'doctor@example.com';
+        const name = profile?.displayName || 'Physiotherapist';
+        const base = window.location.href.split('doctor-dashboard.html')[0];
+        return `${base}signup.html?doctor=${encodeURIComponent(email)}&doctorName=${encodeURIComponent(name)}`;
+    }
+
+    function copyClinicUrl() {
+        const url = getClinicInviteUrl();
+        navigator.clipboard?.writeText(url).then(() => {
+            toast('Clinic onboarding link copied! Send it to your patient.', 'success');
+        }).catch(() => {
+            const el = $('clinic-share-url');
+            if (el) { el.select(); document.execCommand('copy'); toast('Link copied!', 'success'); }
+        });
+    }
+
+    function shareClinicUrl() {
+        const url = getClinicInviteUrl();
+        const drName = profile?.displayName || 'Your Physiotherapist';
+        if (navigator.share) {
+            navigator.share({
+                title: `Join ${drName} on MediTask`,
+                text: `Hi! Sign up on MediTask using my clinic link so I can monitor your physical rehabilitation exercises:`,
+                url: url
+            }).catch(() => copyClinicUrl());
+        } else {
+            copyClinicUrl();
+        }
+    }
+
+    // Share Clinic Link button in header
+    $('share-clinic-link-btn')?.addEventListener('click', () => {
+        const url = getClinicInviteUrl();
+        if ($('clinic-share-url')) $('clinic-share-url').value = url;
+        show('link-patient-error', false);
+        show('link-patient-modal', true);
+    });
+
+    $('copy-clinic-url-btn')?.addEventListener('click', copyClinicUrl);
+    $('native-share-btn')?.addEventListener('click', shareClinicUrl);
+
     // Invite an existing patient
-    $('link-patient-btn').addEventListener('click', () => { $('link-patient-form').reset(); show('link-patient-error', false); show('link-patient-modal', true); });
+    $('link-patient-btn').addEventListener('click', () => {
+        $('link-patient-form').reset();
+        if ($('clinic-share-url')) $('clinic-share-url').value = getClinicInviteUrl();
+        show('link-patient-error', false);
+        show('link-patient-modal', true);
+    });
     bindClose('link-patient-modal', 'cancel-link-patient-btn', 'cancel-link-patient-btn-2');
     $('link-patient-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = $('link-patient-email').value.trim().toLowerCase();
+        if (!email) {
+            copyClinicUrl();
+            return;
+        }
         try {
             if (patients.some(p => p.email === email)) throw new Error('This patient is already on your roster.');
             if (pendingLinks.some(r => r.patientEmail === email)) throw new Error('An invitation to this email is already pending.');
